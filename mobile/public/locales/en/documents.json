@@ -1,0 +1,25 @@
+{
+    "title": "Documents",
+    "list": {
+        "empty": "No document",
+        "search-placeholder": "Search a document..."
+    },
+    "types": {
+        "product": "Product",
+        "thirdparty": "Third party",
+        "project": "Project",
+        "intervention": "Intervention",
+        "category": "Category"
+    },
+    "actions": {
+        "upload": "Upload",
+        "download": "Download",
+        "share-via-bundle": "Download as ZIP"
+    },
+    "toasts": {
+        "upload-success": "Document uploaded",
+        "attach-success": "Document attached",
+        "attach-error": "Failed to attach document",
+        "download-error": "Failed to download document"
+    }
+}

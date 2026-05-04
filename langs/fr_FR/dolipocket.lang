@@ -1,0 +1,114 @@
+# Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleDolipocketName'
+ModuleDolipocketName = Dolipocket
+# Module description 'ModuleDolipocketDesc'
+ModuleDolipocketDesc = Dolibarr SaaS multi-tenant - site public, inscription OTP, PWA
+
+#
+# Admin page
+#
+DolipocketSetup = Configuration de Dolipocket
+Settings = Paramètres
+DolipocketSetupPage = Page de configuration de Dolipocket
+DOLIPOCKET_MYPARAM1 = Mon paramètre 1
+DOLIPOCKET_MYPARAM1Tooltip = Info-bulle du paramètre 1
+DOLIPOCKET_MYPARAM2=Mon paramètre 2
+DOLIPOCKET_MYPARAM2Tooltip=Info-bulle du paramètre 2
+DOLIPOCKET_HOME_MENU_ITEMS = Menu PWA - éléments autorisés
+DOLIPOCKET_HOME_MENU_ITEMSHelp = Liste séparée par des virgules d'identifiants d'éléments de menu à exposer dans la PWA (ex. home,thirdparties,contacts,proposals,invoices). Laisser vide pour exposer automatiquement tous les éléments accessibles selon les droits Dolibarr de l'utilisateur. Identifiants disponibles : home, thirdparties, contacts, proposals, orders, invoices, supplier-orders, supplier-invoices, products, warehouses, stock, agenda, documents.
+
+#
+# Sections et éléments du menu de la PWA
+#
+DolipocketMenuMain = Principal
+DolipocketMenuRelations = Relations
+DolipocketMenuSales = Vente
+DolipocketMenuPurchase = Achat
+DolipocketMenuCatalog = Catalogue
+DolipocketMenuTransverse = Transverse
+DolipocketMenuHome = Tableau de bord
+DolipocketMenuThirdparties = Tiers
+DolipocketMenuContacts = Contacts
+DolipocketMenuProposals = Devis
+DolipocketMenuOrders = Commandes
+DolipocketMenuInvoices = Factures
+DolipocketMenuSupplierOrders = Cdes fournisseur
+DolipocketMenuSupplierInvoices = Fact. fournisseur
+DolipocketMenuProducts = Produits
+DolipocketMenuWarehouses = Entrepôts
+DolipocketMenuStock = Stock
+DolipocketMenuAgenda = Agenda
+DolipocketMenuDocuments = Documents
+
+#
+# Extrafields admin page (used by admin/smartmaker.php at runtime)
+#
+Visible = Visible
+Editable = Modifiable
+Extrafield = Champ supplémentaire
+Extrafields = Champs supplémentaires
+NoExtrafieldsFound = Aucun champ supplémentaire trouvé
+
+#
+# About page
+#
+About = À propos
+DolipocketAbout = À propos de Dolipocket
+DolipocketAboutPage = Page À propos de Dolipocket
+DolipocketDoYouLikeModule = Vous appréciez Dolipocket ?
+DolipocketFeedbackIntro = Faites-nous part de vos retours, suggestions, ou bugs rencontrés afin de nous aider à améliorer Dolipocket.
+DolipocketYourRating = Votre note
+DolipocketYourFeedback = Votre avis
+DolipocketYourEmail = Votre email
+DolipocketFeedbackPlaceholder = Dites-nous ce que vous aimez, ce qui pourrait être amélioré...
+DolipocketSendFeedback = Envoyer mon avis
+DolipocketFeedbackSent = Merci pour votre retour !
+DolipocketFeedbackSendError = Erreur lors de l'envoi du retour
+DolipocketFeedbackButton = Envoyer un retour
+DolipocketBuyMeACoffee = Offrez-nous un café
+DolipocketDonationText = Dolipocket nous a demandé du temps de conception et de développement. Si vous le trouvez utile et souhaitez soutenir le projet, pensez à nous offrir un café. Chaque contribution aide à maintenir le développement actif.
+DolipocketDonateIntro = Soutenez le développement de Dolipocket par une donation.
+DolipocketDonateButton = Faire une donation
+DolipocketOfferCoffee = Offrir un café ... ou un peu plus
+DolipocketLinks = Liens utiles
+DolipocketDocLink = Documentation utilisateur
+DolipocketSourceLink = Code source
+DolipocketContactLink = Contacter l'éditeur
+OnlineDocumentation = Documentation en ligne
+AboutModuleInfo = Informations sur le module
+AboutUsefulLinks = Liens utiles
+AboutSAV = Support
+AboutForum = Forum
+AboutContact = Contact
+DolibarrMinVersion = Version minimale de Dolibarr
+PHPMinVersion = Version minimale de PHP
+
+#
+# Sample page
+#
+DolipocketArea = Accueil Dolipocket
+MyPageName = Nom de ma page
+
+#
+# Sample widget
+#
+MyWidget = Mon widget
+MyWidgetDescription = Description de mon widget

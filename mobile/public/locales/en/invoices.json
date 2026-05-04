@@ -1,0 +1,84 @@
+{
+    "title": "Invoices",
+    "title-singular": "Invoice",
+    "list": {
+        "search-placeholder": "Search an invoice...",
+        "empty": "No invoice found",
+        "create": "New invoice",
+        "filter-status": "Status",
+        "filter-paye": "Payment",
+        "filter-all": "All",
+        "filter-paye-yes": "Paid",
+        "filter-paye-no": "Unpaid",
+        "filter-socid": "Third party"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Lines",
+        "section-totals": "Totals",
+        "section-notes": "Notes",
+        "section-actions": "Actions",
+        "section-payments": "Payments",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this invoice? This cannot be undone.",
+        "total-paid": "Total paid",
+        "remain-to-pay": "Remain to pay"
+    },
+    "edit": {
+        "title-create": "New invoice",
+        "title-edit": "Edit invoice",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ref": "Reference",
+        "ref-client": "Customer reference",
+        "socid": "Third party",
+        "type": "Type",
+        "datef": "Invoice date",
+        "date-lim-reglement": "Due date",
+        "total-ht": "Total excl. tax",
+        "total-ttc": "Total incl. tax",
+        "total-tva": "Total VAT",
+        "fk-cond-reglement": "Payment terms",
+        "fk-mode-reglement": "Payment method",
+        "note-public": "Public note",
+        "note-private": "Private note"
+    },
+    "lines": {
+        "add-line": "Add line",
+        "edit-line": "Edit line",
+        "delete-line": "Delete line",
+        "label": "Label",
+        "description": "Description",
+        "qty": "Quantity",
+        "subprice": "Unit price excl. tax",
+        "tva": "VAT (%)",
+        "remise": "Discount (%)",
+        "total": "Total excl. tax",
+        "product-type": "Type",
+        "empty": "No line"
+    },
+    "actions": {
+        "validate": "Validate",
+        "create-from-order": "Create from order"
+    },
+    "status": {
+        "draft": "Draft",
+        "validated": "Validated",
+        "paid": "Paid",
+        "abandoned": "Abandoned"
+    },
+    "toasts": {
+        "create-success": "Invoice created",
+        "update-success": "Invoice updated",
+        "delete-success": "Invoice deleted",
+        "validate-success": "Invoice validated",
+        "create-from-order-success": "Invoice created from order",
+        "line-add-success": "Line added",
+        "line-update-success": "Line updated",
+        "line-delete-success": "Line deleted",
+        "load-error": "Failed to load invoices",
+        "save-error": "Failed to save invoice",
+        "action-error": "Action failed"
+    }
+}

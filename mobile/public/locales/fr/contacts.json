@@ -1,0 +1,48 @@
+{
+    "title": "Contacts",
+    "list": {
+        "search-placeholder": "Rechercher un contact...",
+        "filter-all": "Tous",
+        "filter-by-thirdparty": "Filtrer par tiers",
+        "empty": "Aucun contact trouvé",
+        "create": "Nouveau contact"
+    },
+    "fiche": {
+        "section-identity": "Identité",
+        "section-address": "Adresse",
+        "section-contact": "Contact",
+        "section-notes": "Notes",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer ce contact ? Cette action est irréversible."
+    },
+    "edit": {
+        "title-create": "Nouveau contact",
+        "title-edit": "Modifier le contact",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "lastname": "Nom",
+        "firstname": "Prénom",
+        "civility": "Civilité",
+        "fk-soc": "Société",
+        "address": "Adresse",
+        "zip": "Code postal",
+        "town": "Ville",
+        "country": "Pays",
+        "phone-pro": "Téléphone professionnel",
+        "phone-mobile": "Téléphone mobile",
+        "fax": "Fax",
+        "email": "Email",
+        "poste": "Fonction",
+        "statut": "Statut",
+        "note-public": "Note publique",
+        "note-private": "Note privée"
+    },
+    "toasts": {
+        "create-success": "Contact créé",
+        "update-success": "Contact mis à jour",
+        "delete-success": "Contact supprimé",
+        "load-error": "Impossible de charger les contacts",
+        "save-error": "Impossible d'enregistrer le contact"
+    }
+}

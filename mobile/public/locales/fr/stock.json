@@ -1,0 +1,55 @@
+{
+    "title": "Stock",
+    "list": {
+        "search-placeholder": "Rechercher un mouvement...",
+        "filter-all": "Tous",
+        "filter-by-product": "Filtrer par produit",
+        "filter-by-warehouse": "Filtrer par entrepôt",
+        "filter-date-from": "Depuis",
+        "filter-date-to": "Jusqu'au",
+        "empty": "Aucun mouvement trouvé",
+        "create": "Nouveau mouvement"
+    },
+    "fiche": {
+        "section-movement": "Mouvement",
+        "section-product": "Produit",
+        "section-warehouse": "Entrepôt",
+        "section-meta": "Métadonnées",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Les mouvements de stock sont immuables. Pour annuler, créez un mouvement inverse."
+    },
+    "edit": {
+        "title-create": "Nouveau mouvement de stock",
+        "title-edit": "Mouvement de stock",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "fk-product": "Produit",
+        "fk-entrepot": "Entrepôt",
+        "value": "Quantité",
+        "qty": "Quantité",
+        "price": "Prix unitaire",
+        "type-mouvement": "Type de mouvement",
+        "type-input-transfer": "Entrée (transfert)",
+        "type-output-transfer": "Sortie (transfert)",
+        "type-output-sale": "Sortie (vente)",
+        "type-input-purchase": "Entrée (achat)",
+        "label": "Libellé",
+        "datem": "Date",
+        "inventorycode": "Code d'inventaire"
+    },
+    "inventory": {
+        "title": "Inventaire global",
+        "search-placeholder": "Rechercher un produit en stock...",
+        "stock-reel": "Stock réel",
+        "empty": "Aucun stock à afficher"
+    },
+    "toasts": {
+        "create-success": "Mouvement enregistré",
+        "update-success": "Mouvement mis à jour",
+        "delete-success": "Mouvement supprimé",
+        "load-error": "Impossible de charger les mouvements",
+        "save-error": "Impossible d'enregistrer le mouvement",
+        "not-supported": "Opération non supportée : les mouvements de stock sont immuables"
+    }
+}

@@ -1,0 +1,55 @@
+{
+    "title": "Stock",
+    "list": {
+        "search-placeholder": "Search a movement...",
+        "filter-all": "All",
+        "filter-by-product": "Filter by product",
+        "filter-by-warehouse": "Filter by warehouse",
+        "filter-date-from": "From",
+        "filter-date-to": "Until",
+        "empty": "No movement found",
+        "create": "New movement"
+    },
+    "fiche": {
+        "section-movement": "Movement",
+        "section-product": "Product",
+        "section-warehouse": "Warehouse",
+        "section-meta": "Metadata",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Stock movements are immutable. To revert, record a counter-movement."
+    },
+    "edit": {
+        "title-create": "New stock movement",
+        "title-edit": "Stock movement",
+        "save": "Save",
+        "cancel": "Cancel",
+        "fk-product": "Product",
+        "fk-entrepot": "Warehouse",
+        "value": "Quantity",
+        "qty": "Quantity",
+        "price": "Unit price",
+        "type-mouvement": "Movement type",
+        "type-input-transfer": "Input (transfer)",
+        "type-output-transfer": "Output (transfer)",
+        "type-output-sale": "Output (sale)",
+        "type-input-purchase": "Input (purchase)",
+        "label": "Label",
+        "datem": "Date",
+        "inventorycode": "Inventory code"
+    },
+    "inventory": {
+        "title": "Global inventory",
+        "search-placeholder": "Search a product in stock...",
+        "stock-reel": "Actual stock",
+        "empty": "No stock to display"
+    },
+    "toasts": {
+        "create-success": "Movement recorded",
+        "update-success": "Movement updated",
+        "delete-success": "Movement deleted",
+        "load-error": "Failed to load movements",
+        "save-error": "Failed to save movement",
+        "not-supported": "Operation not supported: stock movements are immutable"
+    }
+}

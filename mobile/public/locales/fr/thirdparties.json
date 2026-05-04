@@ -1,0 +1,53 @@
+{
+    "title": "Tiers",
+    "list": {
+        "search-placeholder": "Rechercher un tiers...",
+        "filter-all": "Tous",
+        "filter-clients": "Clients",
+        "filter-suppliers": "Fournisseurs",
+        "empty": "Aucun tiers trouvé",
+        "create": "Nouveau tiers"
+    },
+    "fiche": {
+        "section-identity": "Identité",
+        "section-address": "Adresse",
+        "section-contact": "Contact",
+        "section-fiscal": "Fiscal",
+        "section-notes": "Notes",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer ce tiers ? Cette action est irréversible."
+    },
+    "edit": {
+        "title-create": "Nouveau tiers",
+        "title-edit": "Modifier le tiers",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "name": "Nom",
+        "name-alias": "Alias",
+        "code-client": "Code client",
+        "code-fournisseur": "Code fournisseur",
+        "client": "Client",
+        "fournisseur": "Fournisseur",
+        "address": "Adresse",
+        "zip": "Code postal",
+        "town": "Ville",
+        "country": "Pays",
+        "phone": "Téléphone",
+        "email": "Email",
+        "url": "Site web",
+        "siren": "SIREN",
+        "siret": "SIRET",
+        "ape": "Code APE",
+        "tva-intra": "N° TVA intra",
+        "note-public": "Note publique",
+        "note-private": "Note privée"
+    },
+    "toasts": {
+        "create-success": "Tiers créé",
+        "update-success": "Tiers mis à jour",
+        "delete-success": "Tiers supprimé",
+        "load-error": "Impossible de charger les tiers",
+        "save-error": "Impossible d'enregistrer le tiers"
+    }
+}

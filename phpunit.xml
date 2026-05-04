@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="test/phpunit/bootstrap.php"
+         colors="true"
+         verbose="true"
+         stopOnFailure="false"
+         cacheResult="true"
+         executionOrder="defects"
+         cacheResultFile=".phpunit.cache/test-results.xml">
+
+    <testsuites>
+        <testsuite name="unit">
+            <directory>test/phpunit/unit</directory>
+        </testsuite>
+    </testsuites>
+
+    <coverage>
+        <include>
+            <directory suffix=".php">src</directory>
+            <directory suffix=".php">lib</directory>
+            <directory suffix=".php">smartmaker-api</directory>
+        </include>
+        <exclude>
+            <directory>vendor</directory>
+            <directory>test</directory>
+            <directory>mobile</directory>
+            <directory>backport</directory>
+        </exclude>
+        <report>
+            <html outputDirectory=".phpunit.cache/coverage-html"/>
+            <text outputFile="php://stdout"/>
+        </report>
+    </coverage>
+
+    <php>
+        <ini name="error_reporting" value="E_ALL"/>
+        <ini name="display_errors" value="true"/>
+        <ini name="pcov.enabled" value="1"/>
+        <ini name="pcov.directory" value="."/>
+    </php>
+</phpunit>

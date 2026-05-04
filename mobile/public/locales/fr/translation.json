@@ -1,0 +1,98 @@
+{
+    "welcome-page": {
+        "description": "Mettez en place votre application React Dolibarr rapidement et facilement.",
+        "button": "Connexion"
+    },
+    "login-page": {
+        "title": "Connexion",
+        "email-input": {
+            "label": "Identifiant",
+            "placeholder": "Rentrez votre identifiant ..."
+        },
+        "password-input": {
+            "label": "Mot de passe",
+            "placeholder": "●●●●●●●●"
+        },
+        "entity-select": {
+            "label": "Entité",
+            "placeholder": "Veuillez sélectionner une entité ..."
+        },
+        "remember-me-boolean": {
+            "label": "Garder la session ouverte"
+        },
+        "login-button": "Se connecter",
+        "register-link": "Inscription",
+        "forgot-password-link": "Mot de passe oublié ?",
+        "entities-get": {
+            "toasts": {
+                "default-error": "Erreur lors de la récupération des entités. Veuillez quitter et relancer l'application si le multi-entité est activé.",
+                "abort-error": "La récupération des entités a été abandonnée. Veuillez quitter et relancer l'application si le multi-entité est activé."
+            }
+        },
+        "login-post": {
+            "toasts": {
+                "success": "Bonjour {{username}}",
+                "bad-data-error": "Veuillez vérifier vos informations",
+                "default-error": "Erreur lors de la connexion. Veuillez vérifier vos informations.",
+                "abort-error": "La connexion a été abandonnée. Veuillez réésayer ultérieurement."
+            }
+        }
+    },
+    "device-identification-page": {
+        "title": "Identification de l'appareil",
+        "devices-description": "Veuillez sélectionner l'appareil sur lequel vous vous trouvez.",
+        "no-devices-description": "Votre appareil n'est actuellement pas enregistré. Veuillez lui donner un nom descriptif.",
+        "devices-checker": {
+            "label": "Appareils disponibles",
+            "no-device-label": "Mon appareil n'apparaît pas"
+        },
+        "no-devices-input": {
+            "label": "Nom descriptif",
+            "placeholder": "Veuillez nommer votre appareil",
+            "help": "Exemple: Portable de Jean"
+        },
+        "devices-post": {
+            "toasts": {
+                "bad-data-error": "Veuillez vérifier vos informations",
+                "default-error": "L'identification de l'appareil a échoué. Veuillez rééssayer ultérieurement.",
+                "abort-error": "L'identification de l'appareil a été abandonnée. Veuillez réésayer ultérieurement."
+            }
+        }
+    },
+    "home-page": {
+        "settings-panel": {
+            "title": "Paramètres",
+            "lang-setting": {
+                "label": "Langue"
+            },
+            "theme-setting": {
+                "label": "Thème"
+            },
+            "dark-mode-setting": {
+                "label": "Mode sombre"
+            },
+            "scale-setting": {
+                "label": "Echelle"
+            }
+        },
+        "welcome": "Bienvenue",
+        "default-user": "Démo",
+        "blocks": {
+            "doc": {
+                "title": "Documentation",
+                "text": "Vous êtes actuellement sur le page d'accueil. Vous pouvez commencer à développer votre application en vous aidant de la documentation.",
+                "link": "Documentation"
+            },
+            "smart-common": {
+                "title": "SmartCommon",
+                "text": "SmartCommon, une librairie de composants customizables vous est mise à disposition afin d'accélerer votre développement.",
+                "link": "SmartCommon"
+            },
+            "courses": {
+                "title": "Formations",
+                "text": "N'hésitez pas jeter un coup d'oeuil aux formations disponibles réalisées par Cap-Rel pour devenir un vrai pro de SmartMaker.",
+                "link": "Formations"
+            }
+        }
+    }
+}

@@ -1,0 +1,30 @@
+# Note : FallbackResource is not for api.php because api.php is specified into mobile/.env file during build time
+# but index.html to be able to handle a page refresh of https://yourpwa/login for example
+# FallbackResource index.html
+
+# PWA routing: serve index.html for all non-file routes
+# Using mod_rewrite instead of FallbackResource to avoid subrequest recursion
+<IfModule mod_rewrite.c>
+  RewriteEngine on
+  # api.php -- stop (don't rewrite API calls)
+  RewriteRule ^api\.php - [L]
+  # Static files -- stop
+  RewriteRule ^(assets|images|locales)/ - [L]
+  # Existing files -- stop
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d [OR]
+  RewriteCond %{REQUEST_FILENAME} -l
+  RewriteRule ^ - [L]
+  # Everything else -> index.html (SPA routing)
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# --- Allow Authorization header to be passed to PHP ---
+<IfModule mod_setenvif.c>
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+</IfModule>
+
+# --- If available, enable CGI pass-through ---
+<IfModule mod_cgi.c>
+    CGIPassAuth On
+</IfModule>

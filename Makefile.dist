@@ -1,0 +1,137 @@
+#!/usr/bin/make
+# Makefile for Dolipocket -- Dolibarr SaaS multi-tenant module
+#
+
+SHELL = bash
+MODULE       = dolipocket
+DOC_HOST     ?= doc.cap-rel.fr
+DOC_PATH     ?= /home/webs/doc.cap-rel.fr/marginaliamd/data/documents/$(MODULE)
+MARGINALIAMD ?= $(HOME)/dev/marginaliamd
+
+.DEFAULT_GOAL := help
+.PHONY: help phpstan deploy-doc screenshots zip pwa pwadebug zipdebug prod tests-unit tests-integration tests-http test-e2e setup clean
+
+help:
+	@echo 'Dolipocket - Available targets:'
+	@echo -e 'phpstan \t\t-\t run PHPStan static analysis'
+	@echo -e 'pwa \t\t\t-\t build the PWA in production mode (mobile/dist -> pwa/)'
+	@echo -e 'pwadebug \t\t-\t build the PWA in development mode with sourcemaps'
+	@echo -e 'zip \t\t\t-\t build the Dolistore release zip'
+	@echo -e 'zipdebug \t\t-\t build a debug zip including PWA sourcemaps'
+	@echo -e 'deploy-doc \t\t-\t publish user documentation to doc.cap-rel.fr'
+	@echo -e 'screenshots \t\t-\t collect missing admin screenshots interactively'
+	@echo -e 'tests-unit \t\t-\t run PHPUnit unit tests'
+	@echo -e 'tests-integration \t-\t run PHPUnit Dolibarr SQLite integration tests'
+	@echo -e 'tests-http \t\t-\t run PHPUnit HTTP functional tests (admin/ajax/root)'
+	@echo -e 'test-e2e \t\t-\t run Playwright E2E suite (PWA + Blade login bridge)'
+	@echo -e 'setup \t\t\t-\t install composer deps and configure git hooks'
+	@echo -e 'clean \t\t\t-\t remove mobile/node_modules and clear npm cache'
+
+# ---------------------------------------------------------------
+# Static analysis
+# ---------------------------------------------------------------
+phpstan:
+	@if [ -z "$(DOLIBARR_VERSION)" ]; then echo "Set DOLIBARR_VERSION (e.g. 18, 19, 20, 21)"; exit 1; fi
+	TMPDIR=$(HOME)/.cache/phpstan-tmp DOLIBARR_VERSION=$(DOLIBARR_VERSION) php /usr/local/bin/phpstan.phar analyse -c .phpstan.local.neon --memory-limit=512M
+
+# ---------------------------------------------------------------
+# Mobile / PWA build
+# ---------------------------------------------------------------
+clean:
+	rm -rf mobile/node_modules
+	npm cache clean --force
+	rm -rf {mobile/dist,pwa}/*.js {mobile/dist,pwa}/{assets,images,locales}/*
+
+mobile/node_modules:
+	cd mobile; npm i && echo ""
+
+pwa: mobile/node_modules mobile/* mobile/src/*/*/*/*/*
+	rm -f pwa/assets/*
+	if [ ! -f ./mobile/.env.build ]; then cp -f ./mobile/.env ./mobile/.env.build; fi
+	$(eval API_URL_BACKUP=`grep VITE_API_URL ./mobile/.env`)
+	echo "VITE_API_URL=/api.php/" >| ./mobile/.env
+	$(eval VERSION=`grep -E "this->version\s*=" core/modules/mod*.class.php | cut -d "'" -f2`)
+	$(eval BUILD_NUM=$(shell cat .build-number 2>/dev/null || echo 0))
+	$(eval BUILD_NUM=$(shell echo $$(($(BUILD_NUM) + 1))))
+	echo $(BUILD_NUM) >| .build-number
+	echo "VITE_APP_VERSION=$(VERSION).$(BUILD_NUM)" >> ./mobile/.env
+	echo "APP_VERSION=$(VERSION).$(BUILD_NUM)" >> ./mobile/.env
+	echo "MOBILE_APP_VERSION=$(VERSION).$(BUILD_NUM)" >> ./mobile/.env
+	echo "VITE_LOCALES=en,fr" >> ./mobile/.env
+	cd mobile; npm run build
+	cp -a mobile/dist/* pwa/ || true
+	cp -af mobile/dist/.??* pwa/ || true
+	# restore VITE_API_URL
+	cat ./mobile/.env | grep -v VITE_API_URL >| ./mobile/.env.tmp
+	echo "$(API_URL_BACKUP)" >> ./mobile/.env.tmp
+	mv ./mobile/.env.tmp ./mobile/.env
+
+pwadebug: mobile/node_modules mobile/* mobile/src/*/*/*/*/*
+	rm -f pwa/assets/*
+	if [ ! -f ./mobile/.env.build ]; then cp -f ./mobile/.env ./mobile/.env.build; fi
+	$(eval API_URL_BACKUP=`grep VITE_API_URL ./mobile/.env`)
+	echo "VITE_API_URL=/api.php/" >| ./mobile/.env
+	$(eval VERSION=`grep -E "this->version\s*=" core/modules/mod*.class.php | cut -d "'" -f2`)
+	$(eval BUILD_NUM=$(shell cat .build-number 2>/dev/null || echo 0))
+	$(eval BUILD_NUM=$(shell echo $$(($(BUILD_NUM) + 1))))
+	echo $(BUILD_NUM) >| .build-number
+	echo "VITE_APP_VERSION=$(VERSION).$(BUILD_NUM)-dev" >> ./mobile/.env
+	echo "APP_VERSION=$(VERSION).$(BUILD_NUM)-dev" >> ./mobile/.env
+	echo "MOBILE_APP_VERSION=$(VERSION).$(BUILD_NUM)-dev" >> ./mobile/.env
+	cd mobile; npm run build -- --mode development --sourcemap
+	cp -a mobile/dist/* pwa/ || true
+	cp -af mobile/dist/.??* pwa/ || true
+	# restore VITE_API_URL
+	cat ./mobile/.env | grep -v VITE_API_URL >| ./mobile/.env.tmp
+	echo "$(API_URL_BACKUP)" >> ./mobile/.env.tmp
+	mv ./mobile/.env.tmp ./mobile/.env
+
+prod:
+
+# ---------------------------------------------------------------
+# Packaging
+# ---------------------------------------------------------------
+zip: pwa prod
+	rm -rf pwa/{assets,dist,images,*.html,manifest.*,*.js,*.js.map}
+	cp -a mobile/dist/* pwa/ || true
+	cp -a mobile/dist/.??* pwa/ || true
+	php ./build/buildzip.php
+
+zipdebug: pwadebug prod
+	rm -rf pwa/{assets,dist,images,*.html,manifest.*,*.js}
+	cp -a mobile/dist/* pwa/ || true
+	cp -a mobile/dist/.??* pwa/ || true
+	php ./build/buildzip.php --dev
+
+# ---------------------------------------------------------------
+# Documentation
+# ---------------------------------------------------------------
+deploy-doc:
+	rsync -avLP docs/users/ $(DOC_HOST):$(DOC_PATH)/
+
+screenshots:
+	php $(MARGINALIAMD)/cli/collect-screenshots.php docs/users/
+
+# ---------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------
+tests-unit:
+	vendor/bin/phpunit -c phpunit.xml
+
+tests-integration:
+	vendor/bin/phpunit -c phpunit-integration-dolibarr.xml
+
+tests-http:
+	vendor/bin/phpunit -c phpunit-http.xml
+
+test-e2e:
+	@if [ -z "$$DOLIPOCKET_TEST_PWA_PORT" ]; then echo "Set DOLIPOCKET_TEST_PWA_PORT (see .claude/settings.json)"; exit 1; fi
+	@if [ -z "$$DOLIPOCKET_TEST_BACKEND_PORT" ]; then echo "Set DOLIPOCKET_TEST_BACKEND_PORT (see .claude/settings.json)"; exit 1; fi
+	cd test/mobile && npx playwright test
+
+# ---------------------------------------------------------------
+# Setup
+# ---------------------------------------------------------------
+setup:
+	composer install
+	@if [ -f /tmp/pre-commit ]; then cp -f /tmp/pre-commit .git/hooks/pre-commit; chmod +x .git/hooks/pre-commit; fi

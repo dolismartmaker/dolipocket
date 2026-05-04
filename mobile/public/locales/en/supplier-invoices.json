@@ -1,0 +1,84 @@
+{
+    "title": "Supplier invoices",
+    "list": {
+        "search-placeholder": "Search an invoice...",
+        "filter-all": "All",
+        "filter-draft": "Draft",
+        "filter-validated": "Validated",
+        "filter-paid": "Paid",
+        "filter-abandoned": "Abandoned",
+        "filter-unpaid": "Unpaid",
+        "empty": "No supplier invoice found",
+        "create": "New invoice"
+    },
+    "fiche": {
+        "section-header": "Header",
+        "section-supplier": "Supplier",
+        "section-dates": "Dates",
+        "section-totals": "Totals",
+        "section-lines": "Lines",
+        "section-payment": "Payment",
+        "section-notes": "Notes",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this invoice? This cannot be undone.",
+        "no-lines": "No line on this invoice",
+        "add-line": "Add a line"
+    },
+    "edit": {
+        "title-create": "New supplier invoice",
+        "title-edit": "Edit invoice",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ref": "Reference",
+        "ref-supplier": "Supplier reference",
+        "libelle": "Label",
+        "supplier": "Supplier",
+        "type": "Invoice type",
+        "datef": "Invoice date",
+        "date-lim-reglement": "Due date",
+        "cond-reglement": "Payment terms",
+        "mode-reglement": "Payment method",
+        "note-public": "Public note",
+        "note-private": "Private note",
+        "line-product": "Product",
+        "line-description": "Description",
+        "line-qty": "Quantity",
+        "line-subprice": "Unit price (excl. tax)",
+        "line-tva": "VAT",
+        "line-discount": "Discount %",
+        "line-total-ht": "Total excl. tax",
+        "line-save": "Save line",
+        "line-delete": "Delete line"
+    },
+    "status": {
+        "draft": "Draft",
+        "validated": "Validated",
+        "paid": "Paid",
+        "abandoned": "Abandoned"
+    },
+    "paye": {
+        "yes": "Paid",
+        "no": "Unpaid"
+    },
+    "workflow": {
+        "validate": "Validate",
+        "validate-confirm": "Validate this invoice?",
+        "create-from-order": "Create from order",
+        "create-from-order-confirm": "Create an invoice from this supplier order?",
+        "close-paid": "Mark as paid"
+    },
+    "toasts": {
+        "create-success": "Invoice created",
+        "update-success": "Invoice updated",
+        "delete-success": "Invoice deleted",
+        "validate-success": "Invoice validated",
+        "create-from-order-success": "Invoice created from order",
+        "line-add-success": "Line added",
+        "line-update-success": "Line updated",
+        "line-delete-success": "Line deleted",
+        "load-error": "Failed to load supplier invoices",
+        "save-error": "Failed to save invoice",
+        "workflow-error": "Action not allowed on this invoice"
+    }
+}

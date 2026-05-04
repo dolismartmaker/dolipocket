@@ -1,0 +1,35 @@
+# Generated binaries
+/build/*.zip
+/bin/*.zip
+# Doxygen generated documentation
+/build/doxygen/doxygen_warnings.log
+/doc/code/doxygen
+# Composer managed dependencies
+/vendor
+/dev/bin
+# PHPdocumentor generated files
+/build/phpdoc
+/doc/code/phpdoc
+# Sphinx generated files
+/doc/user/build
+/.settings/
+/.buildpath
+/.project
+# Other
+*.back
+/.editorconfig
+/.gitattributes
+# Personal scratch files
+eric_debug.md
+*.scratch.md
+# Local dev tooling (generated from .dist files)
+/Makefile
+/.phpstan.local.neon
+# PHPUnit cache
+/.phpunit.cache/
+.phpunit.result.cache
+# Playwright E2E artefacts
+/test/mobile/node_modules/
+/test/mobile/test-results/
+/test/mobile/playwright-report/
+/test/mobile/.playwright-cache/

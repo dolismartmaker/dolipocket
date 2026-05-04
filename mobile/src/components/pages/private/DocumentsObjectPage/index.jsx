@@ -1,0 +1,318 @@
+import { useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { FaArrowLeft, FaFileAlt, FaFileImage, FaFilePdf, FaDownload, FaUpload } from "react-icons/fa";
+
+import { Page, useStates, useConfirm } from "@cap-rel/smartcommon";
+
+import { useDbDocuments } from "src/db/stores/documents/useDbDocuments";
+
+const TYPE_LABELS = {
+    thirdparty: "Tiers",
+    product: "Produit",
+    project: "Projet",
+    intervention: "Intervention",
+    category: "Catégorie",
+};
+
+const ALLOWED_TYPES = new Set(["thirdparty", "product", "project", "intervention", "category"]);
+
+// Pick a file icon component for a given mime type.
+const pickIcon = (mime) => {
+    if (!mime) return FaFileAlt;
+    if (mime.startsWith("image/")) return FaFileImage;
+    if (mime === "application/pdf") return FaFilePdf;
+    return FaFileAlt;
+};
+
+// Format a byte count into a short human readable string.
+const formatSize = (size) => {
+    if (!size || size <= 0) return "";
+    const kb = size / 1024;
+    if (kb < 1024) return kb.toFixed(1) + " Ko";
+    const mb = kb / 1024;
+    return mb.toFixed(1) + " Mo";
+};
+
+// Trigger the browser to save a Blob with the requested filename.
+const triggerBrowserDownload = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename || "document";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+};
+
+export const DocumentsObjectPage = () => {
+    const { type, id } = useParams();
+    const navigate = useNavigate();
+    const dbDocs = useDbDocuments();
+    const { alert } = useConfirm();
+
+    const isValidType = ALLOWED_TYPES.has(type);
+    const objectId = parseInt(id, 10) || 0;
+
+    const { states, set } = useStates({
+        documents: [],
+        loading: false,
+        error: null,
+        downloadingShare: null,
+        uploading: false,
+        uploadError: null,
+    });
+
+    const { documents, loading, error, downloadingShare, uploading, uploadError } = states ?? {};
+
+    const hasClient = !!dbDocs.list;
+
+    useEffect(() => {
+        if (!hasClient) return;
+        if (!isValidType || objectId <= 0) {
+            set("error", "Type ou identifiant d'objet invalide");
+            return;
+        }
+        loadDocuments();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasClient, type, objectId]);
+
+    const loadDocuments = async () => {
+        set("loading", true);
+        set("error", null);
+        try {
+            const rows = await dbDocs.list({ objectType: type, objectId });
+            set("documents", Array.isArray(rows) ? rows : []);
+        } catch (err) {
+            console.error("dbDocs.list error", err);
+            if (err?.response?.status === 404) {
+                set("error", "Objet introuvable");
+            } else if (err?.response?.status === 403) {
+                set("error", "Accès refusé sur cet objet");
+            } else {
+                set("error", "Erreur de chargement des documents");
+            }
+        } finally {
+            set("loading", false);
+        }
+    };
+
+    const handleBack = () => navigate("/documents");
+
+    const handleDownload = async (doc) => {
+        if (!doc?.share) {
+            await alert({
+                type: "warning",
+                title: "Téléchargement impossible",
+                message: "Le document ne possède pas de hash de partage.",
+            });
+            return;
+        }
+        set("downloadingShare", doc.share);
+        try {
+            // Use the JSON (base64) endpoint: simpler than streaming the binary
+            // through the ky client. The 50 MB cap on the server is acceptable
+            // for documents browsed from the PWA.
+            const { blob, filename } = await dbDocs.download({
+                objectType: type,
+                objectId,
+                share: doc.share,
+            });
+            triggerBrowserDownload(blob, filename || doc.name);
+        } catch (err) {
+            console.error("dbDocs.download error", err);
+            await alert({
+                type: "warning",
+                title: "Téléchargement impossible",
+                message: "Erreur lors du téléchargement du document.",
+            });
+        } finally {
+            set("downloadingShare", null);
+        }
+    };
+
+    // The <input type="file"> change handler.
+    //
+    // Two-step pipeline (cf ~/docs/UPLOAD_PWA.md):
+    //   1. POST /upload via SmartAuth's UploadController: stages the binary
+    //      and returns an upload_id.
+    //   2. POST /document/attach via Dolipocket's DocumentController: moves
+    //      the staged file into the object's dir_output, registers it in
+    //      llx_ecm_files and returns the freshly created share hash.
+    // On success we re-fetch the document list so the new entry appears in
+    // the UI. Failures are surfaced to the user via the alert dialog and the
+    // hook itself takes care of cancelling the staged upload to avoid leaks.
+    const handleFileSelected = async (event) => {
+        const file = event?.target?.files?.[0];
+        // Reset the input so picking the same file twice still triggers a change.
+        if (event?.target) event.target.value = "";
+        if (!file) return;
+
+        set("uploading", true);
+        set("uploadError", null);
+        try {
+            const attached = await dbDocs.upload({
+                file,
+                objectType: type,
+                objectId,
+                filename: file.name,
+            });
+            if (!attached?.attached) {
+                throw new Error("dbDocs.upload did not confirm the attachment");
+            }
+            await alert({
+                type: "success",
+                title: "Document attaché",
+                message: "Le document a été enregistré et lié à l'objet.",
+            });
+            await loadDocuments();
+        } catch (err) {
+            console.error("dbDocs.upload error", err);
+            const status = err?.response?.status;
+            let message = "Échec de l'attachement du document";
+            if (status === 403) {
+                message = "Accès refusé pour attacher un document à cet objet";
+            } else if (status === 404) {
+                message = "Objet introuvable ou téléversement expiré";
+            } else if (status === 400) {
+                message = "Données d'attachement invalides";
+            }
+            set("uploadError", message);
+            await alert({
+                type: "warning",
+                title: "Téléversement impossible",
+                message,
+            });
+        } finally {
+            set("uploading", false);
+        }
+    };
+
+    const triggerFilePicker = () => {
+        const input = document.getElementById("documents-object-file-input");
+        if (input) input.click();
+    };
+
+    if (!isValidType || objectId <= 0) {
+        return (
+            <Page contentProps={{ className: "bg-gray-50 min-h-screen" }}>
+                <div className="bg-gradient-to-r from-primary to-secondary p-4 text-white sticky top-0 z-10 md:bg-none md:bg-white md:text-gray-800 md:border-b md:border-gray-200">
+                    <div className="flex items-center gap-3 md:max-w-5xl md:mx-auto">
+                        <button onClick={handleBack} className="p-2 -ml-2 md:hidden" aria-label="Retour">
+                            <FaArrowLeft />
+                        </button>
+                        <h1 className="text-lg font-bold">Documents</h1>
+                    </div>
+                </div>
+                <div className="p-4">
+                    <div className="p-3 bg-red-100 text-red-700 rounded-lg">
+                        {"Type ou identifiant d'objet invalide."}
+                    </div>
+                </div>
+            </Page>
+        );
+    }
+
+    return (
+        <Page contentProps={{ className: "bg-gray-50 min-h-screen" }}>
+            {/* Header */}
+            <div className="bg-gradient-to-r from-primary to-secondary p-4 text-white sticky top-0 z-10 md:bg-none md:bg-white md:text-gray-800 md:border-b md:border-gray-200">
+                <div className="flex items-center gap-3 md:max-w-5xl md:mx-auto">
+                    <button onClick={handleBack} className="p-2 -ml-2 md:hidden" aria-label="Retour">
+                        <FaArrowLeft />
+                    </button>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-lg font-bold truncate">
+                            {TYPE_LABELS[type] ?? type} #{objectId}
+                        </h1>
+                        <p className="text-sm text-white/80 md:text-gray-500">Documents attachés</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-4 pb-32 space-y-3 md:px-6 md:max-w-5xl md:mx-auto md:pb-4">
+                {error && (
+                    <div className="p-3 bg-red-100 text-red-700 rounded-lg">
+                        {error}
+                        <button onClick={loadDocuments} className="ml-2 underline">Réessayer</button>
+                    </div>
+                )}
+
+                {uploadError && (
+                    <div className="p-3 bg-amber-100 text-amber-800 rounded-lg">
+                        {uploadError}
+                    </div>
+                )}
+
+                {loading && (documents?.length ?? 0) === 0 && (
+                    <div className="text-center text-gray-500 py-8">Chargement...</div>
+                )}
+
+                {!loading && (documents?.length ?? 0) === 0 && !error && (
+                    <div className="text-center text-gray-500 py-12">
+                        <FaFileAlt className="mx-auto text-4xl mb-3 text-gray-300" />
+                        <div>Aucun document</div>
+                    </div>
+                )}
+
+                <ul className="flex flex-col gap-2">
+                    {documents?.map((doc) => {
+                        const Icon = pickIcon(doc.mime);
+                        const downloading = downloadingShare === doc.share;
+                        return (
+                            <li key={doc.id || doc.share || doc.relativePath}>
+                                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-100 flex items-start gap-3">
+                                    <div className="bg-primary/10 text-primary p-2 rounded-lg shrink-0">
+                                        <Icon />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="font-semibold text-gray-800 truncate">
+                                            {doc.name}
+                                        </div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            {doc.mime ?? "?"}
+                                            {doc.size ? " - " + formatSize(doc.size) : ""}
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDownload(doc)}
+                                        disabled={downloading || !doc.share}
+                                        className="px-3 py-2 bg-primary/10 text-primary rounded-lg flex items-center gap-1 disabled:opacity-50"
+                                        aria-label="Télécharger"
+                                    >
+                                        <FaDownload />
+                                        <span className="text-sm hidden sm:inline">
+                                            {downloading ? "..." : "Télécharger"}
+                                        </span>
+                                    </button>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ul>
+            </div>
+
+            {/* Hidden file input for upload */}
+            <input
+                id="documents-object-file-input"
+                type="file"
+                style={{ display: "none" }}
+                onChange={handleFileSelected}
+            />
+
+            {/* Upload action bar */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 z-10 md:static md:border-0 md:bg-transparent md:p-0 md:mt-4 md:max-w-5xl md:mx-auto">
+                <button
+                    type="button"
+                    onClick={triggerFilePicker}
+                    disabled={uploading}
+                    className="w-full py-3 bg-primary text-white rounded-xl flex items-center justify-center gap-2 font-medium disabled:opacity-50"
+                >
+                    <FaUpload className={uploading ? "animate-pulse" : ""} />
+                    {uploading ? "Téléversement..." : "Téléverser un document"}
+                </button>
+            </div>
+        </Page>
+    );
+};

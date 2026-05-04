@@ -1,0 +1,114 @@
+# Copyright (C) 2026 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleDolipocketName'
+ModuleDolipocketName = Dolipocket
+# Module description 'ModuleDolipocketDesc'
+ModuleDolipocketDesc = Dolipocket description
+
+#
+# Admin page
+#
+DolipocketSetup = Dolipocket setup
+Settings = Settings
+DolipocketSetupPage = Dolipocket setup page
+DOLIPOCKET_MYPARAM1 = My param 1
+DOLIPOCKET_MYPARAM1Tooltip = My param 1 tooltip
+DOLIPOCKET_MYPARAM2=My param 2
+DOLIPOCKET_MYPARAM2Tooltip=My param 2 tooltip
+DOLIPOCKET_HOME_MENU_ITEMS = PWA menu - allowed items
+DOLIPOCKET_HOME_MENU_ITEMSHelp = Comma-separated list of menu item ids exposed in the PWA (e.g. home,thirdparties,contacts,proposals,invoices). Leave empty to expose every item the user has Dolibarr rights for. Available ids: home, thirdparties, contacts, proposals, orders, invoices, supplier-orders, supplier-invoices, products, warehouses, stock, agenda, documents.
+
+#
+# PWA menu sections and items
+#
+DolipocketMenuMain = Main
+DolipocketMenuRelations = Relations
+DolipocketMenuSales = Sales
+DolipocketMenuPurchase = Purchase
+DolipocketMenuCatalog = Catalog
+DolipocketMenuTransverse = Transverse
+DolipocketMenuHome = Dashboard
+DolipocketMenuThirdparties = Thirdparties
+DolipocketMenuContacts = Contacts
+DolipocketMenuProposals = Proposals
+DolipocketMenuOrders = Orders
+DolipocketMenuInvoices = Invoices
+DolipocketMenuSupplierOrders = Supplier orders
+DolipocketMenuSupplierInvoices = Supplier invoices
+DolipocketMenuProducts = Products
+DolipocketMenuWarehouses = Warehouses
+DolipocketMenuStock = Stock
+DolipocketMenuAgenda = Agenda
+DolipocketMenuDocuments = Documents
+
+#
+# Extrafields admin page (used by admin/smartmaker.php at runtime)
+#
+Visible = Visible
+Editable = Editable
+Extrafield = Extra field
+Extrafields = Extra fields
+NoExtrafieldsFound = No extra fields found
+
+#
+# About page
+#
+About = About
+DolipocketAbout = About Dolipocket
+DolipocketAboutPage = Dolipocket about page
+DolipocketDoYouLikeModule = Do you like Dolipocket?
+DolipocketFeedbackIntro = Share your feedback, suggestions, or bug reports to help us improve Dolipocket.
+DolipocketYourRating = Your rating
+DolipocketYourFeedback = Your feedback
+DolipocketYourEmail = Your email
+DolipocketFeedbackPlaceholder = Tell us what you like, what could be improved...
+DolipocketSendFeedback = Send my feedback
+DolipocketFeedbackSent = Thank you for your feedback!
+DolipocketFeedbackSendError = Error sending feedback
+DolipocketFeedbackButton = Send feedback
+DolipocketBuyMeACoffee = Buy us a coffee
+DolipocketDonationText = Dolipocket required time to design and build. If you find it useful and want to support the project, consider buying us a coffee. Every contribution helps keep development active.
+DolipocketDonateIntro = Support the development of Dolipocket with a donation.
+DolipocketDonateButton = Make a donation
+DolipocketOfferCoffee = Buy a coffee ... or a little more
+DolipocketLinks = Useful links
+DolipocketDocLink = User documentation
+DolipocketSourceLink = Source code
+DolipocketContactLink = Contact the publisher
+OnlineDocumentation = Online documentation
+AboutModuleInfo = Module information
+AboutUsefulLinks = Useful links
+AboutSAV = Support
+AboutForum = Forum
+AboutContact = Contact
+DolibarrMinVersion = Minimum Dolibarr version
+PHPMinVersion = Minimum PHP version
+
+#
+# Sample page
+#
+DolipocketArea = Home Dolipocket
+MyPageName = My page name
+
+#
+# Sample widget
+#
+MyWidget = My widget
+MyWidgetDescription = My widget description

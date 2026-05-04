@@ -1,0 +1,154 @@
+/* 
+    --breakpoint-tab: 40rem;
+    --breakpoint-lap: 64rem;
+    --breakpoint-des: 80rem; */
+
+@layer base {
+    * {
+      @apply box-border p-0 m-0;
+      -ms-overflow-style: none;  /* Pour Internet Explorer */
+      scrollbar-width: none;  /* Pour Firefox */
+
+    }
+
+    *::-webkit-scrollbar {
+      display: none;  /* Cache la scrollbar pour les navigateurs Webkit */
+    }
+  
+    .scroll-hidden {
+      -ms-overflow-style: none;  /* Pour Internet Explorer */
+      scrollbar-width: none;  /* Pour Firefox */
+    }
+    
+    .scroll-hidden::-webkit-scrollbar {
+      display: none;  /* Cache la scrollbar pour les navigateurs Webkit */
+    }
+  
+    /* Firefox */
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+    /* Chrome, Safari */
+    input[type=number] {
+      -webkit-appearance: textfield;
+    }
+    /* Chrome */
+    input::-webkit-inner-spin-button,
+    input::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    /* input[type=range]::-webkit-slider-runnable-track {
+      @apply h-2 rounded-full bg-strong-bg;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      @apply w-4 h-4 rounded-full border-4 bg-soft-bg border-primary;
+    }
+    input[type=range]::-moz-range-track {
+      @apply h-2 rounded-full bg-strong-bg;
+    }
+    input[type=range]::-moz-range-progress {
+      @apply h-2 rounded-full bg-primary;
+    }
+    input[type=range]::-moz-range-thumb {
+      @apply w-4 h-4 rounded-full border-4 bg-soft-bg border-primary;
+    }
+    input[type=range]::-ms-track {
+      @apply h-2 rounded-full bg-strong-bg;
+    }
+    input[type=range]::-ms-fill-lower {
+      @apply h-2 rounded-full bg-primary;
+    }
+    input[type=range]::-ms-thumb {
+      @apply w-4 h-4 rounded-full border-4 bg-soft-bg border-primary;
+    } */
+
+    .custom-shape-divider-top-1758547995 {
+        /* position: absolute;
+        top: 0;
+        left: 0; */
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+    }
+
+    .custom-shape-divider-top-1758547995 svg {
+        position: relative;
+        display: block;
+        width: calc(100% + 1.3px);
+        height: 150px;
+        transform: rotateY(180deg);
+    }
+
+    .custom-shape-divider-top-1758547995 .shape-fill {
+        /* fill: transparent; */
+    }
+
+    /** For mobile devices **/
+    @media (max-width: 767px) {
+        .custom-shape-divider-top-1758547995 svg {
+            width: calc(225% + 1.3px);
+            height: 156px;
+        }
+    }
+
+    .login-custom-shape-divider-top-1758547995 {
+        /* position: absolute;
+        top: 0;
+        left: 0; */
+        position: relative;
+        width: 100%;
+        overflow: hidden;
+        line-height: 0;
+    }
+
+    .login-custom-shape-divider-top-1758547995 svg {
+        position: relative;
+        display: block;
+        width: calc(100% + 1.3px);
+        height: 150px;
+        transform: rotateY(180deg);
+    }
+
+    .login-custom-shape-divider-top-1758547995 .shape-fill {
+        /* fill: transparent; */
+    }
+
+    /** For mobile devices **/
+    @media (max-width: 767px) {
+        .login-custom-shape-divider-top-1758547995 svg {
+            width: calc(225% + 1.3px);
+            height: 300px;
+        }
+    }
+
+    .linear-text {
+      -webkit-text-fill-color: transparent;
+
+      /* Depends on the navigator */
+      -webkit-background-clip: text;
+      background-clip: text;
+    }
+
+    /* Bottom nav safe area for iOS */
+    .safe-area-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    /* Slide up animation for MoreMenu panel */
+    @keyframes slide-up {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+    .animate-slide-up {
+      animation: slide-up 200ms ease-out;
+    }
+
+    /* Bottom nav spacer to prevent content from hiding behind the bar */
+    .pb-bottom-nav {
+      padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+}
+  

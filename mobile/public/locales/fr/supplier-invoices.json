@@ -1,0 +1,84 @@
+{
+    "title": "Factures fournisseur",
+    "list": {
+        "search-placeholder": "Rechercher une facture...",
+        "filter-all": "Toutes",
+        "filter-draft": "Brouillon",
+        "filter-validated": "Validée",
+        "filter-paid": "Réglée",
+        "filter-abandoned": "Abandonnée",
+        "filter-unpaid": "Impayée",
+        "empty": "Aucune facture fournisseur trouvée",
+        "create": "Nouvelle facture"
+    },
+    "fiche": {
+        "section-header": "En-tête",
+        "section-supplier": "Fournisseur",
+        "section-dates": "Dates",
+        "section-totals": "Totaux",
+        "section-lines": "Lignes",
+        "section-payment": "Règlement",
+        "section-notes": "Notes",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer cette facture ? Cette action est irréversible.",
+        "no-lines": "Aucune ligne sur cette facture",
+        "add-line": "Ajouter une ligne"
+    },
+    "edit": {
+        "title-create": "Nouvelle facture fournisseur",
+        "title-edit": "Modifier la facture",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "ref": "Référence",
+        "ref-supplier": "Référence fournisseur",
+        "libelle": "Libellé",
+        "supplier": "Fournisseur",
+        "type": "Type de facture",
+        "datef": "Date de facture",
+        "date-lim-reglement": "Date d'échéance",
+        "cond-reglement": "Conditions de règlement",
+        "mode-reglement": "Mode de règlement",
+        "note-public": "Note publique",
+        "note-private": "Note privée",
+        "line-product": "Produit",
+        "line-description": "Description",
+        "line-qty": "Quantité",
+        "line-subprice": "Prix unitaire HT",
+        "line-tva": "TVA",
+        "line-discount": "Remise %",
+        "line-total-ht": "Total HT",
+        "line-save": "Enregistrer la ligne",
+        "line-delete": "Supprimer la ligne"
+    },
+    "status": {
+        "draft": "Brouillon",
+        "validated": "Validée",
+        "paid": "Réglée",
+        "abandoned": "Abandonnée"
+    },
+    "paye": {
+        "yes": "Réglée",
+        "no": "Non réglée"
+    },
+    "workflow": {
+        "validate": "Valider",
+        "validate-confirm": "Valider cette facture ?",
+        "create-from-order": "Créer depuis commande",
+        "create-from-order-confirm": "Créer une facture depuis cette commande fournisseur ?",
+        "close-paid": "Marquer comme réglée"
+    },
+    "toasts": {
+        "create-success": "Facture créée",
+        "update-success": "Facture mise à jour",
+        "delete-success": "Facture supprimée",
+        "validate-success": "Facture validée",
+        "create-from-order-success": "Facture créée depuis la commande",
+        "line-add-success": "Ligne ajoutée",
+        "line-update-success": "Ligne mise à jour",
+        "line-delete-success": "Ligne supprimée",
+        "load-error": "Impossible de charger les factures fournisseur",
+        "save-error": "Impossible d'enregistrer la facture",
+        "workflow-error": "Action impossible sur cette facture"
+    }
+}

@@ -1,0 +1,48 @@
+{
+    "title": "Contacts",
+    "list": {
+        "search-placeholder": "Search a contact...",
+        "filter-all": "All",
+        "filter-by-thirdparty": "Filter by third party",
+        "empty": "No contact found",
+        "create": "New contact"
+    },
+    "fiche": {
+        "section-identity": "Identity",
+        "section-address": "Address",
+        "section-contact": "Contact",
+        "section-notes": "Notes",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this contact? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New contact",
+        "title-edit": "Edit contact",
+        "save": "Save",
+        "cancel": "Cancel",
+        "lastname": "Last name",
+        "firstname": "First name",
+        "civility": "Civility",
+        "fk-soc": "Third party",
+        "address": "Address",
+        "zip": "ZIP code",
+        "town": "City",
+        "country": "Country",
+        "phone-pro": "Work phone",
+        "phone-mobile": "Mobile phone",
+        "fax": "Fax",
+        "email": "Email",
+        "poste": "Job title",
+        "statut": "Status",
+        "note-public": "Public note",
+        "note-private": "Private note"
+    },
+    "toasts": {
+        "create-success": "Contact created",
+        "update-success": "Contact updated",
+        "delete-success": "Contact deleted",
+        "load-error": "Failed to load contacts",
+        "save-error": "Failed to save contact"
+    }
+}

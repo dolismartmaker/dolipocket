@@ -1,0 +1,69 @@
+{
+    "title": "Agenda",
+    "list": {
+        "search-placeholder": "Rechercher un événement...",
+        "filter-all": "Tous",
+        "filter-todo": "À faire",
+        "filter-done": "Terminé",
+        "empty": "Aucun événement trouvé",
+        "create": "Nouvel événement"
+    },
+    "fiche": {
+        "section-event": "Événement",
+        "section-when": "Quand",
+        "section-who": "Qui",
+        "section-link": "Lien",
+        "section-notes": "Notes",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer cet événement ? Cette action est irréversible."
+    },
+    "edit": {
+        "title-create": "Nouvel événement",
+        "title-edit": "Modifier l'événement",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "label": "Libellé",
+        "type": "Type",
+        "datep": "Date de début",
+        "datef": "Date de fin",
+        "fulldayevent": "Toute la journée",
+        "percentage": "Avancement",
+        "location": "Lieu",
+        "user-action": "Auteur",
+        "user-assigned": "Affecté à",
+        "thirdparty": "Tiers lié",
+        "contact": "Contact lié",
+        "note": "Note"
+    },
+    "status": {
+        "todo": "À faire",
+        "in-progress": "En cours",
+        "done": "Terminé"
+    },
+    "types": {
+        "meeting": "Rendez-vous",
+        "phone": "Téléphone",
+        "email": "Email",
+        "task": "Tâche",
+        "other": "Autre"
+    },
+    "view-modes": {
+        "list": "Liste",
+        "day": "Jour",
+        "week": "Semaine",
+        "month": "Mois"
+    },
+    "workflow": {
+        "mark-done": "Marquer terminé",
+        "mark-done-confirm": "Marquer cet événement comme terminé ?"
+    },
+    "toasts": {
+        "create-success": "Événement créé",
+        "update-success": "Événement mis à jour",
+        "delete-success": "Événement supprimé",
+        "mark-done-success": "Événement marqué comme terminé",
+        "load-error": "Impossible de charger les événements",
+        "save-error": "Impossible d'enregistrer l'événement"
+    }
+}

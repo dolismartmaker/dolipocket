@@ -1,0 +1,8 @@
+# do not put in your repository that files (auto build by smart* scripts)
+assets
+images
+index.html
+*.js
+*.map
+manifest.webmanifest
+locales

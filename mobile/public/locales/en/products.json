@@ -1,0 +1,50 @@
+{
+    "title": "Products and services",
+    "list": {
+        "search-placeholder": "Search a product...",
+        "filter-all": "All",
+        "filter-products": "Products",
+        "filter-services": "Services",
+        "empty": "No product found",
+        "create": "New product"
+    },
+    "fiche": {
+        "section-identity": "Identity",
+        "section-pricing": "Pricing",
+        "section-stock": "Stock",
+        "section-dimensions": "Dimensions",
+        "section-status": "Status",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this product? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New product",
+        "title-edit": "Edit product",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ref": "Reference",
+        "label": "Label",
+        "description": "Description",
+        "type": "Type",
+        "type-product": "Product",
+        "type-service": "Service",
+        "price": "Net price",
+        "price-ttc": "Gross price",
+        "tva-tx": "VAT rate",
+        "weight": "Weight",
+        "length": "Length",
+        "width": "Width",
+        "height": "Height",
+        "barcode": "Barcode",
+        "status": "For sale",
+        "status-buy": "For purchase"
+    },
+    "toasts": {
+        "create-success": "Product created",
+        "update-success": "Product updated",
+        "delete-success": "Product deleted",
+        "load-error": "Failed to load products",
+        "save-error": "Failed to save product"
+    }
+}

@@ -1,0 +1,43 @@
+{
+    "title": "Warehouses",
+    "list": {
+        "search-placeholder": "Search a warehouse...",
+        "filter-all": "All",
+        "empty": "No warehouse found",
+        "create": "New warehouse"
+    },
+    "fiche": {
+        "section-identity": "Identity",
+        "section-address": "Address",
+        "section-contact": "Contact",
+        "section-hierarchy": "Hierarchy",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this warehouse? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New warehouse",
+        "title-edit": "Edit warehouse",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ref": "Reference",
+        "label": "Label",
+        "description": "Description",
+        "lieu": "Location",
+        "address": "Address",
+        "zip": "ZIP code",
+        "town": "City",
+        "country": "Country",
+        "phone": "Phone",
+        "fax": "Fax",
+        "statut": "Status",
+        "fk-parent": "Parent warehouse"
+    },
+    "toasts": {
+        "create-success": "Warehouse created",
+        "update-success": "Warehouse updated",
+        "delete-success": "Warehouse deleted",
+        "load-error": "Failed to load warehouses",
+        "save-error": "Failed to save warehouse"
+    }
+}

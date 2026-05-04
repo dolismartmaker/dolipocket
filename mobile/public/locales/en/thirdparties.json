@@ -1,0 +1,53 @@
+{
+    "title": "Third parties",
+    "list": {
+        "search-placeholder": "Search a third party...",
+        "filter-all": "All",
+        "filter-clients": "Customers",
+        "filter-suppliers": "Suppliers",
+        "empty": "No third party found",
+        "create": "New third party"
+    },
+    "fiche": {
+        "section-identity": "Identity",
+        "section-address": "Address",
+        "section-contact": "Contact",
+        "section-fiscal": "Fiscal",
+        "section-notes": "Notes",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this third party? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New third party",
+        "title-edit": "Edit third party",
+        "save": "Save",
+        "cancel": "Cancel",
+        "name": "Name",
+        "name-alias": "Alias",
+        "code-client": "Customer code",
+        "code-fournisseur": "Supplier code",
+        "client": "Customer",
+        "fournisseur": "Supplier",
+        "address": "Address",
+        "zip": "ZIP code",
+        "town": "City",
+        "country": "Country",
+        "phone": "Phone",
+        "email": "Email",
+        "url": "Website",
+        "siren": "SIREN",
+        "siret": "SIRET",
+        "ape": "APE code",
+        "tva-intra": "VAT number",
+        "note-public": "Public note",
+        "note-private": "Private note"
+    },
+    "toasts": {
+        "create-success": "Third party created",
+        "update-success": "Third party updated",
+        "delete-success": "Third party deleted",
+        "load-error": "Failed to load third parties",
+        "save-error": "Failed to save third party"
+    }
+}

@@ -1,0 +1,84 @@
+{
+    "title": "Factures",
+    "title-singular": "Facture",
+    "list": {
+        "search-placeholder": "Rechercher une facture...",
+        "empty": "Aucune facture trouvée",
+        "create": "Nouvelle facture",
+        "filter-status": "Statut",
+        "filter-paye": "Paiement",
+        "filter-all": "Tous",
+        "filter-paye-yes": "Réglée",
+        "filter-paye-no": "Non réglée",
+        "filter-socid": "Tiers"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes",
+        "section-totals": "Totaux",
+        "section-notes": "Notes",
+        "section-actions": "Actions",
+        "section-payments": "Paiements",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer cette facture ? Cette action est irréversible.",
+        "total-paid": "Total réglé",
+        "remain-to-pay": "Reste à payer"
+    },
+    "edit": {
+        "title-create": "Nouvelle facture",
+        "title-edit": "Modifier la facture",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "ref": "Référence",
+        "ref-client": "Référence client",
+        "socid": "Tiers",
+        "type": "Type",
+        "datef": "Date de facture",
+        "date-lim-reglement": "Échéance",
+        "total-ht": "Total HT",
+        "total-ttc": "Total TTC",
+        "total-tva": "Total TVA",
+        "fk-cond-reglement": "Conditions de règlement",
+        "fk-mode-reglement": "Mode de règlement",
+        "note-public": "Note publique",
+        "note-private": "Note privée"
+    },
+    "lines": {
+        "add-line": "Ajouter une ligne",
+        "edit-line": "Modifier la ligne",
+        "delete-line": "Supprimer la ligne",
+        "label": "Libellé",
+        "description": "Description",
+        "qty": "Quantité",
+        "subprice": "Prix unitaire HT",
+        "tva": "TVA (%)",
+        "remise": "Remise (%)",
+        "total": "Total HT",
+        "product-type": "Type",
+        "empty": "Aucune ligne"
+    },
+    "actions": {
+        "validate": "Valider",
+        "create-from-order": "Créer depuis une commande"
+    },
+    "status": {
+        "draft": "Brouillon",
+        "validated": "Validée",
+        "paid": "Réglée",
+        "abandoned": "Abandonnée"
+    },
+    "toasts": {
+        "create-success": "Facture créée",
+        "update-success": "Facture mise à jour",
+        "delete-success": "Facture supprimée",
+        "validate-success": "Facture validée",
+        "create-from-order-success": "Facture créée depuis la commande",
+        "line-add-success": "Ligne ajoutée",
+        "line-update-success": "Ligne mise à jour",
+        "line-delete-success": "Ligne supprimée",
+        "load-error": "Impossible de charger les factures",
+        "save-error": "Impossible d'enregistrer la facture",
+        "action-error": "L'action a échoué"
+    }
+}

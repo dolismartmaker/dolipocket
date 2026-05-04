@@ -1,0 +1,25 @@
+{
+    "title": "Documents",
+    "list": {
+        "empty": "Aucun document",
+        "search-placeholder": "Rechercher un document..."
+    },
+    "types": {
+        "product": "Produit",
+        "thirdparty": "Tiers",
+        "project": "Projet",
+        "intervention": "Intervention",
+        "category": "Catégorie"
+    },
+    "actions": {
+        "upload": "Téléverser",
+        "download": "Télécharger",
+        "share-via-bundle": "Télécharger en lot (ZIP)"
+    },
+    "toasts": {
+        "upload-success": "Document téléversé",
+        "attach-success": "Document attaché",
+        "attach-error": "Échec de l'attachement",
+        "download-error": "Erreur lors du téléchargement du document"
+    }
+}

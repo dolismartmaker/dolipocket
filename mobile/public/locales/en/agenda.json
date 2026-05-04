@@ -1,0 +1,69 @@
+{
+    "title": "Agenda",
+    "list": {
+        "search-placeholder": "Search an event...",
+        "filter-all": "All",
+        "filter-todo": "To do",
+        "filter-done": "Done",
+        "empty": "No event found",
+        "create": "New event"
+    },
+    "fiche": {
+        "section-event": "Event",
+        "section-when": "When",
+        "section-who": "Who",
+        "section-link": "Link",
+        "section-notes": "Notes",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this event? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New event",
+        "title-edit": "Edit event",
+        "save": "Save",
+        "cancel": "Cancel",
+        "label": "Label",
+        "type": "Type",
+        "datep": "Start date",
+        "datef": "End date",
+        "fulldayevent": "All day",
+        "percentage": "Progress",
+        "location": "Location",
+        "user-action": "Author",
+        "user-assigned": "Assigned to",
+        "thirdparty": "Linked thirdparty",
+        "contact": "Linked contact",
+        "note": "Note"
+    },
+    "status": {
+        "todo": "To do",
+        "in-progress": "In progress",
+        "done": "Done"
+    },
+    "types": {
+        "meeting": "Meeting",
+        "phone": "Phone call",
+        "email": "Email",
+        "task": "Task",
+        "other": "Other"
+    },
+    "view-modes": {
+        "list": "List",
+        "day": "Day",
+        "week": "Week",
+        "month": "Month"
+    },
+    "workflow": {
+        "mark-done": "Mark as done",
+        "mark-done-confirm": "Mark this event as done?"
+    },
+    "toasts": {
+        "create-success": "Event created",
+        "update-success": "Event updated",
+        "delete-success": "Event deleted",
+        "mark-done-success": "Event marked as done",
+        "load-error": "Failed to load events",
+        "save-error": "Failed to save event"
+    }
+}

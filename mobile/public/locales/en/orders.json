@@ -1,0 +1,77 @@
+{
+    "title": "Customer orders",
+    "title-singular": "Order",
+    "list": {
+        "search-placeholder": "Search an order...",
+        "empty": "No order found",
+        "create": "New order",
+        "filter-status": "Status",
+        "filter-all": "All",
+        "filter-socid": "Third party"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Lines",
+        "section-totals": "Totals",
+        "section-notes": "Notes",
+        "section-actions": "Actions",
+        "edit": "Edit",
+        "delete": "Delete",
+        "delete-confirm": "Delete this order? This cannot be undone."
+    },
+    "edit": {
+        "title-create": "New order",
+        "title-edit": "Edit order",
+        "save": "Save",
+        "cancel": "Cancel",
+        "ref": "Reference",
+        "ref-client": "Customer reference",
+        "socid": "Third party",
+        "date-commande": "Order date",
+        "date-livraison": "Delivery date",
+        "total-ht": "Total excl. tax",
+        "total-ttc": "Total incl. tax",
+        "total-tva": "Total VAT",
+        "fk-cond-reglement": "Payment terms",
+        "fk-mode-reglement": "Payment method",
+        "note-public": "Public note",
+        "note-private": "Private note"
+    },
+    "lines": {
+        "add-line": "Add line",
+        "edit-line": "Edit line",
+        "delete-line": "Delete line",
+        "label": "Label",
+        "description": "Description",
+        "qty": "Quantity",
+        "subprice": "Unit price excl. tax",
+        "tva": "VAT (%)",
+        "remise": "Discount (%)",
+        "total": "Total excl. tax",
+        "product-type": "Type",
+        "empty": "No line"
+    },
+    "actions": {
+        "validate": "Validate",
+        "create-from-proposal": "Create from proposal"
+    },
+    "status": {
+        "draft": "Draft",
+        "validated": "Validated",
+        "shipped": "Shipped",
+        "billed": "Billed"
+    },
+    "toasts": {
+        "create-success": "Order created",
+        "update-success": "Order updated",
+        "delete-success": "Order deleted",
+        "validate-success": "Order validated",
+        "create-from-proposal-success": "Order created from proposal",
+        "line-add-success": "Line added",
+        "line-update-success": "Line updated",
+        "line-delete-success": "Line deleted",
+        "load-error": "Failed to load orders",
+        "save-error": "Failed to save order",
+        "action-error": "Action failed"
+    }
+}

@@ -1,0 +1,36 @@
+{
+    "name": "cap-rel/dolipocket",
+    "description": "Dolipocket - Dolibarr SaaS multi-tenant mobile",
+    "type": "dolibarr-module",
+    "license": "GPL-3.0-or-later",
+    "require": {
+        "php": ">=7.4",
+        "eftec/bladeone": "^4.19"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "phpstan/phpstan": "^1",
+        "cap-rel/dolibarr-integration-sqlite": "18.0.x-dev",
+        "symfony/http-client": "^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Dolipocket\\Web\\": "src/Web/",
+            "Dolipocket\\Tenant\\": "src/Tenant/",
+            "Dolipocket\\Api\\": "smartmaker-api/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Dolipocket\\Tests\\": "test/phpunit/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:unit": "vendor/bin/phpunit --testsuite unit",
+        "test:integration": "vendor/bin/phpunit -c phpunit-integration-dolibarr.xml",
+        "test:http": "vendor/bin/phpunit -c phpunit-http.xml",
+        "phpstan": "phpstan analyse -c .phpstan.local.neon --memory-limit=512M",
+        "test:coverage": "php -d pcov.enabled=1 -d pcov.directory=. vendor/bin/phpunit"
+    }
+}

@@ -1,0 +1,77 @@
+{
+    "title": "Bons de commande",
+    "title-singular": "Bon de commande",
+    "list": {
+        "search-placeholder": "Rechercher une commande...",
+        "empty": "Aucune commande trouvée",
+        "create": "Nouvelle commande",
+        "filter-status": "Statut",
+        "filter-all": "Tous",
+        "filter-socid": "Tiers"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes",
+        "section-totals": "Totaux",
+        "section-notes": "Notes",
+        "section-actions": "Actions",
+        "edit": "Modifier",
+        "delete": "Supprimer",
+        "delete-confirm": "Supprimer cette commande ? Cette action est irréversible."
+    },
+    "edit": {
+        "title-create": "Nouvelle commande",
+        "title-edit": "Modifier la commande",
+        "save": "Enregistrer",
+        "cancel": "Annuler",
+        "ref": "Référence",
+        "ref-client": "Référence client",
+        "socid": "Tiers",
+        "date-commande": "Date de commande",
+        "date-livraison": "Date de livraison",
+        "total-ht": "Total HT",
+        "total-ttc": "Total TTC",
+        "total-tva": "Total TVA",
+        "fk-cond-reglement": "Conditions de règlement",
+        "fk-mode-reglement": "Mode de règlement",
+        "note-public": "Note publique",
+        "note-private": "Note privée"
+    },
+    "lines": {
+        "add-line": "Ajouter une ligne",
+        "edit-line": "Modifier la ligne",
+        "delete-line": "Supprimer la ligne",
+        "label": "Libellé",
+        "description": "Description",
+        "qty": "Quantité",
+        "subprice": "Prix unitaire HT",
+        "tva": "TVA (%)",
+        "remise": "Remise (%)",
+        "total": "Total HT",
+        "product-type": "Type",
+        "empty": "Aucune ligne"
+    },
+    "actions": {
+        "validate": "Valider",
+        "create-from-proposal": "Créer depuis un devis"
+    },
+    "status": {
+        "draft": "Brouillon",
+        "validated": "Validée",
+        "shipped": "Expédiée",
+        "billed": "Facturée"
+    },
+    "toasts": {
+        "create-success": "Commande créée",
+        "update-success": "Commande mise à jour",
+        "delete-success": "Commande supprimée",
+        "validate-success": "Commande validée",
+        "create-from-proposal-success": "Commande créée depuis le devis",
+        "line-add-success": "Ligne ajoutée",
+        "line-update-success": "Ligne mise à jour",
+        "line-delete-success": "Ligne supprimée",
+        "load-error": "Impossible de charger les commandes",
+        "save-error": "Impossible d'enregistrer la commande",
+        "action-error": "L'action a échoué"
+    }
+}

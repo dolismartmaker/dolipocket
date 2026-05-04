@@ -1,0 +1,122 @@
+@theme {
+  /* Colors */
+  --color-primary           : #5fbabf;
+  --color-secondary         : #fc8c8c;
+  --color-tertiary          : #283f5d;
+
+  --color-success           : var(--color-green-500);
+  --color-error             : var(--color-red-500);
+  --color-warning           : var(--color-yellow-500);
+  --color-neutral           : var(--color-gray-500);
+
+  --color-soft-text         : var(--color-gray-400);
+  --color-medium-text       : var(--color-gray-500);
+  --color-strong-text       : var(--color-gray-900);
+
+  --color-soft-bg           : white;
+  --color-medium-bg         : #f7f8fc;                /* var(--color-gray-100); */
+  --color-strong-bg         : var(--color-gray-100);
+
+  --color-border            : var(--color-gray-300);
+
+  --color-soft-border       : var(--color-gray-300);
+  --color-medium-border     : var(--color-gray-400);
+  --color-strong-border     : var(--color-gray-500);
+
+  --color-dark-primary      : #f72d40;
+  --color-dark-secondary    : #fccb4f;
+  
+  --color-dark-success      : var(--color-green-500);
+  --color-dark-error        : var(--color-red-500);
+  --color-dark-warning      : var(--color-yellow-500);
+  --color-dark-neutral      : var(--color-gray-500);
+
+  --color-dark-soft-text    : var(--color-gray-400);
+  --color-dark-medium-text  : var(--color-gray-600);
+  --color-dark-strong-text  : var(--color-white);
+
+  --color-dark-soft-bg      : var(--color-gray-800);
+  --color-dark-medium-bg    : var(--color-gray-900);
+  --color-dark-strong-bg    : var(--color-gray-700);
+
+  --color-dark-border       : var(--color-gray-500);
+
+  /* filter-brightness */
+  --brightness-soft         : 90%;
+  --brightness-medium       : 80%;
+  --brightness-strong       : 70%;
+
+  --brightness-dark-soft    : 120%;
+  --brightness-dark-medium  : 140%;
+  --brightness-dark-strong  : 160%;
+
+  /* border-radius */
+  --radius-app-base         : 0;
+  --radius-app-md           : var(--radius-md);
+  --radius-app-lg           : var(--radius-xl);
+  --radius-app-xl           : 9999px;
+
+  /* font-weight */
+  --font-weight-app-base    : var(--font-weight-normal);
+  --font-weight-app-semibold: var(--font-weight-semibold);
+  --font-weight-app-bold    : var(--font-weight-extrabold);
+
+  /* scale */
+  --scale                   : 1;
+
+  /* font-size */
+  --text-app-xxs            : calc(10px * var(--scale));
+  --text-app-xs             : calc(var(--text-xs) * var(--scale));
+  --text-app-sm             : calc(var(--text-sm) * var(--scale));
+  --text-app-base           : calc(var(--text-base) * var(--scale));
+  --text-app-md             : calc(var(--text-lg) * var(--scale));
+  --text-app-lg             : calc(var(--text-xl) * var(--scale));
+  --text-app-xl             : calc(var(--text-2xl) * var(--scale));
+  --text-app-2xl            : calc(var(--text-3xl) * var(--scale));
+  --text-app-3xl            : calc(var(--text-4xl) * var(--scale));
+  --text-app-4xl            : calc(var(--text-5xl) * var(--scale));
+  --text-app-5xl            : calc(var(--text-6xl) * var(--scale));
+  --text-app-6xl            : calc(var(--text-7xl) * var(--scale));
+
+  /* spacing */
+  --spacing-app-xxs         : calc(4px * var(--scale));
+  --spacing-app-xs          : calc(8px * var(--scale));
+  --spacing-app-sm          : calc(12px * var(--scale));
+  --spacing-app-base        : calc(16px * var(--scale));
+  --spacing-app-md          : calc(24px * var(--scale));
+  --spacing-app-lg          : calc(32px * var(--scale));
+  --spacing-app-xl          : calc(48px * var(--scale));
+
+  /* duration */
+  --instant                 : 50ms;
+  --really-quick            : 100ms;
+  --quick                   : 200ms;
+  --medium                  : 300ms;
+  --slow                    : 1000ms;
+
+
+  /* leading, tracking, shadow, blur, border */
+};
+
+.dark {
+  --color-primary      : #f72d40;
+  --color-secondary    : #fccb4f;
+  --color-success      : var(--color-green-500);
+  --color-error        : var(--color-red-500);
+  --color-warning      : var(--color-yellow-500);
+  --color-neutral      : var(--color-gray-500);
+
+  --color-soft-text    : var(--color-gray-400);
+  --color-medium-text  : var(--color-gray-600);
+  --color-strong-text  : var(--color-white);
+
+  --color-soft-bg      : var(--color-gray-800);
+  --color-medium-bg    : var(--color-gray-900);
+  --color-strong-bg    : var(--color-gray-700);
+
+  --color-border       : var(--color-gray-500);
+
+  --brightness-soft    : 120%;
+  --brightness-medium  : 140%;
+  --brightness-strong  : 160%;
+};
