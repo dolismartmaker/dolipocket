@@ -37,6 +37,9 @@ export const mapLineFromBackend = (raw) => {
         totalTtc: toFloat(raw.total_ttc),
         rang: toInt(raw.rang),
         productType: toInt(raw.product_type),
+        // Section lines (Lot 11). product_type=9 + special_code=0 -> title,
+        // product_type=9 + special_code=104 -> sub-total.
+        specialCode: toInt(raw.special_code),
     };
 };
 
@@ -53,6 +56,8 @@ export const mapLineToBackend = (local) => {
         remise_percent: toFloat(local.remisePercent),
         rang: toInt(local.rang),
         product_type: toInt(local.productType),
+        // Section lines (Lot 11).
+        special_code: toInt(local.specialCode),
     };
 };
 
@@ -77,6 +82,8 @@ export const mapFromBackend = (raw) => {
         fkCondReglement: toInt(raw.fk_cond_reglement),
         fkModeReglement: toInt(raw.fk_mode_reglement),
         thirdpartyName: toStr(raw.thirdparty_name),
+        // Last generated PDF (relative path under DOL_DATA_ROOT).
+        lastMainDoc: toStr(raw.last_main_doc),
         lines: linesRaw.map(mapLineFromBackend).filter(Boolean),
         updatedAt: toInt(raw.tms),
     };

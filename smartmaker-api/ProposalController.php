@@ -19,12 +19,17 @@
 
 namespace Dolipocket\Api;
 
-require_once DOL_DOCUMENT_ROOT . '/comm/propal/class/propal.class.php';
+dol_include_once('/comm/propal/class/propal.class.php');
 dol_include_once('/dolipocket/smartmaker-api/Trait/PaginatedListTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/SendEmailTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/PdfDownloadTrait.php');
 dol_include_once('/dolipocket/smartmaker-api/dmProposal.php');
 
 use Propal;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use Dolipocket\Api\Trait\SendEmailTrait;
+use Dolipocket\Api\Trait\PdfDownloadTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * Customer proposal (devis) API controller.
@@ -48,6 +53,8 @@ use Dolipocket\Api\Trait\PaginatedListTrait;
 class ProposalController
 {
     use PaginatedListTrait;
+    use SendEmailTrait;
+    use PdfDownloadTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -154,6 +161,51 @@ class ProposalController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET proposal/lines/columns
+     *
+     * Returns the catalog describing the proposal-line columns. Same shape
+     * as columns() but built from $listOfPublishedFieldsForLines and the
+     * PropaleLigne class. Cf docs/DATATABLE_SPEC.md section 13.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function linesColumns($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('propal', 'lire')) {
+            dol_syslog("DPK ProposalController::linesColumns forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        return [$this->mapper->getLinesCatalog(), 200];
+    }
+
+    /**
+     * GET proposal/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata: type, label,
+     * required, visible, position, options...). Consumed by the AutoForm
+     * frontend bridge to generate edit forms automatically. Cf
+     * .claude/CLAUDE.md "Form-from-catalog (AutoForm)".
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('propal', 'lire')) {
+            dol_syslog("DPK ProposalController::describe forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -385,10 +437,12 @@ class ProposalController
 
         $propal = new Propal($db);
         $propal->socid = $socid;
-        $propal->date = !empty($arr['datep']) ? (is_numeric($arr['datep']) ? (int) $arr['datep'] : strtotime($arr['datep'])) : dol_now();
+        $datep = self::normalizeTimestamp($arr['datep'] ?? null);
+        $propal->date = $datep !== null ? $datep : dol_now();
         $propal->datep = $propal->date;
-        if (!empty($arr['fin_validite'])) {
-            $propal->fin_validite = is_numeric($arr['fin_validite']) ? (int) $arr['fin_validite'] : strtotime($arr['fin_validite']);
+        $finValidite = self::normalizeTimestamp($arr['fin_validite'] ?? null);
+        if ($finValidite !== null) {
+            $propal->fin_validite = $finValidite;
         }
         if (isset($arr['ref_client'])) {
             $propal->ref_client = $arr['ref_client'];
@@ -444,27 +498,48 @@ class ProposalController
             return [['error' => 'Proposal not found'], 404];
         }
 
-        if (isset($arr['ref_client'])) {
-            $propal->ref_client = $arr['ref_client'];
+        $payload = $arr;
+        unset($payload['id']);
+
+        // Pre-process date fields with the project-specific normalizer.
+        foreach (['datep', 'fin_validite'] as $dateField) {
+            if (isset($payload[$dateField])) {
+                $normalized = self::normalizeTimestamp($payload[$dateField]);
+                if ($normalized !== null) {
+                    $payload[$dateField] = $normalized;
+                } else {
+                    unset($payload[$dateField]);
+                }
+            }
         }
-        if (isset($arr['datep'])) {
-            $propal->date = is_numeric($arr['datep']) ? (int) $arr['datep'] : strtotime($arr['datep']);
-            $propal->datep = $propal->date;
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payload);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK ProposalController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
         }
-        if (isset($arr['fin_validite'])) {
-            $propal->fin_validite = is_numeric($arr['fin_validite']) ? (int) $arr['fin_validite'] : strtotime($arr['fin_validite']);
-        }
-        if (isset($arr['note_public'])) {
-            $propal->note_public = $arr['note_public'];
-        }
-        if (isset($arr['note_private'])) {
-            $propal->note_private = $arr['note_private'];
-        }
-        if (isset($arr['fk_cond_reglement'])) {
-            $propal->cond_reglement_id = (int) $arr['fk_cond_reglement'];
-        }
-        if (isset($arr['fk_mode_reglement'])) {
-            $propal->mode_reglement_id = (int) $arr['fk_mode_reglement'];
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            // Quirk Dolibarr: on Propal, fk_cond_reglement / fk_mode_reglement
+            // are stored on cond_reglement_id / mode_reglement_id PHP properties.
+            if ($field === 'fk_cond_reglement') {
+                $propal->cond_reglement_id = $value;
+                continue;
+            }
+            if ($field === 'fk_mode_reglement') {
+                $propal->mode_reglement_id = $value;
+                continue;
+            }
+            // Quirk Dolibarr: datep is the customer-facing date duplicated onto
+            // $propal->date AND $propal->datep (Propal::update reads $this->date
+            // for the SQL `datep` column, cf propal.class.php:1777).
+            if ($field === 'datep') {
+                $propal->date = $value;
+                $propal->datep = $value;
+                continue;
+            }
+            $propal->$field = $value;
         }
 
         $result = $propal->update($user);
@@ -651,7 +726,55 @@ class ProposalController
         $product_type = isset($arr['product_type']) ? (int) $arr['product_type'] : 0;
         $label = isset($arr['label']) ? (string) $arr['label'] : '';
         $rang = isset($arr['rang']) ? (int) $arr['rang'] : -1;
+        // Section lines (Lot 11). product_type=9 + special_code=0 -> title,
+        // product_type=9 + special_code=104 -> sub-total. Pure label, no
+        // calculation (qty/subprice/tva_tx all 0).
+        $special_code = isset($arr['special_code']) ? (int) $arr['special_code'] : 0;
+        // Service-line dates (typed as Dolibarr dates -- normalised from
+        // milliseconds / ISO strings via PaginatedListTrait::normalizeTimestamp).
+        $dateStart = self::normalizeTimestamp($arr['date_start'] ?? null);
+        $dateEnd = self::normalizeTimestamp($arr['date_end'] ?? null);
+        if ($dateStart === null) $dateStart = '';
+        if ($dateEnd === null) $dateEnd = '';
+        $fk_unit = isset($arr['fk_unit']) && (int) $arr['fk_unit'] > 0 ? (int) $arr['fk_unit'] : null;
 
+        // If a product was picked but description / subprice / tva_tx /
+        // product_type / label were not supplied, hydrate them from the
+        // product record. Mirrors what Dolibarr's standard "addline" form
+        // does after a product is chosen via the prod_entry_mode=predef
+        // radio (cf objectline_create.tpl.php).
+        if ($fk_product > 0) {
+            require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+            $product = new \Product($db);
+            if ($product->fetch($fk_product) > 0) {
+                if ($desc === '') {
+                    $desc = (string) ($product->description !== '' ? $product->description : $product->label);
+                }
+                if ($label === '') {
+                    $label = (string) $product->label;
+                }
+                if (!isset($arr['subprice'])) {
+                    $pu_ht = (float) $product->price;
+                }
+                if (!isset($arr['tva_tx']) && $product->tva_tx !== null) {
+                    $txtva = (string) $product->tva_tx;
+                }
+                if (!isset($arr['product_type'])) {
+                    $product_type = (int) $product->type;
+                }
+                if ($fk_unit === null && !empty($product->fk_unit)) {
+                    $fk_unit = (int) $product->fk_unit;
+                }
+            }
+        }
+
+        // Propal::addline signature (27 args, cf comm/propal/class/propal.class.php:579):
+        //   1 desc, 2 pu_ht, 3 qty, 4 txtva, 5 txlocaltax1, 6 txlocaltax2,
+        //   7 fk_product, 8 remise_percent, 9 price_base_type, 10 pu_ttc,
+        //  11 info_bits, 12 type, 13 rang, 14 special_code, 15 fk_parent_line,
+        //  16 fk_fournprice, 17 pa_ht, 18 label, 19 date_start, 20 date_end,
+        //  21 array_options, 22 fk_unit, 23 origin, 24 origin_id, 25 pu_ht_devise,
+        //  26 fk_remise_except, 27 noupdateafterinsertline
         $result = $propal->addline(
             $desc,
             $pu_ht,
@@ -666,11 +789,15 @@ class ProposalController
             0,
             $product_type,
             $rang,
+            $special_code,
             0,
             0,
             0,
+            $label,
+            $dateStart,
+            $dateEnd,
             0,
-            $label
+            $fk_unit
         );
         if ($result <= 0) {
             dol_syslog("DPK ProposalController::addLine addline() failed: " . $propal->error, LOG_ERR);
@@ -732,7 +859,33 @@ class ProposalController
         $label = isset($arr['label']) ? (string) $arr['label'] : (string) ($existing->label ?? '');
         $type = isset($arr['product_type']) ? (int) $arr['product_type'] : (int) $existing->product_type;
         $rang = isset($arr['rang']) ? (int) $arr['rang'] : (int) ($existing->rang ?? 0);
+        // Preserve special_code on section lines (Lot 11). When the caller
+        // does not supply it, fall back to the existing line's value so we
+        // don't accidentally demote a sub-total / title to a regular line
+        // by updating its description.
+        $special_code = isset($arr['special_code'])
+            ? (int) $arr['special_code']
+            : (int) ($existing->special_code ?? 0);
+        // Service-line dates + unit -- normalised when present, otherwise
+        // we keep the existing line's value (via empty string sentinel for
+        // dates / null for fk_unit which Propal::updateline interprets as
+        // "no change").
+        $dateStart = array_key_exists('date_start', $arr) ? self::normalizeTimestamp($arr['date_start']) : (int) ($existing->date_start ?? 0);
+        $dateEnd = array_key_exists('date_end', $arr) ? self::normalizeTimestamp($arr['date_end']) : (int) ($existing->date_end ?? 0);
+        if ($dateStart === null) $dateStart = '';
+        if ($dateEnd === null) $dateEnd = '';
+        $fk_unit = array_key_exists('fk_unit', $arr)
+            ? ((int) $arr['fk_unit'] > 0 ? (int) $arr['fk_unit'] : null)
+            : (isset($existing->fk_unit) ? (int) $existing->fk_unit : null);
 
+        // Propal::updateline signature (24 args):
+        //   1 rowid, 2 pu, 3 qty, 4 remise_percent, 5 txtva,
+        //   6 txlocaltax1, 7 txlocaltax2, 8 desc, 9 price_base_type,
+        //  10 info_bits, 11 special_code, 12 fk_parent_line,
+        //  13 skip_update_total, 14 fk_fournprice, 15 pa_ht,
+        //  16 label, 17 type, 18 date_start, 19 date_end,
+        //  20 array_options, 21 fk_unit, 22 pu_ht_devise,
+        //  23 notrigger, 24 rang
         $result = $propal->updateline(
             $lineid,
             $pu,
@@ -744,17 +897,17 @@ class ProposalController
             $desc,
             'HT',
             0,
-            0,
+            $special_code,
             0,
             0,
             0,
             0,
             $label,
             $type,
-            '',
-            '',
+            $dateStart,
+            $dateEnd,
             0,
-            null,
+            $fk_unit,
             0,
             0,
             $rang
@@ -806,5 +959,116 @@ class ProposalController
         $propal->fetch($id);
         $propal->fetch_lines();
         return [$this->mapper->exportMappedData($propal), 200];
+    }
+
+    /**
+     * POST proposal/{id}/pdf
+     *
+     * Generate the PDF document for the proposal using the configured
+     * model (Dolibarr conf $conf->global->PROPALE_ADDON_PDF, falls back to
+     * 'azur'). Mirrors what the Dolibarr standard "(Re)generate" button
+     * does on the proposal card.
+     *
+     * Body params:
+     *   - model    (optional) -- override the PDF model name
+     *   - lang     (optional) -- output language
+     *   - hideref  / hidedesc / hidedetails (optional bool)
+     *
+     * Returns { ok, file } where `file` is the basename of the generated
+     * PDF (saved under documents/<entity>/propale/<ref>/).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function generatePdf($arr = null)
+    {
+        global $db, $user, $langs, $conf;
+
+        if (!$user->hasRight('propal', 'creer') && !$user->hasRight('propal', 'lire')) {
+            dol_syslog("DPK ProposalController::generatePdf forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProposalController::generatePdf missing id", LOG_WARNING);
+            return [['error' => 'Proposal id is required'], 400];
+        }
+
+        $propal = new Propal($db);
+        if ($propal->fetch($id) <= 0) {
+            dol_syslog("DPK ProposalController::generatePdf not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Proposal not found'], 404];
+        }
+        $propal->fetch_lines();
+        $propal->fetch_thirdparty();
+
+        $model = isset($arr['model']) && trim((string) $arr['model']) !== ''
+            ? (string) $arr['model']
+            : (string) (getDolGlobalString('PROPALE_ADDON_PDF') ?: 'azur');
+        $hideref = isset($arr['hideref']) ? (int) $arr['hideref'] : 0;
+        $hidedesc = isset($arr['hidedesc']) ? (int) $arr['hidedesc'] : 0;
+        $hidedetails = isset($arr['hidedetails']) ? (int) $arr['hidedetails'] : 0;
+
+        $result = $propal->generateDocument($model, $langs, $hidedetails, $hidedesc, $hideref);
+        if ($result <= 0) {
+            dol_syslog("DPK ProposalController::generatePdf generateDocument() failed: " . $propal->error, LOG_ERR);
+            return [['error' => 'Failed to generate PDF: ' . $propal->error], 500];
+        }
+
+        return [
+            ['ok' => true, 'file' => $propal->last_main_doc ?? '', 'model' => $model],
+            200,
+        ];
+    }
+
+    /**
+     * POST proposal/{id}/send
+     *
+     * Send the proposal by email with the last generated PDF attached.
+     * Cf .claude/CLAUDE.md "Envoi par email" (todo.md task 1).
+     *
+     * Body params:
+     *   - to              (required, email)
+     *   - subject         (optional, defaults to "Devis <ref>")
+     *   - body            (optional, defaults to subject)
+     *   - cc / bcc        (optional, CSV of emails)
+     *   - attachment_path (optional, override last_main_doc)
+     *   - ishtml          (optional 0|1)
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function send($arr = null)
+    {
+        return $this->sendEmail($arr, [
+            'objectClass'   => '\\Propal',
+            'permGroup'     => 'propal',
+            'logTag'        => 'ProposalController',
+            'notFoundLabel' => 'Proposal',
+            'defaultModel'  => 'azur',
+            'addonPdfKey'   => 'PROPALE_ADDON_PDF',
+            'subjectPrefix' => 'Devis',
+        ]);
+    }
+
+    /**
+     * GET proposal/{id}/pdf/download
+     *
+     * Stream the last generated PDF for the proposal. Reads $obj->last_main_doc
+     * (set by generateDocument). Does NOT regenerate the PDF -- the caller
+     * must hit POST proposal/{id}/pdf separately if needed. Cf todo.md task 3.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function download($arr = null)
+    {
+        return $this->downloadPdf($arr, [
+            'objectClass'   => '\\Propal',
+            'permGroup'     => 'propal',
+            'logTag'        => 'ProposalController',
+            'notFoundLabel' => 'Proposal',
+        ]);
     }
 }

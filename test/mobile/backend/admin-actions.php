@@ -106,6 +106,42 @@ switch ($subcommand) {
         reply(['ok' => true, 'count' => (int) $row->n]);
         // no break
 
+    case 'create-thirdparty':
+        $entity = (int) ($args[0] ?? 0);
+        $name = (string) ($args[1] ?? '');
+        if ($entity <= 0 || $name === '') {
+            reply(['ok' => false, 'error' => 'missing_args']);
+        }
+        $conf->entity = $entity;
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+        $soc = new Societe($db);
+        $soc->name = $name;
+        $soc->client = 1;
+        $soc->status = 1;
+        $soc->entity = $entity;
+        $r = $soc->create($user);
+        if ($r <= 0) {
+            reply(['ok' => false, 'error' => $soc->error ?? 'create_failed']);
+        }
+        reply(['ok' => true, 'id' => (int) $r]);
+        // no break
+
+    case 'delete-proposal':
+        $entity = (int) ($args[0] ?? 0);
+        $propId = (int) ($args[1] ?? 0);
+        if ($entity <= 0 || $propId <= 0) {
+            reply(['ok' => false, 'error' => 'missing_args']);
+        }
+        $conf->entity = $entity;
+        require_once DOL_DOCUMENT_ROOT . '/comm/propal/class/propal.class.php';
+        $propal = new Propal($db);
+        if ($propal->fetch($propId) <= 0) {
+            reply(['ok' => false, 'error' => 'not_found', 'deleted' => 0]);
+        }
+        $r = $propal->delete($user);
+        reply(['ok' => $r > 0, 'deleted' => $r > 0 ? 1 : 0, 'error' => $r <= 0 ? ($propal->error ?? 'unknown') : null]);
+        // no break
+
     default:
         reply(['ok' => false, 'error' => 'unknown_subcommand', 'subcommand' => $subcommand]);
 }

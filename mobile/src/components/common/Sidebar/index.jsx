@@ -43,7 +43,7 @@ export const Sidebar = ({ collapsed, onToggle }) => {
 
     return (
         <aside
-            className={`hidden md:flex flex-col bg-soft-bg border-r border-soft-border h-screen sticky top-0 transition-all duration-200 z-30 ${
+            className={`flex flex-col bg-soft-bg border-r border-soft-border h-screen sticky top-0 transition-[width] duration-200 z-30 ${
                 collapsed ? "w-16" : "w-56"
             }`}
         >

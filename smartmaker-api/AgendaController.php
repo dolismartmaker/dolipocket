@@ -22,6 +22,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
 dol_include_once('/dolipocket/smartmaker-api/dmAgenda.php');
 
 use ActionComm;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * Agenda (ActionComm) controller for Dolipocket.
@@ -136,6 +137,49 @@ class AgendaController
         $db->free($resql);
 
         return [$events, 200];
+    }
+
+    /**
+     * GET event/columns
+     *
+     * Returns the normalized column catalog for the DataTable / DocumentHeaderFields
+     * consumer. Cf .claude/CLAUDE.md "Lot 6 v2 - DataTable single source of truth"
+     * + "Lot 8 - Pages détail catalogue-driven".
+     *
+     * @param  array|null $arr Unused (no params).
+     * @return array            [data, httpCode]
+     */
+    public function columns($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('agenda', 'myactions', 'read')) {
+            dol_syslog('DPK AgendaController::columns denied: missing agenda.myactions.read for user '.((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->getMapper()->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET event/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param  array|null $arr Unused (no params).
+     * @return array            [data, httpCode]
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('agenda', 'myactions', 'read')) {
+            dol_syslog('DPK AgendaController::describe denied: missing agenda.myactions.read for user '.((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->getMapper()->objectDesc(), 200];
     }
 
     /**
@@ -268,50 +312,43 @@ class AgendaController
             return [['error' => 'Access denied'], 403];
         }
 
-        if (isset($arr['label'])) {
-            $event->label = trim((string) $arr['label']);
+        $payload = $arr;
+        unset($payload['id']);
+
+        // Legacy API write key fk_user_assigned has no entry in
+        // listOfPublishedFields (the symmetric read key is fk_user_action).
+        // Translate the legacy write key into the appside key the mapper
+        // recognises BEFORE importMappedData() sees the payload.
+        if (isset($payload['fk_user_assigned'])) {
+            $payload['fk_user_action'] = $payload['fk_user_assigned'];
+            unset($payload['fk_user_assigned']);
         }
-        if (isset($arr['type_code'])) {
-            $event->type_code = (string) $arr['type_code'];
-            // type_id needs reset so create()/update() resolve from type_code
-            $event->type_id = 0;
+
+        // parseDate returns null for invalid/empty, int otherwise. We apply
+        // it BEFORE importMappedData to preserve the legacy semantic where
+        // an empty datep/datef value clears the SQL column to null.
+        foreach (['datep', 'datef'] as $dateField) {
+            if (array_key_exists($dateField, $payload)) {
+                $payload[$dateField] = $this->parseDate($payload[$dateField]);
+            }
         }
-        if (isset($arr['datep'])) {
-            $event->datep = !empty($arr['datep']) ? $this->parseDate($arr['datep']) : null;
+
+        try {
+            $sanitized = $this->getMapper()->importMappedData($payload);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK AgendaController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
         }
-        if (isset($arr['datef'])) {
-            $event->datef = !empty($arr['datef']) ? $this->parseDate($arr['datef']) : null;
-        }
-        if (isset($arr['fulldayevent'])) {
-            $event->fulldayevent = !empty($arr['fulldayevent']) ? 1 : 0;
-        }
-        if (isset($arr['location'])) {
-            $event->location = (string) $arr['location'];
-        }
-        if (isset($arr['note'])) {
-            $event->note_private = (string) $arr['note'];
-        }
-        if (isset($arr['percentage'])) {
-            $event->percentage = (int) $arr['percentage'];
-        }
-        if (isset($arr['status'])) {
-            $event->status = (int) $arr['status'];
-        }
-        if (isset($arr['socid'])) {
-            $event->socid = !empty($arr['socid']) ? (int) $arr['socid'] : 0;
-        }
-        if (isset($arr['fk_contact'])) {
-            $event->contact_id = !empty($arr['fk_contact']) ? (int) $arr['fk_contact'] : 0;
-        }
-        if (isset($arr['fk_element'])) {
-            $event->fk_element = !empty($arr['fk_element']) ? (int) $arr['fk_element'] : 0;
-        }
-        if (isset($arr['elementtype'])) {
-            $event->elementtype = (string) $arr['elementtype'];
-        }
-        if (!empty($arr['fk_user_assigned'])) {
-            $newAssignee = (int) $arr['fk_user_assigned'];
-            $event->userownerid = $newAssignee;
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            // Quirk: setting type_code resets type_id so ActionComm::update()
+            // re-resolves the type by code (cf actioncomm.class.php:1162-1167).
+            if ($field === 'type_code') {
+                $event->type_code = $value;
+                $event->type_id = 0;
+                continue;
+            }
+            $event->$field = $value;
         }
 
         $result = $event->update($user);
@@ -493,7 +530,11 @@ class AgendaController
      */
     private function formatEvent($event, $mapper, $detailed = false)
     {
-        $data = $mapper->exportMappedData($event);
+        // exportMappedData returns a stdClass; cast to array so the
+        // ActionComm-specific reshape below (which uses array syntax)
+        // works on every PHP version (PHP 8.2 strict mode otherwise
+        // raises "Cannot use object of type stdClass as array").
+        $data = (array) $mapper->exportMappedData($event);
 
         // Re-shape ActionComm-specific fields that the mapper cannot infer.
         $data['id'] = (int) $event->id;

@@ -40,6 +40,49 @@ namespace Dolipocket\Api\Trait;
 trait PaginatedListTrait
 {
     /**
+     * Normalise an incoming date/timestamp value to a Unix timestamp in
+     * SECONDS (Dolibarr's expected format for $object->date / ->datep / ...).
+     *
+     * Accepted inputs:
+     *   - int/numeric string in seconds  (10 digits, e.g. 1777939200)
+     *     -> returned as-is (cast to int)
+     *   - int/numeric string in milliseconds (13+ digits, e.g. 1777939200000)
+     *     -> divided by 1000. This is what the AutoForm front sends because
+     *        smartcommon Input type="date" stores values via Date.getTime().
+     *   - ISO-ish string ("2026-06-15", "2026-06-15T10:30") -> strtotime()
+     *   - empty / null / false -> null (caller decides on a default)
+     *
+     * Without this helper every document controller forwarded ms straight
+     * into Dolibarr, yielding "Bad value 1777939200000 for date" SQL
+     * crashes (cf prod log 2026-05-05 12:58 + DocumentCreateSqlSafetyTest).
+     *
+     * @param   mixed  $value
+     * @return  int|null  Unix timestamp in seconds, or null when input is empty.
+     */
+    protected static function normalizeTimestamp($value)
+    {
+        if ($value === null || $value === '' || $value === false) {
+            return null;
+        }
+        if (is_numeric($value)) {
+            $n = (int) $value;
+            // 13+ digits -> milliseconds. We keep a generous threshold so a
+            // future Date.now() call (currently ~1.7e12, growing) still
+            // matches as ms while a pre-2286 seconds-since-epoch (currently
+            // ~1.7e9) stays under it.
+            if ($n > 99999999999) { // 11 digits or more -> ms
+                return intdiv($n, 1000);
+            }
+            return $n;
+        }
+        if (is_string($value)) {
+            $ts = strtotime($value);
+            return $ts === false ? null : $ts;
+        }
+        return null;
+    }
+
+    /**
      * Parse pagination/filter parameters from the input array.
      *
      * Normalizes inputs:

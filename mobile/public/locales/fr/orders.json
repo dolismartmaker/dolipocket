@@ -61,6 +61,13 @@
         "shipped": "Expédiée",
         "billed": "Facturée"
     },
+    "status-code": {
+        "-1": "Annulée",
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "En cours",
+        "3": "Livrée"
+    },
     "toasts": {
         "create-success": "Commande créée",
         "update-success": "Commande mise à jour",

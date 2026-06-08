@@ -3,6 +3,8 @@ import {
     FaFileCsv, FaFileExcel, FaFileLines,
 } from "react-icons/fa6";
 
+import { StatusPill, getStatusInfo } from "src/lib/components/StatusPill";
+
 // listConfig for the desktop DataTable.
 // Cf DATATABLE_SPEC.md §13 (v2) -- the server catalog is the source of truth
 // for the column list. Local overrides only carry width hints, force a
@@ -42,7 +44,11 @@ export const supplierOrdersListConfig = {
         dateLivraison: { defaultVisible: false, defaultWidth: 110, formatter: fmtDate },
         totalHt:       { defaultVisible: false, defaultWidth: 120, formatter: fmtAmount },
         totalTtc:      { defaultVisible: true,  defaultWidth: 130, formatter: fmtAmount },
-        statut:        { defaultVisible: true,  defaultWidth: 140 },
+        statut:        {
+            defaultVisible: true, defaultWidth: 140,
+            formatter: (v) => <StatusPill feature="supplierorder" status={v} />,
+            exportFormatter: (v) => getStatusInfo("supplierorder", v).label,
+        },
     },
 
     rowActions: [

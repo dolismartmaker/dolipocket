@@ -36,38 +36,69 @@ class dmSupplierOrder extends dmBase
     protected $dolibarrClassName = 'CommandeFournisseur';
 
     /**
-     * Dolibarr class name
-     * @var string
-     */
-    protected $parentClassName = 'CommandeFournisseur';
-
-    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */
     protected $parentElementToUseForExtraFields = 'commande_fournisseur';
 
     /**
+     * Table-side element name (consumed by SmartAuth dmTrait::_objectDesc()
+     * line 161 when fetching extrafields metadata for the catalog).
+     * @var string
+     */
+    protected $parentTableElementToUseForExtraFields = 'commande_fournisseur';
+
+    /**
+     * Force a sellist descriptor on bare-integer reference fields so the
+     * AutoForm front renders <Select> populated from c_* tables. Cf the
+     * matching block in dmProposal for the full rationale. fk_currency is
+     * declared as varchar(3) on the supplier order header so we don't need
+     * to override it here (the smartauth resolver already kicks in).
+     *
+     * @var array
+     */
+    protected $parentFieldsOverride = [
+        'fk_cond_reglement' => array('type' => 'sellist:c_payment_term:libelle:rowid', 'label' => 'PaymentConditionsShort'),
+        'fk_mode_reglement' => array('type' => 'sellist:c_paiement:libelle:id', 'label' => 'PaymentMode'),
+        'fk_account'        => array('type' => 'sellist:bank_account:label:rowid', 'label' => 'BankAccount'),
+    ];
+
+    /**
      * Mapping: Dolibarr field name => API field name (header)
+     * Validated against CommandeFournisseur::$fields (cf
+     * fourn/class/fournisseur.commande.class.php).
      * @var array
      */
     protected $listOfPublishedFields = [
-        'rowid'             => 'id',
-        'ref'               => 'ref',
-        'ref_supplier'      => 'ref_supplier',
-        'socid'             => 'socid',
-        'fk_soc'            => 'fk_soc',
-        'fk_user_author'    => 'fk_user_author',
-        'date_commande'     => 'date_commande',
-        'date_livraison'    => 'date_livraison',
-        'total_ht'          => 'total_ht',
-        'total_ttc'         => 'total_ttc',
-        'total_tva'         => 'total_tva',
-        'statut'            => 'statut',
-        'note_public'       => 'note_public',
-        'note_private'      => 'note_private',
-        'fk_cond_reglement' => 'fk_cond_reglement',
-        'fk_mode_reglement' => 'fk_mode_reglement',
+        'rowid'              => 'id',
+        'ref'                => 'ref',
+        'ref_supplier'       => 'ref_supplier',
+        'socid'              => 'socid',
+        'fk_soc'             => 'fk_soc',
+        'fk_projet'          => 'fk_projet',
+        'fk_user_author'     => 'fk_user_author',
+        'fk_user_valid'      => 'fk_user_valid',
+        'fk_user_approve'    => 'fk_user_approve',
+        'fk_user_approve2'   => 'fk_user_approve2',
+        'date_creation'      => 'date_creation',
+        'date_commande'      => 'date_commande',
+        'date_valid'         => 'date_valid',
+        'date_approve'       => 'date_approve',
+        'date_approve2'      => 'date_approve2',
+        'date_livraison'     => 'date_livraison',
+        'total_ht'           => 'total_ht',
+        'total_ttc'          => 'total_ttc',
+        'total_tva'          => 'total_tva',
+        'statut'             => 'statut',
+        'billed'             => 'billed',
+        'note_public'        => 'note_public',
+        'note_private'       => 'note_private',
+        'fk_cond_reglement'  => 'fk_cond_reglement',
+        'fk_mode_reglement'  => 'fk_mode_reglement',
+        'fk_account'         => 'fk_account',
+        'fk_input_method'    => 'fk_input_method',
+        'model_pdf'          => 'model_pdf',
+        'last_main_doc'      => 'last_main_doc',
     ];
 
     /**
@@ -84,23 +115,37 @@ class dmSupplierOrder extends dmBase
 
     /**
      * Mapping: Dolibarr field name => API field name (lines)
+     * Validated against CommandeFournisseurLigne properties (no $fields on
+     * the line class -- properties listed near line 3719 of
+     * fournisseur.commande.class.php).
      * @var array
      */
     protected $listOfPublishedFieldsForLines = [
-        'rowid'        => 'id',
-        'fk_commande'  => 'fk_commande',
-        'fk_product'   => 'fk_product',
-        'ref'          => 'ref',
-        'label'        => 'label',
-        'description'  => 'description',
-        'qty'          => 'qty',
-        'tva_tx'       => 'tva_tx',
-        'subprice'     => 'subprice',
+        'rowid'          => 'id',
+        'fk_commande'    => 'fk_commande',
+        'fk_parent_line' => 'fk_parent_line',
+        'fk_product'     => 'fk_product',
+        'ref'            => 'ref',
+        'product_ref'    => 'product_ref',
+        'product_label'  => 'product_label',
+        'product_type'   => 'product_type',
+        'label'          => 'label',
+        'description'    => 'description',
+        'qty'            => 'qty',
+        'subprice'       => 'subprice',
+        'tva_tx'         => 'tva_tx',
+        'localtax1_tx'   => 'localtax1_tx',
+        'localtax2_tx'   => 'localtax2_tx',
         'remise_percent' => 'remise_percent',
-        'total_ht'     => 'total_ht',
-        'total_ttc'    => 'total_ttc',
-        'rang'         => 'rang',
-        'product_type' => 'product_type',
+        'total_ht'       => 'total_ht',
+        'total_tva'      => 'total_tva',
+        'total_ttc'      => 'total_ttc',
+        'date_start'     => 'date_start',
+        'date_end'       => 'date_end',
+        'info_bits'      => 'info_bits',
+        'special_code'   => 'special_code',
+        'rang'           => 'rang',
+        'fk_unit'        => 'fk_unit',
     ];
 
     /**

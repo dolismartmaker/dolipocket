@@ -19,6 +19,13 @@ import { useUsersServices } from "src/db";
 //   userid=<int>
 //   entity=<int>
 //   device_uuid=<uuid>  (must be replayed via X-DEVICEID for token validation)
+//
+// NOTE: the primary persistence of localStorage["global"] (deviceId + user)
+// happens SYNCHRONOUSLY in src/main.jsx BEFORE React mounts. This avoids the
+// race against smartcommon useApi() autogen effect which would otherwise
+// overwrite deviceId with a fresh v4() and break JWT validation. The work
+// done in the useEffect below is the React-side mirror (redux, gst, Dexie)
+// plus the hard reload that strips the tokens from the URL.
 const parseHandoffFragment = () => {
     const hash = window.location.hash || "";
     const queryStart = hash.indexOf("?");
@@ -71,13 +78,10 @@ export const HandoffPage = () => {
             settings: defaultSettings,
         };
 
-        // Persist directly to localStorage in the smartcommon "global" bucket
-        // BEFORE any setState/dispatch: the hard reload below boots the app
-        // fresh, and smartcommon useGlobalStates initial state is read from
-        // localStorage["global"]. Doing this here (rather than going through
-        // gst.local.set which is async/batched) ensures useApi() sees the
-        // user on the very first render after reload, which is what
-        // PrivatePagesLayout checks before allowing access to /.
+        // Belt and braces: localStorage["global"] should already have been
+        // populated by main.jsx pre-React, but write again here in case the
+        // fragment was malformed at boot (e.g. a soft navigation to /handoff
+        // from inside the app, which would skip main.jsx).
         try {
             const prev = JSON.parse(window.localStorage.getItem("global") || "{}");
             const next = { ...prev, deviceId: data.deviceUuid, user: newUser };

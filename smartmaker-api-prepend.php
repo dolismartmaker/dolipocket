@@ -87,6 +87,60 @@ if (is_file($dpkVendorAutoload)) {
 
 dol_include_once('/smartauth/autoload.php');
 
+// Dev-mode opcache invalidation. When the Dolibarr admin sets
+// DOLIPOCKET_DEV_MODE=1, every request invalidates opcache for the
+// Dolipocket smartmaker-api/ tree + the smartauth dolMapping/ tree, so
+// changes to mappers and the SmartAuth helper take effect on the very next
+// request -- no php-fpm restart required.
+//
+// Cost: ~one stat() per cached file, only when opcache is loaded. Negligible
+// for the ~20 files in scope. Disabled by default so prod is unaffected.
+if (getDolGlobalString('DOLIPOCKET_DEV_MODE') === '1' && function_exists('opcache_invalidate')) {
+    $dpkRoots = [
+        __DIR__.'/smartmaker-api',
+        __DIR__.'/class',
+        __DIR__.'/src',
+    ];
+    $smartauthRoot = realpath(DOL_DOCUMENT_ROOT.'/custom/smartauth/dolMapping');
+    if ($smartauthRoot !== false) {
+        $dpkRoots[] = $smartauthRoot;
+    }
+    // Use a custom recursive walk that resolves realpath() at each step and
+    // skips already-visited inodes. Without this guard, a project that
+    // contains a symlink pointing back into its own tree (typical when
+    // smartauth/dolibarr-integration-sqlite test fixtures expose a
+    // .../htdocs/custom/dolipocket -> /home/.../dolipocket loop) blows up
+    // with "Too many levels of symbolic links". Iterating ourselves is
+    // also faster than RecursiveDirectoryIterator on small trees.
+    $visited = [];
+    $walk = function ($dir) use (&$walk, &$visited) {
+        $real = @realpath($dir);
+        if ($real === false || isset($visited[$real])) return;
+        $visited[$real] = true;
+        $entries = @scandir($real);
+        if ($entries === false) return;
+        foreach ($entries as $e) {
+            if ($e === '.' || $e === '..') continue;
+            $path = $real . DIRECTORY_SEPARATOR . $e;
+            if (is_link($path)) continue; // never follow symlinks
+            if (is_dir($path)) {
+                // Skip vendor/ and node_modules/ -- they are large and not
+                // mutated by Dolipocket development.
+                if ($e === 'vendor' || $e === 'node_modules') continue;
+                $walk($path);
+            } elseif (is_file($path) && substr($e, -4) === '.php') {
+                @opcache_invalidate($path, true);
+            }
+        }
+    };
+    foreach ($dpkRoots as $root) {
+        if (is_dir($root)) {
+            $walk($root);
+        }
+    }
+    clearstatcache(true);
+}
+
 // get informations about current module
 dol_include_once('/dolipocket/core/modules/modDolipocket.class.php');
 $tmpmodule = new \modDolipocket($db);
@@ -95,11 +149,18 @@ $tmpmodule = new \modDolipocket($db);
 $smartAuthAppID = $tmpmodule->numero;
 
 // JWT key is per-entity so a token signed for tenant A cannot validate on tenant B.
+// admin.lib.php must be loaded BEFORE dolibarr_set_const() is called, otherwise
+// JwtKeyHelper (in SmartAuth\Api namespace) falls back to a direct SQL write
+// that updates the DB but NOT $conf->global -- breaking JWT minting on the
+// very next request. The Blade entry point public/index.php loads admin.lib.php
+// itself; for the API entry point pwa/api.php (this file), main.inc.php does
+// not auto-load it, hence the explicit require here.
+require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 $smartAuthAppKey = trim(getDolGlobalString('DOLIPOCKET_JWT_KEY'));
 if (empty($smartAuthAppKey)) {
     $smartAuthAppKey = bin2hex(random_bytes(32));
-    if (dolibarr_set_const($db, 'DOLIPOCKET_JWT_KEY', $smartAuthAppKey, 'chaine', 0, '', $conf->entity) < 0) {
-        dol_syslog("DPK smartmaker-api-prepend: failed to persist DOLIPOCKET_JWT_KEY for entity ".$conf->entity, LOG_ERR);
+    if (dolibarr_set_const($db, 'DOLIPOCKET_JWT_KEY', $smartAuthAppKey, 'chaine', 0, '', 0) < 0) {
+        dol_syslog("DPK smartmaker-api-prepend: failed to persist DOLIPOCKET_JWT_KEY", LOG_ERR);
     }
 }
 
@@ -108,3 +169,22 @@ if (empty($smartAuthAppKey)) {
 // Dolipocket\\Api\\ => smartmaker-api/. Run `composer dump-autoload` after
 // pulling new controllers into smartmaker-api/ so the optimised classmap is
 // regenerated (otherwise newly added controllers will not be found).
+//
+// Belt and braces: also register an explicit PSR-4 autoloader for our own
+// namespace. Some prod deployments ship the source tree without re-running
+// `composer dump-autoload`, leaving the vendor/composer/autoload_psr4.php
+// stale; SmartAuth then logs "Class (Dolipocket\Api\xxx) not found" and the
+// request returns 500. This loader mirrors the SmartAuth-style spl autoload
+// (cf ~/dev/smartauth/autoload.php) so newly added controllers / mappers /
+// traits are findable even on a stale vendor.
+spl_autoload_register(function ($class) {
+    $prefix = 'Dolipocket\\Api\\';
+    if (strncmp($class, $prefix, strlen($prefix)) !== 0) {
+        return;
+    }
+    $relative = substr($class, strlen($prefix));
+    $file = __DIR__.'/smartmaker-api/'.str_replace('\\', '/', $relative).'.php';
+    if (is_file($file)) {
+        require $file;
+    }
+});

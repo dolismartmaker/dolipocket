@@ -94,7 +94,7 @@ export const TopBar = () => {
                 onClose={() => set("isAboutOpen", false)}
                 appName="Dolipocket"
             />
-            <header className="hidden md:flex items-center h-14 px-6 border-b border-soft-border bg-soft-bg sticky top-0 z-20">
+            <header className="flex items-center h-14 px-6 border-b border-soft-border bg-soft-bg sticky top-0 z-20">
                 {/* Breadcrumb */}
                 <div className="flex items-center gap-1.5 text-sm flex-1 min-w-0">
                     {crumbs.map((crumb, idx) => (

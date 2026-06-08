@@ -44,12 +44,6 @@ class dmProposal extends dmBase
     protected $dolibarrClassName = 'Propal';
 
     /**
-     * Dolibarr class name
-     * @var string
-     */
-    protected $parentClassName = 'Propal';
-
-    /**
      * Dolibarr line class, required by dmTrait::_objectDesc() to expose lines metadata.
      * @var string
      */
@@ -62,7 +56,32 @@ class dmProposal extends dmBase
     protected $parentElementToUseForExtraFields = 'propal';
 
     /**
+     * Table-side element name (consumed by SmartAuth dmTrait::_objectDesc()
+     * line 161 when fetching extrafields metadata for the catalog).
+     * @var string
+     */
+    protected $parentTableElementToUseForExtraFields = 'propal';
+
+    /**
+     * Force a sellist descriptor on the bare-integer reference fields so the
+     * AutoForm front renders them as <Select> populated from the matching
+     * Dolibarr c_* table instead of an empty numeric input. Cf .claude/CLAUDE.md
+     * "Lot 9 - sellist resolver". Without this override Propal::$fields
+     * declares fk_cond_reglement / fk_mode_reglement / fk_account as plain
+     * 'integer' which the smartauth resolver cannot translate into options.
+     *
+     * @var array
+     */
+    protected $parentFieldsOverride = [
+        'fk_cond_reglement' => array('type' => 'sellist:c_payment_term:libelle:rowid', 'label' => 'PaymentConditionsShort'),
+        'fk_mode_reglement' => array('type' => 'sellist:c_paiement:libelle:id', 'label' => 'PaymentMode'),
+        'fk_account'        => array('type' => 'sellist:bank_account:label:rowid', 'label' => 'BankAccount'),
+        'fk_currency'       => array('type' => 'sellist:c_currencies:label:code_iso', 'label' => 'Currency'),
+    ];
+
+    /**
      * Mapping for the proposal header.
+     * Validated against Propal::$fields (cf comm/propal/class/propal.class.php).
      * @var array
      */
     protected $listOfPublishedFields = [
@@ -71,9 +90,15 @@ class dmProposal extends dmBase
         'ref_client'         => 'ref_client',
         'socid'              => 'socid',
         'fk_soc'             => 'fk_soc',
+        'fk_projet'          => 'fk_projet',
         'fk_user_author'     => 'fk_user_author',
+        'fk_user_valid'      => 'fk_user_valid',
+        'fk_user_cloture'    => 'fk_user_cloture',
+        'datec'              => 'datec',
         'datep'              => 'datep',
         'datev'              => 'datev',
+        'date_valid'         => 'date_valid',
+        'date_cloture'       => 'date_cloture',
         'fin_validite'       => 'fin_validite',
         'total_ht'           => 'total_ht',
         'total_ttc'          => 'total_ttc',
@@ -83,26 +108,43 @@ class dmProposal extends dmBase
         'note_private'       => 'note_private',
         'fk_cond_reglement'  => 'fk_cond_reglement',
         'fk_mode_reglement'  => 'fk_mode_reglement',
+        'fk_account'         => 'fk_account',
+        'fk_currency'        => 'fk_currency',
+        'model_pdf'          => 'model_pdf',
+        'last_main_doc'      => 'last_main_doc',
     ];
 
     /**
      * Mapping for proposal lines (PropaleLigne).
+     * Validated against PropaleLigne properties (no $fields array on the
+     * line class -- properties are listed near line 4051 of propal.class.php).
      * @var array
      */
     protected $listOfPublishedFieldsForLines = [
         'rowid'          => 'id',
         'fk_propal'      => 'fk_propal',
+        'fk_parent_line' => 'fk_parent_line',
         'fk_product'     => 'fk_product',
+        'product_ref'    => 'product_ref',
+        'product_label'  => 'product_label',
+        'product_type'   => 'product_type',
         'label'          => 'label',
         'description'    => 'description',
         'qty'            => 'qty',
-        'tva_tx'         => 'tva_tx',
         'subprice'       => 'subprice',
+        'tva_tx'         => 'tva_tx',
+        'localtax1_tx'   => 'localtax1_tx',
+        'localtax2_tx'   => 'localtax2_tx',
         'remise_percent' => 'remise_percent',
         'total_ht'       => 'total_ht',
+        'total_tva'      => 'total_tva',
         'total_ttc'      => 'total_ttc',
+        'date_start'     => 'date_start',
+        'date_end'       => 'date_end',
+        'info_bits'      => 'info_bits',
+        'special_code'   => 'special_code',
         'rang'           => 'rang',
-        'product_type'   => 'product_type',
+        'fk_unit'        => 'fk_unit',
     ];
 
     /**

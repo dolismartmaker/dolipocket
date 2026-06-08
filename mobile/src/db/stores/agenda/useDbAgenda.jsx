@@ -10,6 +10,8 @@ import { mapFromBackend, mapToBackend } from "src/api/mapping/agenda";
 //
 // API exposed (stable contract -- mirrors useDbThirdParties + markDone):
 //   list({ start, end, fkUserAssigned, socid, q }) -> Promise<Array<Event>>
+//   columns({ signal })                            -> Promise<Array<ColumnDef>> (DataTable v2 catalog)
+//   describe({ signal })                           -> Promise<objectDescJSON>   (AutoForm catalog)
 //   get(id)                                        -> Promise<Event | null>
 //   create(local)                                  -> Promise<Event>
 //   update(id, local)                              -> Promise<Event>
@@ -47,6 +49,22 @@ export const useDbAgenda = () => {
                 await store.bulkPut(mapped).catch(() => undefined);
             }
             return mapped;
+        },
+
+        // Column catalog for the DataTable v2 / DocumentHeaderFields. Returns
+        // the full list of columns the backend mapper exposes (cf
+        // DATATABLE_SPEC.md §13). The endpoint is at the singular noun /event
+        // following the module convention.
+        columns: async ({ signal } = {}) => {
+            const data = await get("event/columns", { signal });
+            return Array.isArray(data) ? data : [];
+        },
+
+        // Field descriptor for <AutoForm> (objectDesc() raw output). Cf
+        // .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+        describe: async ({ signal } = {}) => {
+            const data = await get("event/describe", { signal });
+            return data && typeof data === "object" ? data : {};
         },
 
         get: async (id) => {

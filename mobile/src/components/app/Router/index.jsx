@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { HashRouter, Route, Routes } from "react-router-dom";
 
 import {
     // App layouts + bootstrapped pages
@@ -29,7 +29,7 @@ import { RequirePermission } from "src/lib/permissions";
 
 export const Router = () => {
     return (
-        <BrowserRouter>
+        <HashRouter>
             <Routes>
                 <Route element={<PagesLayout />}>
                     <Route element={<PublicPagesLayout />}>
@@ -146,6 +146,6 @@ export const Router = () => {
                     <Route path="*" element={<Error404Page />} />
                 </Route>
             </Routes>
-        </BrowserRouter>
+        </HashRouter>
     );
 };

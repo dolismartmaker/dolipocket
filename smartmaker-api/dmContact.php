@@ -40,12 +40,6 @@ class dmContact extends dmBase
     protected $dolibarrClassName = 'Contact';
 
     /**
-     * Dolibarr class name
-     * @var string
-     */
-    protected $parentClassName = 'Contact';
-
-    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */
@@ -79,10 +73,21 @@ class dmContact extends dmBase
      * Fields that can be modified via API
      * @var array
      */
+    /**
+     * Fields that can be modified via API.
+     *
+     * Entries are the DOLISIDE keys of $listOfPublishedFields. The Contact
+     * SQL column is `civility_code`, exposed under the API name `civility`
+     * (cf $listOfPublishedFields). The controller re-routes
+     * \$sanitized->civility_code onto \$c->civility_code (the SQL property)
+     * and \$c->civility_id (legacy mirror) in the post-import loop.
+     *
+     * @var array
+     */
     protected $writableFields = [
         'lastname',
         'firstname',
-        'civility',
+        'civility_code',
         'fk_soc',
         'address',
         'zip',

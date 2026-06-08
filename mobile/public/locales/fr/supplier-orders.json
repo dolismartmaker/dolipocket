@@ -59,6 +59,18 @@
         "cancelled": "Annulée",
         "refused": "Refusée"
     },
+    "status-code": {
+        "-1": "Annulée",
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Approuvée",
+        "3": "Commandée",
+        "4": "Reçue partiellement",
+        "5": "Reçue",
+        "6": "Annulée",
+        "7": "Refusée",
+        "9": "Refusée"
+    },
     "workflow": {
         "validate": "Valider",
         "validate-confirm": "Valider cette commande ?",

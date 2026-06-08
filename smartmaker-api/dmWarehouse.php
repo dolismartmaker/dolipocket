@@ -42,12 +42,6 @@ class dmWarehouse extends dmBase
     protected $dolibarrClassName = 'Entrepot';
 
     /**
-     * Dolibarr class name for the parent object.
-     * @var string
-     */
-    protected $parentClassName = 'Entrepot';
-
-    /**
      * Element name used by extrafields (matches llx_extrafields.elementtype).
      * @var string
      */

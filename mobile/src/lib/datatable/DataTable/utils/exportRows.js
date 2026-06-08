@@ -14,10 +14,30 @@ const stamp = () => {
 };
 
 const toCellString = (col, row) => {
+    // Optional override: a column may declare an exportFormatter to keep
+    // the spreadsheet output plain text while letting `formatter` return
+    // a React element for the on-screen rendering.
+    if (typeof col?.exportFormatter === "function") {
+        try {
+            const v = col.exportFormatter(row[col.key], row);
+            if (v === null || v === undefined) return "";
+            return String(v);
+        } catch (_) {
+            return "";
+        }
+    }
     if (typeof col?.formatter === "function") {
         try {
             const formatted = col.formatter(row[col.key], row);
             if (formatted === null || formatted === undefined) return "";
+            // A React element stringifies to "[object Object]", which is
+            // useless in a CSV / spreadsheet. Fall back to the raw value
+            // so the export remains readable; callers that need a richer
+            // textual representation should expose `exportFormatter`.
+            if (typeof formatted === "object" && formatted !== null && formatted.$$typeof) {
+                const raw = row?.[col.key];
+                return raw === null || raw === undefined ? "" : String(raw);
+            }
             return String(formatted);
         } catch (_) {
             return "";

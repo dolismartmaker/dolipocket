@@ -86,6 +86,18 @@ export const useDbProposals = () => {
             return Array.isArray(data) ? data : [];
         },
 
+        // Lines column catalog (read-only descriptor for <DocumentLinesTable>).
+        linesColumns: async ({ signal } = {}) => {
+            const data = await get("proposal/lines/columns", { signal });
+            return Array.isArray(data) ? data : [];
+        },
+
+        // Field descriptor for <AutoForm> (objectDesc() raw output).
+        describe: async ({ signal } = {}) => {
+            const data = await get("proposal/describe", { signal });
+            return data && typeof data === "object" ? data : {};
+        },
+
         // Bulk delete by ids. Server returns {success: [...], errors: [...]}.
         deleteBulk: async ({ ids } = {}) => {
             if (!Array.isArray(ids) || ids.length === 0) {
@@ -146,6 +158,43 @@ export const useDbProposals = () => {
                 await store.put(stripLines(mapped)).catch(() => undefined);
             }
             return mapped;
+        },
+
+        // Generate PDF for the proposal. Backend returns
+        // { ok, file, model } -- forwarded as-is to the caller.
+        generatePdf: async (id, opts = {}) => {
+            return post(`proposal/${id}/pdf`, { json: opts });
+        },
+
+        // Download the last generated PDF as a Blob. Throws when the document
+        // has no last_main_doc (404) or the file is missing on disk (410).
+        // Caller is responsible for piping the Blob to downloadBlob().
+        // Cf todo.md task 3 (Backend stream + Front Blob).
+        downloadPdf: async (id) => {
+            const response = await get(`proposal/${id}/pdf/download`, { raw: true });
+            const blob = await response.blob();
+            return {
+                blob,
+                contentDisposition: response.headers.get("Content-Disposition") ?? "",
+            };
+        },
+
+        // Send the proposal by email with the last generated PDF attached.
+        // Body fields (all strings): to (required, email), subject, body,
+        // cc, bcc, attachmentPath (override last_main_doc), ishtml (0|1).
+        // Backend POST /proposal/{id}/send -- cf SendEmailTrait.
+        sendEmail: async (id, payload = {}) => {
+            const json = {};
+            if (payload.to !== undefined) json.to = String(payload.to);
+            if (payload.cc !== undefined && payload.cc !== "") json.cc = String(payload.cc);
+            if (payload.bcc !== undefined && payload.bcc !== "") json.bcc = String(payload.bcc);
+            if (payload.subject !== undefined) json.subject = String(payload.subject);
+            if (payload.body !== undefined) json.body = String(payload.body);
+            if (payload.attachmentPath !== undefined && payload.attachmentPath !== "") {
+                json.attachment_path = String(payload.attachmentPath);
+            }
+            if (payload.ishtml !== undefined) json.ishtml = Number(payload.ishtml) ? 1 : 0;
+            return post(`proposal/${id}/send`, { json });
         },
 
         closeSigned: async (id, note) => {

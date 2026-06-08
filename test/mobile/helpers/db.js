@@ -64,6 +64,22 @@ export function countSocietes(entity) {
 }
 
 /**
+ * Return all proposal ids linked to a given socid for the entity. Used by
+ * the AutoForm proposal-create spec to assert the row reached the database.
+ *
+ * @param {number} socId
+ * @param {number} entity
+ * @returns {number[]}
+ */
+export function findProposalIdsBySocId(socId, entity) {
+    const db = getDb();
+    const rows = db
+        .prepare('SELECT rowid FROM llx_propal WHERE fk_soc = ? AND entity = ?')
+        .all(socId, entity);
+    return rows.map((r) => Number(r.rowid));
+}
+
+/**
  * Return the row of the test tenant from llx_dolipocket_tenant.
  *
  * @param {string} email

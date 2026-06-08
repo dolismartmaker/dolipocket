@@ -22,7 +22,7 @@ export const PagesLayout = () => {
     const lastSettings = useSelector(state => state.lastSettings);
     const user = useSelector(state => state.user);
     const settings = user?.settings;
-    const { isDesktop } = useViewport();
+    const { isMobile } = useViewport();
 
     const currentSettings = settings ?? lastSettings ?? {};
 
@@ -39,7 +39,7 @@ export const PagesLayout = () => {
     }, [currentSettings]);
 
     return (
-        <div className={`bg-medium-bg ${isDesktop ? "min-h-screen" : "fixed inset-x-0 top-0 h-dvh"}`}>
+        <div className={`bg-medium-bg ${isMobile ? "fixed inset-x-0 top-0 h-dvh" : "min-h-screen"}`}>
             <Outlet />
         </div>
     );

@@ -57,6 +57,12 @@
         "paid": "Réglée",
         "abandoned": "Abandonnée"
     },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Réglée",
+        "3": "Abandonnée"
+    },
     "paye": {
         "yes": "Réglée",
         "no": "Non réglée"
@@ -66,7 +72,28 @@
         "validate-confirm": "Valider cette facture ?",
         "create-from-order": "Créer depuis commande",
         "create-from-order-confirm": "Créer une facture depuis cette commande fournisseur ?",
-        "close-paid": "Marquer comme réglée"
+        "close-paid": "Marquer comme réglée",
+        "add-payment": "Enregistrer paiement"
+    },
+    "payment": {
+        "title": "Enregistrer un paiement",
+        "amount": "Montant",
+        "amount-help": "Reste à payer",
+        "mode": "Mode de paiement",
+        "date": "Date du paiement",
+        "ref": "Référence (numéro de chèque, virement, etc.)",
+        "ref-placeholder": "optionnel",
+        "account": "Compte bancaire (optionnel)",
+        "note": "Note (visible uniquement en interne)",
+        "submit": "Enregistrer le paiement",
+        "submitting": "Enregistrement...",
+        "cancel": "Annuler",
+        "success": "Paiement enregistré",
+        "error-amount-positive": "Le montant doit être un nombre positif.",
+        "error-amount-exceeds": "Le montant ne peut pas dépasser le reste à payer.",
+        "error-mode-required": "Le mode de paiement est obligatoire.",
+        "error-date-required": "La date du paiement est obligatoire.",
+        "error-generic": "Erreur lors de l'enregistrement du paiement"
     },
     "toasts": {
         "create-success": "Facture créée",

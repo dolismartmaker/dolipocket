@@ -40,12 +40,6 @@ class dmThirdParty extends dmBase
     protected $dolibarrClassName = 'Societe';
 
     /**
-     * Dolibarr class name
-     * @var string
-     */
-    protected $parentClassName = 'Societe';
-
-    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */
@@ -57,7 +51,12 @@ class dmThirdParty extends dmBase
      */
     protected $listOfPublishedFields = [
         'rowid'             => 'id',
-        'name'              => 'name',
+        // Dolibarr's Societe class declares the column as `nom` in $fields and
+        // in SQL (llx_societe.nom), but exposes a synonym property $name that
+        // is kept in sync after fetch(). We use `nom` as the doliside key so
+        // the catalog-driven SQL filter/sort produces valid `s.nom` clauses.
+        // exportMappedData() reads $obj->nom which equals $obj->name after fetch.
+        'nom'               => 'name',
         'name_alias'        => 'name_alias',
         'code_client'       => 'code_client',
         'code_fournisseur'  => 'code_fournisseur',
@@ -83,11 +82,20 @@ class dmThirdParty extends dmBase
     ];
 
     /**
-     * Fields that can be modified via API
+     * Fields that can be modified via API.
+     *
+     * Entries are the DOLISIDE keys of $listOfPublishedFields (matching how
+     * importMappedData() walks the reverseMap). The Dolibarr SQL column for
+     * the company name is `nom` even though Societe exposes a synonym
+     * property $name -- so the doliside key here is 'nom'. The controller
+     * re-routes \$sanitized->nom onto \$tp->name in the post-import loop
+     * because Societe::update() reads $this->name (then mirrors it onto
+     * $this->nom for backward compatibility).
+     *
      * @var array
      */
     protected $writableFields = [
-        'name',
+        'nom',
         'name_alias',
         'code_client',
         'code_fournisseur',

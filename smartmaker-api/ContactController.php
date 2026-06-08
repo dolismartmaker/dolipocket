@@ -23,6 +23,7 @@ dol_include_once('/dolipocket/smartmaker-api/Trait/PaginatedListTrait.php');
 
 use Contact;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * REST controller for the Contacts module of Dolipocket.
@@ -148,6 +149,27 @@ class ContactController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET contact/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param  array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('societe', 'contact', 'lire') && !$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ContactController::describe access denied for user ".((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -448,7 +470,47 @@ class ContactController
         }
 
         $c->fetch_optionals();
-        $this->applyPayload($c, $arr);
+
+        // Split the payload: options_* keys go to applyExtrafields()
+        // (unchanged path), every other key flows through importMappedData()
+        // on the native side.
+        $payloadNative = [];
+        $payloadExtra = [];
+        foreach ($arr as $k => $v) {
+            if ($k === 'id') {
+                continue;
+            }
+            if (is_string($k) && strpos($k, 'options_') === 0) {
+                $payloadExtra[$k] = $v;
+            } else {
+                $payloadNative[$k] = $v;
+            }
+        }
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payloadNative);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK ContactController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
+        }
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            // Quirk: API civility maps to $c->civility_code (the SQL property);
+            // the legacy $c->civility_id mirror is kept for any code path
+            // that still reads it.
+            if ($field === 'civility_code') {
+                $c->civility_code = $value;
+                $c->civility_id = $value;
+                continue;
+            }
+            // Quirk: fk_soc sets both $c->socid AND $c->fk_soc.
+            if ($field === 'fk_soc') {
+                $c->socid = $value;
+                $c->fk_soc = $value;
+                continue;
+            }
+            $c->$field = $value;
+        }
 
         $res = $c->update($id, $user);
         if ($res < 0) {
@@ -456,7 +518,7 @@ class ContactController
             return [['error' => 'Failed to update contact: '.$c->error], 500];
         }
 
-        if ($this->applyExtrafields($c, $arr)) {
+        if ($this->applyExtrafields($c, $payloadExtra)) {
             $efRes = $c->insertExtraFields();
             if ($efRes < 0) {
                 dol_syslog("DPK ContactController::update insertExtraFields failed: ".$c->error, LOG_ERR);

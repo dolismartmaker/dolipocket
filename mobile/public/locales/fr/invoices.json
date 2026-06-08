@@ -60,13 +60,40 @@
     },
     "actions": {
         "validate": "Valider",
-        "create-from-order": "Créer depuis une commande"
+        "create-from-order": "Créer depuis une commande",
+        "add-payment": "Enregistrer paiement"
+    },
+    "payment": {
+        "title": "Enregistrer un paiement",
+        "amount": "Montant",
+        "amount-help": "Reste à payer",
+        "mode": "Mode de paiement",
+        "date": "Date du paiement",
+        "ref": "Référence (numéro de chèque, virement, etc.)",
+        "ref-placeholder": "optionnel",
+        "account": "Compte bancaire (optionnel)",
+        "note": "Note (visible uniquement en interne)",
+        "submit": "Enregistrer le paiement",
+        "submitting": "Enregistrement...",
+        "cancel": "Annuler",
+        "success": "Paiement enregistré",
+        "error-amount-positive": "Le montant doit être un nombre positif.",
+        "error-amount-exceeds": "Le montant ne peut pas dépasser le reste à payer.",
+        "error-mode-required": "Le mode de paiement est obligatoire.",
+        "error-date-required": "La date du paiement est obligatoire.",
+        "error-generic": "Erreur lors de l'enregistrement du paiement"
     },
     "status": {
         "draft": "Brouillon",
         "validated": "Validée",
         "paid": "Réglée",
         "abandoned": "Abandonnée"
+    },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Réglée",
+        "3": "Abandonnée"
     },
     "toasts": {
         "create-success": "Facture créée",

@@ -60,13 +60,40 @@
     },
     "actions": {
         "validate": "Validate",
-        "create-from-order": "Create from order"
+        "create-from-order": "Create from order",
+        "add-payment": "Record payment"
+    },
+    "payment": {
+        "title": "Record a payment",
+        "amount": "Amount",
+        "amount-help": "Remain to pay",
+        "mode": "Payment mode",
+        "date": "Payment date",
+        "ref": "Reference (cheque number, wire transfer, etc.)",
+        "ref-placeholder": "optional",
+        "account": "Bank account (optional)",
+        "note": "Note (internal only)",
+        "submit": "Record payment",
+        "submitting": "Saving...",
+        "cancel": "Cancel",
+        "success": "Payment recorded",
+        "error-amount-positive": "Amount must be a positive number.",
+        "error-amount-exceeds": "Amount cannot exceed the remain-to-pay.",
+        "error-mode-required": "Payment mode is required.",
+        "error-date-required": "Payment date is required.",
+        "error-generic": "Failed to record the payment"
     },
     "status": {
         "draft": "Draft",
         "validated": "Validated",
         "paid": "Paid",
         "abandoned": "Abandoned"
+    },
+    "status-code": {
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Paid",
+        "3": "Abandoned"
     },
     "toasts": {
         "create-success": "Invoice created",

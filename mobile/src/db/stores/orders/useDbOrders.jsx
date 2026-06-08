@@ -82,6 +82,18 @@ export const useDbOrders = () => {
             return Array.isArray(data) ? data : [];
         },
 
+        // Lines column catalog (read-only descriptor for <DocumentLinesTable>).
+        linesColumns: async ({ signal } = {}) => {
+            const data = await get("order/lines/columns", { signal });
+            return Array.isArray(data) ? data : [];
+        },
+
+        // Field descriptor for <AutoForm> (objectDesc() raw output).
+        describe: async ({ signal } = {}) => {
+            const data = await get("order/describe", { signal });
+            return data && typeof data === "object" ? data : {};
+        },
+
         deleteBulk: async ({ ids } = {}) => {
             if (!Array.isArray(ids) || ids.length === 0) {
                 return { success: [], errors: [] };
@@ -141,6 +153,38 @@ export const useDbOrders = () => {
                 await store.put(stripLines(mapped)).catch(() => undefined);
             }
             return mapped;
+        },
+
+        // Generate PDF for the order. Backend returns
+        // { ok, file, model } -- forwarded as-is to the caller.
+        generatePdf: async (id, opts = {}) => {
+            return post(`order/${id}/pdf`, { json: opts });
+        },
+
+        // Download the last generated PDF as a Blob (raw response). Cf todo.md task 3.
+        downloadPdf: async (id) => {
+            const response = await get(`order/${id}/pdf/download`, { raw: true });
+            const blob = await response.blob();
+            return {
+                blob,
+                contentDisposition: response.headers.get("Content-Disposition") ?? "",
+            };
+        },
+
+        // Send the order by email with the last generated PDF attached.
+        // Backend POST /order/{id}/send -- cf SendEmailTrait.
+        sendEmail: async (id, payload = {}) => {
+            const json = {};
+            if (payload.to !== undefined) json.to = String(payload.to);
+            if (payload.cc !== undefined && payload.cc !== "") json.cc = String(payload.cc);
+            if (payload.bcc !== undefined && payload.bcc !== "") json.bcc = String(payload.bcc);
+            if (payload.subject !== undefined) json.subject = String(payload.subject);
+            if (payload.body !== undefined) json.body = String(payload.body);
+            if (payload.attachmentPath !== undefined && payload.attachmentPath !== "") {
+                json.attachment_path = String(payload.attachmentPath);
+            }
+            if (payload.ishtml !== undefined) json.ishtml = Number(payload.ishtml) ? 1 : 0;
+            return post(`order/${id}/send`, { json });
         },
 
         createFromProposal: async (proposalId) => {

@@ -23,6 +23,7 @@ require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 
 use Product;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * REST API controller for Dolibarr products and services (Product class).
@@ -151,6 +152,27 @@ class ProductController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET product/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param  array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::describe access denied for user ".$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -467,53 +489,58 @@ class ProductController
             return [['error' => 'Access denied'], 403];
         }
 
-        // Apply mutable fields only when provided in the payload.
-        if (isset($arr['ref'])) {
-            $product->ref = (string) $arr['ref'];
-        }
-        if (isset($arr['label'])) {
-            $product->label = (string) $arr['label'];
-        }
-        if (isset($arr['description'])) {
-            $product->description = (string) $arr['description'];
-        }
-        if (isset($arr['price']) || isset($arr['price_ttc']) || isset($arr['tva_tx'])) {
-            $newPrice = isset($arr['price']) ? (float) $arr['price'] : (float) $product->price;
-            $newPriceTtc = isset($arr['price_ttc']) ? (float) $arr['price_ttc'] : (float) $product->price_ttc;
-            $newTva = isset($arr['tva_tx']) ? (float) $arr['tva_tx'] : (float) $product->tva_tx;
-            // updatePrice handles HT/TTC consistency and avoids stale derived values.
-            $priceResult = $product->updatePrice($newPrice, 'HT', $user, $newTva, 0, 0, 0, 0, '', [], 0, [], '', $newPriceTtc);
-            if ($priceResult < 0) {
-                dol_syslog("DPK ProductController::update updatePrice failed: ".$product->error, LOG_ERR);
-                return [['error' => 'Failed to update price: '.$product->error], 500];
+        // Extract price-related fields: they must go through updatePrice(),
+        // not through direct assignment, so the SQL price log and derived
+        // fields (price_min, multicurrency, etc.) stay coherent.
+        $priceUpdate = [];
+        foreach (['price', 'price_ttc', 'tva_tx'] as $pf) {
+            if (isset($arr[$pf])) {
+                $priceUpdate[$pf] = $arr[$pf];
             }
         }
-        if (isset($arr['status'])) {
-            $product->status = (int) $arr['status'];
+
+        $payload = $arr;
+        unset($payload['id'], $payload['price'], $payload['price_ttc'], $payload['tva_tx']);
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payload);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK ProductController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
         }
-        if (isset($arr['status_buy'])) {
-            $product->status_buy = (int) $arr['status_buy'];
-        }
-        if (isset($arr['weight'])) {
-            $product->weight = (float) $arr['weight'];
-        }
-        if (isset($arr['length'])) {
-            $product->length = (float) $arr['length'];
-        }
-        if (isset($arr['width'])) {
-            $product->width = (float) $arr['width'];
-        }
-        if (isset($arr['height'])) {
-            $product->height = (float) $arr['height'];
-        }
-        if (isset($arr['barcode'])) {
-            $product->barcode = (string) $arr['barcode'];
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            $product->$field = $value;
         }
 
         $result = $product->update($product->id, $user);
         if ($result <= 0) {
             dol_syslog("DPK ProductController::update failed: ".$product->error, LOG_ERR);
             return [['error' => 'Failed to update product: '.$product->error], 500];
+        }
+
+        // Apply price via dedicated method to keep derived fields coherent.
+        // updatePrice() runs AFTER update() so the price log row references
+        // the final HT/TVA values, not intermediate ones.
+        if (!empty($priceUpdate)) {
+            $newPrice = isset($priceUpdate['price'])
+                ? (float) $priceUpdate['price']
+                : (float) $product->price;
+            $newPriceTtc = isset($priceUpdate['price_ttc'])
+                ? (float) $priceUpdate['price_ttc']
+                : (float) $product->price_ttc;
+            $newTva = isset($priceUpdate['tva_tx'])
+                ? (float) $priceUpdate['tva_tx']
+                : (float) $product->tva_tx;
+
+            $priceResult = $product->updatePrice(
+                $newPrice, 'HT', $user, $newTva,
+                0, 0, 0, 0, '', [], 0, [], '', $newPriceTtc
+            );
+            if ($priceResult < 0) {
+                dol_syslog("DPK ProductController::update updatePrice failed: ".$product->error, LOG_ERR);
+                return [['error' => 'Failed to update price: '.$product->error], 500];
+            }
         }
 
         $product->fetch($id);

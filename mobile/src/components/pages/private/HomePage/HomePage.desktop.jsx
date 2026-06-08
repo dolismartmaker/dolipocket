@@ -103,7 +103,7 @@ export const HomePageDesktop = (props) => {
                     <button
                         type="button"
                         onClick={() => navigate("/invoices")}
-                        className="w-full bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 hover:border-red-300 hover:bg-red-100/50 text-left transition-all"
+                        className="w-full bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3 hover:border-red-300 hover:bg-red-100/50 text-left transition-colors"
                     >
                         <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
                             <FaTriangleExclamation className="text-red-500 text-lg" />
@@ -279,7 +279,7 @@ const KpiCard = ({ icon: Icon, label, value, unit, sub, accent = "primary", onCl
         <button
             type="button"
             onClick={onClick}
-            className="bg-white rounded-xl p-4 border border-soft-border text-left hover:shadow-md hover:border-soft-border/80 transition-all"
+            className="bg-white rounded-xl p-4 border border-soft-border text-left hover:border-soft-border/80 transition-colors"
         >
             <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-soft-text uppercase tracking-wider">

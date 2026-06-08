@@ -22,6 +22,7 @@ dol_include_once('/dolipocket/smartmaker-api/Trait/PaginatedListTrait.php');
 
 use Societe;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * REST controller for the Tiers (Societe) module of Dolipocket.
@@ -159,6 +160,27 @@ class ThirdPartyController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET thirdparty/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param  array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::describe access denied for user ".((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -484,7 +506,57 @@ class ThirdPartyController
         }
 
         $tp->fetch_optionals();
-        $this->applyPayload($tp, $arr);
+
+        // Split the payload between native fields (handled by the mapper)
+        // and extrafields (still routed through applyExtrafields in v1).
+        $payloadNative = [];
+        $payloadExtra = [];
+        foreach ($arr as $k => $v) {
+            if ($k === 'id') {
+                continue;
+            }
+            if (is_string($k) && strpos($k, 'options_') === 0) {
+                $payloadExtra[$k] = $v;
+            } else {
+                $payloadNative[$k] = $v;
+            }
+        }
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payloadNative);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK ThirdPartyController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
+        }
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            // Quirk: the Dolibarr SQL column is `nom` but Societe::update()
+            // reads $this->name (then mirrors back to $this->nom for BC).
+            if ($field === 'nom') {
+                $tp->name = $value;
+                continue;
+            }
+            // Quirk: siren / siret / ape are stored on $this->idprof1/2/3
+            // (cf societe.class.php:1470 -- UPDATE writes `siren = idprof1`).
+            // We keep the legacy double-assignment so any other code path
+            // reading $this->siren / $this->siret / $this->ape still works.
+            if ($field === 'siren') {
+                $tp->idprof1 = $value;
+                $tp->siren = $value;
+                continue;
+            }
+            if ($field === 'siret') {
+                $tp->idprof2 = $value;
+                $tp->siret = $value;
+                continue;
+            }
+            if ($field === 'ape') {
+                $tp->idprof3 = $value;
+                $tp->ape = $value;
+                continue;
+            }
+            $tp->$field = $value;
+        }
 
         $res = $tp->update($id, $user);
         if ($res < 0) {
@@ -492,7 +564,7 @@ class ThirdPartyController
             return [['error' => 'Failed to update thirdparty: '.$tp->error], 500];
         }
 
-        if ($this->applyExtrafields($tp, $arr)) {
+        if ($this->applyExtrafields($tp, $payloadExtra)) {
             $efRes = $tp->insertExtraFields();
             if ($efRes < 0) {
                 dol_syslog("DPK ThirdPartyController::update insertExtraFields failed: ".$tp->error, LOG_ERR);

@@ -61,6 +61,13 @@
         "shipped": "Shipped",
         "billed": "Billed"
     },
+    "status-code": {
+        "-1": "Cancelled",
+        "0": "Draft",
+        "1": "Validated",
+        "2": "In progress",
+        "3": "Delivered"
+    },
     "toasts": {
         "create-success": "Order created",
         "update-success": "Order updated",

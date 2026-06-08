@@ -59,6 +59,18 @@
         "cancelled": "Cancelled",
         "refused": "Refused"
     },
+    "status-code": {
+        "-1": "Cancelled",
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Approved",
+        "3": "Ordered",
+        "4": "Partially received",
+        "5": "Received",
+        "6": "Cancelled",
+        "7": "Refused",
+        "9": "Refused"
+    },
     "workflow": {
         "validate": "Validate",
         "validate-confirm": "Validate this order?",

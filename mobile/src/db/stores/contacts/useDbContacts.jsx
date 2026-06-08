@@ -81,6 +81,12 @@ export const useDbContacts = () => {
             return Array.isArray(data) ? data : [];
         },
 
+        // Field descriptor for <AutoForm> (objectDesc() raw output).
+        describe: async ({ signal } = {}) => {
+            const data = await get("contact/describe", { signal });
+            return data && typeof data === "object" ? data : {};
+        },
+
         // Bulk delete by ids. Server returns {success: [...], errors: [...]}.
         // We rely on privateApi.delete because ky needs the body via `json`
         // (ApiContext exposes both private and the convenience `del`).

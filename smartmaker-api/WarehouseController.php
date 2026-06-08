@@ -23,6 +23,7 @@ require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
 
 use Entrepot;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * REST API controller for Dolibarr warehouses (Entrepot class).
@@ -150,6 +151,27 @@ class WarehouseController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET warehouse/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param  array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('stock', 'lire')) {
+            dol_syslog("DPK WarehouseController::describe access denied for user ".$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -433,35 +455,18 @@ class WarehouseController
             return [['error' => 'Warehouse not found'], 404];
         }
 
-        if (isset($arr['label'])) {
-            $warehouse->label = (string) $arr['label'];
+        $payload = $arr;
+        unset($payload['id']);
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payload);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK WarehouseController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
         }
-        if (isset($arr['description'])) {
-            $warehouse->description = (string) $arr['description'];
-        }
-        if (isset($arr['lieu'])) {
-            $warehouse->lieu = (string) $arr['lieu'];
-        }
-        if (isset($arr['address'])) {
-            $warehouse->address = (string) $arr['address'];
-        }
-        if (isset($arr['zip'])) {
-            $warehouse->zip = (string) $arr['zip'];
-        }
-        if (isset($arr['town'])) {
-            $warehouse->town = (string) $arr['town'];
-        }
-        if (isset($arr['phone'])) {
-            $warehouse->phone = (string) $arr['phone'];
-        }
-        if (isset($arr['fax'])) {
-            $warehouse->fax = (string) $arr['fax'];
-        }
-        if (isset($arr['statut'])) {
-            $warehouse->statut = (int) $arr['statut'];
-        }
-        if (isset($arr['fk_parent'])) {
-            $warehouse->fk_parent = (int) $arr['fk_parent'];
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            $warehouse->$field = $value;
         }
 
         $result = $warehouse->update($warehouse->id, $user);

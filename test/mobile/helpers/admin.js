@@ -67,3 +67,25 @@ export function adminDeleteThirdParty(entity, socId) {
 export function adminCountThirdParties(entity) {
     return runAdmin('count-thirdparties', [String(entity)]);
 }
+
+/**
+ * Seed a third party (Societe) for use as a fixture in pickers / FK tests.
+ *
+ * @param {number} entity
+ * @param {string} name
+ * @returns {{ok: boolean, id?: number, error?: string}}
+ */
+export function adminCreateThirdParty(entity, name) {
+    return runAdmin('create-thirdparty', [String(entity), String(name)]);
+}
+
+/**
+ * Delete a Propal row, used as teardown safety net for proposal specs.
+ *
+ * @param {number} entity
+ * @param {number} propId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteProposal(entity, propId) {
+    return runAdmin('delete-proposal', [String(entity), String(propId)]);
+}

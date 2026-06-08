@@ -25,6 +25,22 @@ use SmartAuth\Api\UploadHelper;
 use EcmFiles;
 
 /**
+ * Process-wide flag and capture slot for DocumentController::download().
+ * Mirrors PdfDownloadRegistry so integration tests can intercept the
+ * binary streaming without dying inside exit(). In production both fields
+ * stay at their default values: $skipExit = false means the controller
+ * streams the file then exits as expected.
+ */
+final class DocumentDownloadRegistry
+{
+    /** @var bool Toggle: true during tests to avoid exit() killing PHPUnit. */
+    public static $skipExit = false;
+
+    /** @var array|null Last captured [body, code, headers] (test inspection). */
+    public static $lastResponse = null;
+}
+
+/**
  * DocumentController
  *
  * Bridges SmartAuth's generic /upload staging route with Dolibarr's per-object
@@ -572,5 +588,471 @@ class DocumentController
             'ecm_id' => (int) $created,
             'share'  => (string) $ecm->share,
         ];
+    }
+
+    /**
+     * GET /document?objectType=<type>&objectId=<id>
+     *
+     * List every file currently sitting in the Dolibarr document directory of
+     * a given object. Returns metadata only -- no file content. This is the
+     * primary consumer of the "Documents" section displayed below the
+     * <DocumentLinesEditor> on the five PageDetail desktop views (Proposal,
+     * Order, Invoice, SupplierOrder, SupplierInvoice).
+     *
+     * Why a dedicated endpoint instead of reusing SmartAuth's
+     * GET /object/{type}/{id}/documents : SmartAuth only knows about
+     * product/thirdparty/project/intervention/category. The 11 Dolipocket
+     * object types (propal, commande, facture, supplier_order,
+     * supplier_invoice, agenda, ...) are whitelisted right here in
+     * $objectTypeMap together with the directory resolution strategy that
+     * matches what the core Dolibarr PDF generators write to disk.
+     *
+     * The endpoint walks the on-disk directory (so it catches every file:
+     * generated PDFs, attached uploads, manually copied files) and indexes
+     * llx_ecm_files entries by (filepath, filename). When a row exists, we
+     * include its primary key and share hash in the response. When it does
+     * not (file present on disk but not yet registered, e.g. a freshly
+     * generated PDF from before Dolipocket existed), we still expose the
+     * file with ecm_id=0 so the user can see it -- the dedicated download
+     * route serves it via its filename as a fallback (see download() below).
+     *
+     * @param array|null $arr Decoded query string merged by SmartAuth.
+     * @return array          [responseBody, httpStatus]
+     */
+    public function list($arr = null)
+    {
+        global $db, $user, $conf;
+
+        dol_syslog('DPK DocumentController::list');
+
+        $arr = is_array($arr) ? $arr : [];
+
+        // ----- Input validation -----
+        if (empty($user) || !is_object($user) || empty($user->id)) {
+            dol_syslog('DPK DocumentController::list missing authenticated user', LOG_ERR);
+            return [['error' => 'Authentication required'], 401];
+        }
+
+        $type = isset($arr['objectType']) ? trim((string) $arr['objectType']) : '';
+        if ($type === '' && isset($arr['object_type'])) {
+            // Accept snake_case alias too -- the PWA may send either form.
+            $type = trim((string) $arr['object_type']);
+        }
+        if ($type === '' || !isset(self::$objectTypeMap[$type])) {
+            dol_syslog('DPK DocumentController::list invalid objectType='.$type, LOG_ERR);
+            return [['error' => 'Invalid objectType'], 400];
+        }
+        $cfg = self::$objectTypeMap[$type];
+
+        $objectId = isset($arr['objectId']) ? (int) $arr['objectId'] : 0;
+        if ($objectId <= 0 && isset($arr['object_id'])) {
+            $objectId = (int) $arr['object_id'];
+        }
+        if ($objectId <= 0) {
+            dol_syslog('DPK DocumentController::list invalid objectId='.($arr['objectId'] ?? $arr['object_id'] ?? 'null'), LOG_ERR);
+            return [['error' => 'Invalid objectId'], 400];
+        }
+
+        // ----- Module enabled check -----
+        if (!isModEnabled($cfg['module'])) {
+            dol_syslog('DPK DocumentController::list module not enabled: '.$cfg['module'], LOG_ERR);
+            return [['error' => 'Module not enabled: '.$cfg['module']], 403];
+        }
+
+        // ----- Permission check (read variant: 'lire' instead of 'creer') -----
+        if (!$this->hasReadPermission($user, $cfg)) {
+            dol_syslog('DPK DocumentController::list denied for user '.$user->id.' on type='.$type, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        // ----- Load target object -----
+        require_once DOL_DOCUMENT_ROOT.$cfg['file'];
+        $className = $cfg['class'];
+        if (!class_exists($className)) {
+            dol_syslog('DPK DocumentController::list class not found: '.$className, LOG_ERR);
+            return [['error' => 'Object class unavailable'], 500];
+        }
+        /** @var \CommonObject $object */
+        $object = new $className($db);
+        $fetched = $object->fetch($objectId);
+        if ($fetched <= 0) {
+            dol_syslog('DPK DocumentController::list object not found type='.$type.' id='.$objectId, LOG_ERR);
+            return [['error' => 'Object not found'], 404];
+        }
+
+        // ----- Entity scoping -----
+        $objectEntity = isset($object->entity) ? (int) $object->entity : (int) $conf->entity;
+        $allowedEntities = $this->getAllowedEntities($cfg);
+        if (!in_array($objectEntity, $allowedEntities, true)) {
+            dol_syslog('DPK DocumentController::list entity mismatch: object='.$objectEntity.' allowed='.implode(',', $allowedEntities), LOG_WARNING);
+            return [['error' => 'Object not in current entity'], 403];
+        }
+
+        // ----- Resolve target directory -----
+        $dir = $this->resolveObjectDir($object, $cfg, $conf, $objectEntity);
+        if ($dir === null) {
+            dol_syslog('DPK DocumentController::list could not resolve dir_output for type='.$type.' id='.$objectId, LOG_WARNING);
+            // Not a failure: an object freshly created with no document has no
+            // dir yet. Return an empty list so the PWA renders the
+            // "no documents" state.
+            return [['documents' => [], 'object_type' => $type, 'object_id' => $objectId], 200];
+        }
+        if (!is_dir($dir)) {
+            return [['documents' => [], 'object_type' => $type, 'object_id' => $objectId], 200];
+        }
+
+        // ----- Walk the directory recursively, skipping previews/meta -----
+        // dol_dir_list returns an array of [name, fullname, size, date, ...]
+        // entries. We exclude the auto-generated *_preview*.png + .meta files
+        // (mirrors what SmartAuth's ObjectDocumentController already does).
+        $files = function_exists('dol_dir_list')
+            ? dol_dir_list($dir, 'files', 1, '', array('(\.meta|_preview.*\.png)$', '^\.'), 'date', SORT_DESC, 1)
+            : [];
+
+        // ----- Index llx_ecm_files entries for this object -----
+        $ecmIndex = $this->loadEcmIndex((string) $cfg['table_element'], (int) $object->id, $allowedEntities);
+
+        $documents = [];
+        $dataRootPrefix = rtrim(DOL_DATA_ROOT, '/').'/';
+        $sourcePrefix = rtrim($dir, '/').'/';
+
+        foreach ((array) $files as $file) {
+            $absPath = (string) ($file['fullname'] ?? '');
+            $name = (string) ($file['name'] ?? '');
+            if ($absPath === '' || $name === '') {
+                continue;
+            }
+            // Build filepath relative to DOL_DATA_ROOT, exactly like
+            // llx_ecm_files stores it.
+            $relativeAbsDir = rtrim(dirname($absPath), '/');
+            $relPath = $relativeAbsDir;
+            if (strpos($relativeAbsDir.'/', $dataRootPrefix) === 0) {
+                $relPath = substr($relativeAbsDir, strlen($dataRootPrefix));
+            }
+            $relPath = rtrim($relPath, '/');
+            $key = $relPath.'/'.$name;
+
+            $ecm = isset($ecmIndex[$key]) ? $ecmIndex[$key] : ['ecm_id' => 0, 'share' => ''];
+            $mime = function_exists('dol_mimetype') ? dol_mimetype($name) : 'application/octet-stream';
+            $size = (int) ($file['size'] ?? 0);
+            $date = (int) ($file['date'] ?? 0);
+
+            $documents[] = [
+                'ecm_id'        => (int) $ecm['ecm_id'],
+                'share'         => (string) $ecm['share'],
+                'filename'      => $name,
+                'relative_path' => str_replace($sourcePrefix, '', $absPath),
+                'mime_type'     => $mime,
+                'size'          => $size,
+                'date_creation' => $date,
+                'date_modification' => $date,
+                'object_type'   => $type,
+                'object_id'     => (int) $object->id,
+            ];
+        }
+
+        dol_syslog('DPK DocumentController::list ok type='.$type.' id='.$objectId.' count='.count($documents));
+
+        return [[
+            'documents'   => $documents,
+            'object_type' => $type,
+            'object_id'   => (int) $object->id,
+        ], 200];
+    }
+
+    /**
+     * GET /document/{id}/download
+     *
+     * Stream the binary content of an ECM-indexed document. The id is the
+     * llx_ecm_files.rowid (NOT the source object id). The endpoint:
+     *  1. Reads the ecm_files row;
+     *  2. Resolves an absolute path inside DOL_DATA_ROOT (path traversal
+     *     guard via realpath() + prefix check);
+     *  3. Verifies the caller has 'lire' on the originating module by
+     *     mapping src_object_type back to a permission group;
+     *  4. Streams the binary with Content-Type / Content-Disposition headers.
+     *
+     * Test mode: when DocumentDownloadRegistry::$skipExit is true, the
+     * captured response is stored in DocumentDownloadRegistry::$lastResponse
+     * and a synthetic [body, code] tuple is returned so PHPUnit can assert
+     * without exit() killing the runner.
+     *
+     * @param array|null $arr Route params (id) merged by SmartAuth.
+     * @return array          [responseBody, httpStatus] on error paths or
+     *                        in test mode. On the success path in production
+     *                        the function streams + exits and never returns.
+     */
+    public function download($arr = null)
+    {
+        global $db, $user, $conf;
+
+        dol_syslog('DPK DocumentController::download');
+
+        $arr = is_array($arr) ? $arr : [];
+
+        if (empty($user) || !is_object($user) || empty($user->id)) {
+            dol_syslog('DPK DocumentController::download missing authenticated user', LOG_ERR);
+            return [['error' => 'Authentication required'], 401];
+        }
+
+        $ecmId = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($ecmId <= 0) {
+            dol_syslog('DPK DocumentController::download invalid id='.($arr['id'] ?? 'null'), LOG_ERR);
+            return [['error' => 'Invalid id'], 400];
+        }
+
+        // ----- Load the ecm_files row -----
+        $ecm = new EcmFiles($db);
+        $fetched = $ecm->fetch($ecmId);
+        if ($fetched <= 0) {
+            dol_syslog('DPK DocumentController::download ecm not found id='.$ecmId, LOG_WARNING);
+            return [['error' => 'Document not found'], 404];
+        }
+
+        // ----- Entity scoping -----
+        $rowEntity = (int) ($ecm->entity ?? 0);
+        $currentEntity = (int) ($conf->entity ?? 1);
+        if ($rowEntity !== 0 && $rowEntity !== $currentEntity) {
+            dol_syslog('DPK DocumentController::download entity mismatch row='.$rowEntity.' cur='.$currentEntity, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        // ----- Permission check (map src_object_type -> Dolibarr right) -----
+        $tableElement = (string) ($ecm->src_object_type ?? '');
+        $perm = $this->permGroupForTableElement($tableElement);
+        if ($perm === null) {
+            dol_syslog('DPK DocumentController::download unsupported src_object_type='.$tableElement, LOG_WARNING);
+            return [['error' => 'Unsupported document type'], 403];
+        }
+        if (!$this->hasReadRight($user, $perm)) {
+            dol_syslog('DPK DocumentController::download forbidden user='.$user->id.' src='.$tableElement, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        // ----- Resolve absolute path inside DOL_DATA_ROOT -----
+        $filepath = (string) ($ecm->filepath ?? '');
+        $filename = (string) ($ecm->filename ?? '');
+        if ($filename === '') {
+            dol_syslog('DPK DocumentController::download empty filename for ecm id='.$ecmId, LOG_WARNING);
+            return [['error' => 'Filename missing'], 422];
+        }
+
+        $rawDataRoot = defined('DOL_DATA_ROOT') ? rtrim((string) DOL_DATA_ROOT, '/') : '';
+        $dataRoot = $rawDataRoot;
+        if ($rawDataRoot !== '') {
+            $resolvedRoot = @realpath($rawDataRoot);
+            if ($resolvedRoot !== false) {
+                $dataRoot = rtrim($resolvedRoot, '/');
+            }
+        }
+
+        $candidate = '';
+        if ($filepath !== '' && $filepath[0] === '/') {
+            // Absolute filepath (rare but valid for legacy rows).
+            $candidate = $filepath.'/'.$filename;
+        } else {
+            $candidate = ($dataRoot !== '' ? $dataRoot.'/' : '').ltrim($filepath, '/').'/'.$filename;
+        }
+        $real = @realpath($candidate);
+        if ($real === false || !is_file($real)) {
+            dol_syslog('DPK DocumentController::download orphan path candidate='.$candidate, LOG_WARNING);
+            return [['error' => 'Document file no longer exists on disk'], 410];
+        }
+        if ($dataRoot !== '' && strpos($real, $dataRoot) !== 0) {
+            dol_syslog('DPK DocumentController::download outside DOL_DATA_ROOT path='.$real, LOG_WARNING);
+            return [['error' => 'Refusing to serve a file outside the document root'], 422];
+        }
+
+        $mime = function_exists('dol_mimetype') ? dol_mimetype($filename) : 'application/octet-stream';
+        $size = @filesize($real);
+        if ($size === false) {
+            $size = 0;
+        }
+
+        // Conservative filename for Content-Disposition (no quotes, no CRLF).
+        $safeName = $filename;
+        if (function_exists('dol_sanitizeFileName')) {
+            $safeName = dol_sanitizeFileName($filename);
+        } else {
+            $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $filename);
+        }
+        if ($safeName === '') {
+            $safeName = 'document.bin';
+        }
+
+        $headers = [
+            'Content-Type'           => $mime,
+            'Content-Disposition'    => 'attachment; filename="'.$safeName.'"',
+            'Content-Length'         => (string) $size,
+            'Cache-Control'          => 'private, no-cache, must-revalidate, max-age=0',
+            'X-Content-Type-Options' => 'nosniff',
+        ];
+
+        dol_syslog('DPK DocumentController::download streaming ecm='.$ecmId.' path='.$real.' size='.$size);
+
+        if (DocumentDownloadRegistry::$skipExit) {
+            $body = @file_get_contents($real);
+            DocumentDownloadRegistry::$lastResponse = [
+                'body'     => $body === false ? '' : $body,
+                'code'     => 200,
+                'headers'  => $headers,
+                'path'     => $real,
+                'filename' => $safeName,
+            ];
+            return [['ok' => true, 'file' => $safeName, 'size' => $size], 200];
+        }
+
+        if (!headers_sent()) {
+            http_response_code(200);
+            foreach ($headers as $name => $value) {
+                header($name.': '.$value);
+            }
+        }
+        @readfile($real);
+        exit;
+    }
+
+    /**
+     * Load the llx_ecm_files index for a given (table_element, id) pair,
+     * keyed by "filepath/filename" (relative to DOL_DATA_ROOT). Returns
+     * an associative array.
+     *
+     * @param string $tableElement     Value of llx_ecm_files.src_object_type
+     * @param int    $objectId         Value of llx_ecm_files.src_object_id
+     * @param int[]  $allowedEntities  Entity ids to filter on
+     * @return array<string, array{ecm_id:int, share:string}>
+     */
+    private function loadEcmIndex($tableElement, $objectId, $allowedEntities)
+    {
+        global $db;
+
+        $index = [];
+        if ($tableElement === '' || $objectId <= 0) {
+            return $index;
+        }
+        $entityCsv = implode(',', array_map('intval', $allowedEntities));
+        if ($entityCsv === '') {
+            return $index;
+        }
+
+        $sql = 'SELECT rowid, filename, filepath, share, label, fullpath_orig, date_c'
+             . ' FROM '.MAIN_DB_PREFIX.'ecm_files'
+             . " WHERE src_object_type = '".$db->escape($tableElement)."'"
+             . ' AND src_object_id = '.((int) $objectId)
+             . ' AND entity IN ('.$entityCsv.')';
+
+        $res = $db->query($sql);
+        if (!$res) {
+            return $index;
+        }
+        while ($row = $db->fetch_object($res)) {
+            $filepath = (string) ($row->filepath ?? '');
+            $filename = (string) ($row->filename ?? '');
+            if ($filename === '') {
+                continue;
+            }
+            $key = $filepath.'/'.$filename;
+            $index[$key] = [
+                'ecm_id' => (int) $row->rowid,
+                'share'  => (string) ($row->share ?? ''),
+            ];
+        }
+        $db->free($res);
+        return $index;
+    }
+
+    /**
+     * Check that the user has the 'lire' right for the given object type
+     * config. Mirrors hasAttachPermission() but maps the 'creer' action to
+     * 'lire' (or 'commande_lire' / 'facture_lire' for the fournisseur
+     * resource which has two-level rights).
+     *
+     * @param object $user
+     * @param array  $cfg
+     * @return bool
+     */
+    private function hasReadPermission($user, $cfg)
+    {
+        if (!empty($user->admin)) {
+            return true;
+        }
+        $resource = (string) $cfg['perm_resource'];
+        $createAction = (string) $cfg['perm_action'];
+        if ($resource === '' || $createAction === '') {
+            return false;
+        }
+        // Replace the trailing 'creer' segment with 'lire'. Action shapes are
+        // 'creer', 'commande_creer', 'facture_creer', 'myactions_create'.
+        $parts = explode('_', $createAction);
+        $last = end($parts);
+        if ($last === 'creer' || $last === 'create') {
+            $parts[count($parts) - 1] = 'lire';
+        }
+        $readAction = implode('_', $parts);
+        $readParts = explode('_', $readAction);
+        if (count($readParts) === 1) {
+            return (bool) $user->hasRight($resource, $readParts[0]);
+        }
+        return (bool) $user->hasRight($resource, $readParts[0], $readParts[1]);
+    }
+
+    /**
+     * Map the llx_ecm_files.src_object_type value back to a Dolibarr
+     * permission group descriptor. The download endpoint cannot rely on
+     * $objectTypeMap because that map is keyed by PWA object type (propal,
+     * order, ...), while ecm_files stores the Dolibarr table element name
+     * (propal, commande, facture, commande_fournisseur, invoice_supplier,
+     * actioncomm, ...).
+     *
+     * @param string $tableElement
+     * @return array|string|null  Returns a string ('propal', 'commande', ...)
+     *                            for single-segment rights, an array
+     *                            (['fournisseur','commande']) for two-level
+     *                            rights, or null when the type is unknown.
+     */
+    private function permGroupForTableElement($tableElement)
+    {
+        $map = [
+            'societe'              => 'societe',
+            'product'              => 'produit',
+            'propal'               => 'propal',
+            'commande'             => 'commande',
+            'facture'              => 'facture',
+            'commande_fournisseur' => ['fournisseur', 'commande'],
+            'invoice_supplier'     => ['fournisseur', 'facture'],
+            'actioncomm'           => 'agenda',
+            'projet'               => 'projet',
+            'categorie'            => 'categorie',
+        ];
+        return $map[$tableElement] ?? null;
+    }
+
+    /**
+     * Check the 'lire' permission for a permGroup descriptor as returned
+     * by permGroupForTableElement().
+     *
+     * @param object $user
+     * @param mixed  $perm  String like 'propal' or ['fournisseur','commande'].
+     * @return bool
+     */
+    private function hasReadRight($user, $perm)
+    {
+        if (!empty($user->admin)) {
+            return true;
+        }
+        if (is_array($perm) && count($perm) === 2) {
+            // Agenda uses 'myactions' subkey for the regular user case.
+            if ($perm[0] === 'agenda') {
+                if ($user->hasRight('agenda', 'myactions', 'read')) {
+                    return true;
+                }
+                return (bool) $user->hasRight('agenda', 'allactions', 'read');
+            }
+            return (bool) $user->hasRight($perm[0], $perm[1], 'lire');
+        }
+        if (is_string($perm)) {
+            return (bool) $user->hasRight($perm, 'lire');
+        }
+        return false;
     }
 }

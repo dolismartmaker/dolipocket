@@ -3,16 +3,23 @@ import { useViewport } from "src/lib/viewport";
 import { useWarehousesData } from "./useWarehousesData";
 import { WarehousesPageMobile } from "./WarehousesPage.mobile";
 import { WarehousesPageDesktop } from "./WarehousesPage.desktop";
+import { WarehousesWorkspace } from "./WarehousesPage.tablet";
 
 // Viewport router pattern (cf ~/docs/SMARTMAKER.md "Viewport-aware rendering").
 // Data lives in useWarehousesData(); .mobile and .desktop are pure render.
+// Tablet renders a self-contained master-detail workspace.
 export const WarehousesPage = () => {
-    const data = useWarehousesData();
-    const { isDesktop } = useViewport();
+    const { isTablet } = useViewport();
+    if (isTablet) return <WarehousesWorkspace />;
+    return <WarehousesListViews />;
+};
 
-    return isDesktop
-        ? <WarehousesPageDesktop {...data} />
-        : <WarehousesPageMobile {...data} />;
+const WarehousesListViews = () => {
+    const data = useWarehousesData();
+    const { isMobile } = useViewport();
+    return isMobile
+        ? <WarehousesPageMobile {...data} />
+        : <WarehousesPageDesktop {...data} />;
 };
 
 export default WarehousesPage;

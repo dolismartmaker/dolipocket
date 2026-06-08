@@ -16,8 +16,11 @@
 
 namespace Dolipocket\Api;
 
+dol_include_once('/dolipocket/smartmaker-api/Trait/dmCatalogTrait.php');
+
 use SmartAuth\DolibarrMapping\dmBase;
 use SmartAuth\DolibarrMapping\dmTrait;
+use Dolipocket\Api\Trait\dmCatalogTrait;
 
 /**
  * DolibarrMapping class for ActionComm (agenda events)
@@ -29,6 +32,7 @@ use SmartAuth\DolibarrMapping\dmTrait;
 class dmAgenda extends dmBase
 {
     use dmTrait;
+    use dmCatalogTrait;
 
     /**
      * Dolibarr class name (used by dmTrait::boot() to instantiate the object)
@@ -37,16 +41,19 @@ class dmAgenda extends dmBase
     protected $dolibarrClassName = 'ActionComm';
 
     /**
-     * Parent class name used by the mapping helpers
-     * @var string
-     */
-    protected $parentClassName = 'ActionComm';
-
-    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */
     protected $parentElementToUseForExtraFields = 'actioncomm';
+
+    /**
+     * Element name used by dmCatalogTrait to enumerate extrafields. Required
+     * for the catalog endpoints to flag extrafields with group=extrafield.
+     * Matches llx_extrafields.elementtype like the legacy
+     * $parentElementToUseForExtraFields above.
+     * @var string
+     */
+    protected $parentTableElementToUseForExtraFields = 'actioncomm';
 
     /**
      * Mapping: Dolibarr field name => API field name
@@ -76,6 +83,19 @@ class dmAgenda extends dmBase
      * Fields that can be modified via API
      * @var array
      */
+    /**
+     * Fields that can be modified via API.
+     *
+     * Entries are the DOLISIDE keys of $listOfPublishedFields. The
+     * controller translates the legacy API write key `fk_user_assigned`
+     * into the appside key `fk_user_action` (mapped to PHP property
+     * `userownerid`) BEFORE calling importMappedData(). Other appside-vs
+     * -doliside renames (`note` -> `note_private`,
+     * `fk_contact` -> `contact_id`) are handled natively by the mapper
+     * since writableFields lists the doliside keys here.
+     *
+     * @var array
+     */
     protected $writableFields = [
         'label',
         'type_code',
@@ -84,11 +104,10 @@ class dmAgenda extends dmBase
         'percentage',
         'location',
         'fulldayevent',
-        'note',
-        'fk_user_action',
-        'fk_user_assigned',
+        'note_private',
+        'userownerid',
         'socid',
-        'fk_contact',
+        'contact_id',
         'fk_element',
         'elementtype',
         'status',

@@ -41,12 +41,6 @@ class dmProduct extends dmBase
     protected $dolibarrClassName = 'Product';
 
     /**
-     * Dolibarr class name for the parent object.
-     * @var string
-     */
-    protected $parentClassName = 'Product';
-
-    /**
      * Element name used by extrafields (matches llx_extrafields.elementtype).
      * @var string
      */

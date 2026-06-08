@@ -40,12 +40,6 @@ class dmStockMovement extends dmBase
     protected $dolibarrClassName = 'MouvementStock';
 
     /**
-     * Dolibarr class name for the parent object.
-     * @var string
-     */
-    protected $parentClassName = 'MouvementStock';
-
-    /**
      * Element name used by extrafields (matches llx_extrafields.elementtype).
      * @var string
      */

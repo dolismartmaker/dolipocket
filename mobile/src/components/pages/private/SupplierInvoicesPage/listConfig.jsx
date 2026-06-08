@@ -3,6 +3,8 @@ import {
     FaFileCsv, FaFileExcel, FaFileLines,
 } from "react-icons/fa6";
 
+import { StatusPill, getStatusInfo } from "src/lib/components/StatusPill";
+
 // listConfig for the desktop DataTable.
 // Cf DATATABLE_SPEC.md §13 (v2) -- the server catalog is the source of truth
 // for the column list. Local overrides only carry width hints, force a
@@ -22,7 +24,18 @@ const fmtAmount = (v) => {
     return n.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-const fmtPaye = (v) => {
+// Paye flag rendering: an emerald "Payée" pill when the supplier invoice
+// is fully settled, an amber "Impayée" pill otherwise. Same visual style
+// as InvoicesPage.
+const renderPayePill = (v) => {
+    if (v === null || v === undefined || v === "") return "";
+    const paid = Number(v) === 1;
+    return paid
+        ? <StatusPill label="Payée" tone="emerald" />
+        : <StatusPill label="Impayée" tone="amber" />;
+};
+
+const exportPayeText = (v) => {
     if (v === null || v === undefined || v === "") return "";
     return Number(v) === 1 ? "Payée" : "Impayée";
 };
@@ -47,8 +60,16 @@ export const supplierInvoicesListConfig = {
         dateLimReglement: { defaultVisible: false, defaultWidth: 110, formatter: fmtDate },
         totalHt:          { defaultVisible: false, defaultWidth: 120, formatter: fmtAmount },
         totalTtc:         { defaultVisible: true,  defaultWidth: 130, formatter: fmtAmount },
-        paye:             { defaultVisible: true,  defaultWidth: 100, formatter: fmtPaye },
-        statut:           { defaultVisible: false, defaultWidth: 110 },
+        paye:             {
+            defaultVisible: true, defaultWidth: 100,
+            formatter: renderPayePill,
+            exportFormatter: exportPayeText,
+        },
+        statut:           {
+            defaultVisible: false, defaultWidth: 110,
+            formatter: (v, row) => <StatusPill feature="supplierinvoice" status={v} paid={Number(row?.paye) === 1} />,
+            exportFormatter: (v, row) => getStatusInfo("supplierinvoice", v, { paid: Number(row?.paye) === 1 }).label,
+        },
     },
 
     rowActions: [

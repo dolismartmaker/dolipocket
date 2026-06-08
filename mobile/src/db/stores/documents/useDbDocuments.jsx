@@ -207,6 +207,54 @@ export const useDbDocuments = () => {
             return { blob, filename, mime };
         },
 
+        // Task 4 - list documents attached to a Dolibarr business object via
+        // the Dolipocket-native endpoint. Unlike list() above (which targets
+        // SmartAuth's ObjectDocumentController, limited to product /
+        // thirdparty / project / intervention / category), this hits the
+        // GET /document?objectType=<t>&objectId=<id> route powered by
+        // DocumentController::list() and supports the 11 Dolipocket object
+        // types (propal, commande, facture, supplier_order, supplier_invoice,
+        // agenda, ...). Used by the <DocumentsSection> rendered under the
+        // <DocumentLinesEditor> on the 5 document PageDetail desktop views.
+        listForObject: async ({ objectType, objectId } = {}) => {
+            if (!objectType || !objectId) return [];
+            const data = await get("document", {
+                searchParams: {
+                    objectType: String(objectType),
+                    objectId: Number(objectId),
+                },
+            });
+            const rows = Array.isArray(data?.documents) ? data.documents : [];
+            return rows.map((r) => ({
+                ecmId: Number(r.ecm_id ?? 0),
+                share: String(r.share ?? ""),
+                filename: String(r.filename ?? ""),
+                relativePath: String(r.relative_path ?? ""),
+                mime: String(r.mime_type ?? ""),
+                size: Number(r.size ?? 0),
+                dateCreation: Number(r.date_creation ?? 0),
+                dateModification: Number(r.date_modification ?? 0),
+                objectType: String(r.object_type ?? objectType),
+                objectId: Number(r.object_id ?? objectId),
+            }));
+        },
+
+        // Task 4 - download an ECM-indexed document as a Blob via the
+        // Dolipocket-native GET /document/{ecmId}/download endpoint.
+        // Same shape as downloadPdf() in other stores: returns
+        // { blob, contentDisposition }. Throws on 403/404/410/422.
+        downloadFile: async (ecmId) => {
+            if (!ecmId || ecmId <= 0) {
+                throw new Error("downloadFile: ecmId is required");
+            }
+            const response = await get(`document/${Number(ecmId)}/download`, { raw: true });
+            const blob = await response.blob();
+            return {
+                blob,
+                contentDisposition: response.headers.get("Content-Disposition") ?? "",
+            };
+        },
+
         cacheLocal: (item) => (store ? store.put(item) : Promise.resolve()),
         cacheList: (items) => (store ? store.bulkPut(items) : Promise.resolve()),
         readCache: async ({ objectType, objectId } = {}) => {

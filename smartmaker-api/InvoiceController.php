@@ -19,14 +19,22 @@
 
 namespace Dolipocket\Api;
 
-require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
+dol_include_once('/compta/facture/class/facture.class.php');
+dol_include_once('/commande/class/commande.class.php');
+dol_include_once('/compta/paiement/class/paiement.class.php');
 dol_include_once('/dolipocket/smartmaker-api/Trait/PaginatedListTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/SendEmailTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/PaymentTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/PdfDownloadTrait.php');
 dol_include_once('/dolipocket/smartmaker-api/dmInvoice.php');
 
 use Facture;
 use Commande;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use Dolipocket\Api\Trait\SendEmailTrait;
+use Dolipocket\Api\Trait\PaymentTrait;
+use Dolipocket\Api\Trait\PdfDownloadTrait;
+use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
  * Customer invoice (facture client) API controller.
@@ -49,6 +57,9 @@ use Dolipocket\Api\Trait\PaginatedListTrait;
 class InvoiceController
 {
     use PaginatedListTrait;
+    use SendEmailTrait;
+    use PaymentTrait;
+    use PdfDownloadTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -155,6 +166,48 @@ class InvoiceController
         }
 
         return [$this->mapper->getColumnCatalog(), 200];
+    }
+
+    /**
+     * GET invoice/lines/columns
+     *
+     * Returns the catalog describing the invoice-line columns. Cf
+     * docs/DATATABLE_SPEC.md section 13.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function linesColumns($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::linesColumns forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        return [$this->mapper->getLinesCatalog(), 200];
+    }
+
+    /**
+     * GET invoice/describe
+     *
+     * Returns the raw objectDesc() output (per-field metadata) for AutoForm.
+     * Cf .claude/CLAUDE.md "Lot 9 - Form-from-catalog (AutoForm)".
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function describe($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::describe forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        return [$this->mapper->objectDesc(), 200];
     }
 
     /**
@@ -405,10 +458,12 @@ class InvoiceController
         $invoice = new Facture($db);
         $invoice->socid = $socid;
         $invoice->type = isset($arr['type']) ? (int) $arr['type'] : Facture::TYPE_STANDARD;
-        $invoice->date = !empty($arr['datef']) ? (is_numeric($arr['datef']) ? (int) $arr['datef'] : strtotime($arr['datef'])) : dol_now();
+        $datef = self::normalizeTimestamp($arr['datef'] ?? null);
+        $invoice->date = $datef !== null ? $datef : dol_now();
         $invoice->datef = $invoice->date;
-        if (!empty($arr['date_lim_reglement'])) {
-            $invoice->date_lim_reglement = is_numeric($arr['date_lim_reglement']) ? (int) $arr['date_lim_reglement'] : strtotime($arr['date_lim_reglement']);
+        $dateLimCreate = self::normalizeTimestamp($arr['date_lim_reglement'] ?? null);
+        if ($dateLimCreate !== null) {
+            $invoice->date_lim_reglement = $dateLimCreate;
         }
         if (isset($arr['ref_client'])) {
             $invoice->ref_client = $arr['ref_client'];
@@ -464,27 +519,50 @@ class InvoiceController
             return [['error' => 'Invoice not found'], 404];
         }
 
-        if (isset($arr['ref_client'])) {
-            $invoice->ref_client = $arr['ref_client'];
+        $payload = $arr;
+        unset($payload['id']);
+
+        // Pre-process date fields with the project-specific normalizer.
+        // dmTrait::_castInputValue() handles strtotime() but normalizeTimestamp()
+        // is more permissive (accepts JS Date.now() in ms, etc).
+        foreach (['datef', 'date_lim_reglement'] as $dateField) {
+            if (isset($payload[$dateField])) {
+                $normalized = self::normalizeTimestamp($payload[$dateField]);
+                if ($normalized !== null) {
+                    $payload[$dateField] = $normalized;
+                } else {
+                    unset($payload[$dateField]);
+                }
+            }
         }
-        if (isset($arr['datef'])) {
-            $invoice->date = is_numeric($arr['datef']) ? (int) $arr['datef'] : strtotime($arr['datef']);
-            $invoice->datef = $invoice->date;
+
+        try {
+            $sanitized = $this->mapper->importMappedData($payload);
+        } catch (MapperValidationException $e) {
+            dol_syslog("DPK InvoiceController::update rejected payload: " . json_encode($e->getErrors()), LOG_WARNING);
+            return [['errors' => $e->getErrors()], 400];
         }
-        if (isset($arr['date_lim_reglement'])) {
-            $invoice->date_lim_reglement = is_numeric($arr['date_lim_reglement']) ? (int) $arr['date_lim_reglement'] : strtotime($arr['date_lim_reglement']);
-        }
-        if (isset($arr['note_public'])) {
-            $invoice->note_public = $arr['note_public'];
-        }
-        if (isset($arr['note_private'])) {
-            $invoice->note_private = $arr['note_private'];
-        }
-        if (isset($arr['fk_cond_reglement'])) {
-            $invoice->cond_reglement_id = (int) $arr['fk_cond_reglement'];
-        }
-        if (isset($arr['fk_mode_reglement'])) {
-            $invoice->mode_reglement_id = (int) $arr['fk_mode_reglement'];
+
+        foreach (get_object_vars($sanitized) as $field => $value) {
+            // Quirk Dolibarr: on Facture, fk_cond_reglement / fk_mode_reglement
+            // are stored on cond_reglement_id / mode_reglement_id PHP properties
+            // (the SQL column keeps the fk_ prefix).
+            if ($field === 'fk_cond_reglement') {
+                $invoice->cond_reglement_id = $value;
+                continue;
+            }
+            if ($field === 'fk_mode_reglement') {
+                $invoice->mode_reglement_id = $value;
+                continue;
+            }
+            // Quirk Dolibarr: datef must also land on $date (cf facture.class.php
+            // line 2544 -- update() reads $this->date for the SQL `datef` column).
+            if ($field === 'datef') {
+                $invoice->date = $value;
+                $invoice->datef = $value;
+                continue;
+            }
+            $invoice->$field = $value;
         }
 
         $result = $invoice->update($user);
@@ -646,8 +724,60 @@ class InvoiceController
         $fk_product = isset($arr['fk_product']) ? (int) $arr['fk_product'] : 0;
         $remise_percent = isset($arr['remise_percent']) ? (float) $arr['remise_percent'] : 0.0;
         $product_type = isset($arr['product_type']) ? (int) $arr['product_type'] : 0;
+        $label = isset($arr['label']) ? (string) $arr['label'] : '';
         $rang = isset($arr['rang']) ? (int) $arr['rang'] : -1;
+        // Section lines (Lot 11). product_type=9 + special_code=0 -> title,
+        // product_type=9 + special_code=104 -> sub-total. Pure label, no
+        // calculation (qty/subprice/tva_tx all 0).
+        $special_code = isset($arr['special_code']) ? (int) $arr['special_code'] : 0;
+        // Service-line dates (typed as Dolibarr dates -- normalised from
+        // milliseconds / ISO strings via PaginatedListTrait::normalizeTimestamp).
+        $dateStart = self::normalizeTimestamp($arr['date_start'] ?? null);
+        $dateEnd = self::normalizeTimestamp($arr['date_end'] ?? null);
+        if ($dateStart === null) $dateStart = '';
+        if ($dateEnd === null) $dateEnd = '';
+        $fk_unit = isset($arr['fk_unit']) && (int) $arr['fk_unit'] > 0 ? (int) $arr['fk_unit'] : null;
 
+        // If a product was picked but description / subprice / tva_tx /
+        // product_type / label were not supplied, hydrate them from the
+        // product record. Mirrors what Dolibarr's standard "addline" form
+        // does after a product is chosen via the prod_entry_mode=predef
+        // radio (cf objectline_create.tpl.php).
+        if ($fk_product > 0) {
+            require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
+            $product = new \Product($db);
+            if ($product->fetch($fk_product) > 0) {
+                if ($desc === '') {
+                    $desc = (string) ($product->description !== '' ? $product->description : $product->label);
+                }
+                if ($label === '') {
+                    $label = (string) $product->label;
+                }
+                if (!isset($arr['subprice'])) {
+                    $pu_ht = (float) $product->price;
+                }
+                if (!isset($arr['tva_tx']) && $product->tva_tx !== null) {
+                    $txtva = (string) $product->tva_tx;
+                }
+                if (!isset($arr['product_type'])) {
+                    $product_type = (int) $product->type;
+                }
+                if ($fk_unit === null && !empty($product->fk_unit)) {
+                    $fk_unit = (int) $product->fk_unit;
+                }
+            }
+        }
+
+        // Facture::addline signature (31 args):
+        //   1 desc, 2 pu_ht, 3 qty, 4 txtva, 5 txlocaltax1,
+        //   6 txlocaltax2, 7 fk_product, 8 remise_percent,
+        //   9 date_start, 10 date_end, 11 ventil, 12 info_bits,
+        //  13 fk_remise_except, 14 price_base_type, 15 pu_ttc,
+        //  16 type, 17 rang, 18 special_code, 19 origin,
+        //  20 origin_id, 21 fk_parent_line, 22 fk_fournprice,
+        //  23 pa_ht, 24 label, 25 array_options, 26 situation_percent,
+        //  27 fk_prev_id, 28 fk_unit, 29 pu_ht_devise, 30 ref_ext,
+        //  31 noupdateafterinsertline
         $result = $invoice->addline(
             $desc,
             $pu_ht,
@@ -657,8 +787,8 @@ class InvoiceController
             0,
             $fk_product,
             $remise_percent,
-            '',
-            '',
+            $dateStart,
+            $dateEnd,
             0,
             0,
             '',
@@ -666,13 +796,17 @@ class InvoiceController
             0,
             $product_type,
             $rang,
-            0,
+            $special_code,
             '',
             0,
             0,
             null,
             0,
-            ''
+            $label,
+            0,
+            100,
+            0,
+            $fk_unit
         );
         if ($result <= 0) {
             dol_syslog("DPK InvoiceController::addLine addline() failed: " . $invoice->error, LOG_ERR);
@@ -730,17 +864,42 @@ class InvoiceController
         $remise_percent = isset($arr['remise_percent']) ? (float) $arr['remise_percent'] : (float) $existing->remise_percent;
         $txtva = isset($arr['tva_tx']) ? (string) $arr['tva_tx'] : (string) $existing->tva_tx;
         $desc = isset($arr['description']) ? (string) $arr['description'] : (string) $existing->desc;
+        $label = isset($arr['label']) ? (string) $arr['label'] : (string) ($existing->label ?? '');
         $type = isset($arr['product_type']) ? (int) $arr['product_type'] : (int) $existing->product_type;
         $rang = isset($arr['rang']) ? (int) $arr['rang'] : (int) ($existing->rang ?? 0);
+        // Preserve special_code on section lines (Lot 11). Falls back to
+        // existing line's value to avoid demoting sub-total / title rows.
+        $special_code = isset($arr['special_code'])
+            ? (int) $arr['special_code']
+            : (int) ($existing->special_code ?? 0);
+        // Service-line dates + unit -- normalised when present, otherwise
+        // we keep the existing line's value (via empty string sentinel for
+        // dates / null for fk_unit which Facture::updateline interprets as
+        // "no change").
+        $dateStart = array_key_exists('date_start', $arr) ? self::normalizeTimestamp($arr['date_start']) : (int) ($existing->date_start ?? 0);
+        $dateEnd = array_key_exists('date_end', $arr) ? self::normalizeTimestamp($arr['date_end']) : (int) ($existing->date_end ?? 0);
+        if ($dateStart === null) $dateStart = '';
+        if ($dateEnd === null) $dateEnd = '';
+        $fk_unit = array_key_exists('fk_unit', $arr)
+            ? ((int) $arr['fk_unit'] > 0 ? (int) $arr['fk_unit'] : null)
+            : (isset($existing->fk_unit) ? (int) $existing->fk_unit : null);
 
+        // Facture::updateline signature (26 args):
+        //   1 rowid, 2 desc, 3 pu, 4 qty, 5 remise_percent,
+        //   6 date_start, 7 date_end, 8 txtva, 9 txlocaltax1,
+        //  10 txlocaltax2, 11 price_base_type, 12 info_bits,
+        //  13 type, 14 fk_parent_line, 15 skip_update_total,
+        //  16 fk_fournprice, 17 pa_ht, 18 label, 19 special_code,
+        //  20 array_options, 21 situation_percent, 22 fk_unit,
+        //  23 pu_ht_devise, 24 notrigger, 25 ref_ext, 26 rang
         $result = $invoice->updateline(
             $lineid,
             $desc,
             $pu,
             $qty,
             $remise_percent,
-            '',
-            '',
+            $dateStart,
+            $dateEnd,
             $txtva,
             0,
             0,
@@ -751,11 +910,11 @@ class InvoiceController
             0,
             null,
             0,
-            '',
-            0,
+            $label,
+            $special_code,
             0,
             100,
-            null,
+            $fk_unit,
             0,
             0,
             '',
@@ -808,5 +967,132 @@ class InvoiceController
         $invoice->fetch($id);
         $invoice->fetch_lines();
         return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * POST invoice/{id}/pdf
+     *
+     * Generate the PDF document for the invoice using the configured
+     * model (Dolibarr conf $conf->global->FACTURE_ADDON_PDF, falls back to
+     * 'crabe'). Mirrors what the Dolibarr standard "(Re)generate" button
+     * does on the invoice card.
+     *
+     * Body params:
+     *   - model    (optional) -- override the PDF model name
+     *   - lang     (optional) -- output language
+     *   - hideref  / hidedesc / hidedetails (optional bool)
+     *
+     * Returns { ok, file } where `file` is the basename of the generated
+     * PDF (saved under documents/<entity>/facture/<ref>/).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function generatePdf($arr = null)
+    {
+        global $db, $user, $langs, $conf;
+
+        if (!$user->hasRight('facture', 'creer') && !$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::generatePdf forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::generatePdf missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::generatePdf not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+        $invoice->fetch_lines();
+        $invoice->fetch_thirdparty();
+
+        $model = isset($arr['model']) && trim((string) $arr['model']) !== ''
+            ? (string) $arr['model']
+            : (string) (getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe');
+        $hideref = isset($arr['hideref']) ? (int) $arr['hideref'] : 0;
+        $hidedesc = isset($arr['hidedesc']) ? (int) $arr['hidedesc'] : 0;
+        $hidedetails = isset($arr['hidedetails']) ? (int) $arr['hidedetails'] : 0;
+
+        $result = $invoice->generateDocument($model, $langs, $hidedetails, $hidedesc, $hideref);
+        if ($result <= 0) {
+            dol_syslog("DPK InvoiceController::generatePdf generateDocument() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to generate PDF: ' . $invoice->error], 500];
+        }
+
+        return [
+            ['ok' => true, 'file' => $invoice->last_main_doc ?? '', 'model' => $model],
+            200,
+        ];
+    }
+
+    /**
+     * POST invoice/{id}/send
+     *
+     * Send the customer invoice by email with the last generated PDF attached.
+     * Cf .claude/CLAUDE.md "Envoi par email" (todo.md task 1).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function send($arr = null)
+    {
+        return $this->sendEmail($arr, [
+            'objectClass'   => '\\Facture',
+            'permGroup'     => 'facture',
+            'logTag'        => 'InvoiceController',
+            'notFoundLabel' => 'Invoice',
+            'defaultModel'  => 'crabe',
+            'addonPdfKey'   => 'FACTURE_ADDON_PDF',
+            'subjectPrefix' => 'Facture',
+        ]);
+    }
+
+    /**
+     * GET invoice/{id}/pdf/download
+     *
+     * Stream the last generated PDF for the customer invoice. Reads
+     * $obj->last_main_doc; does NOT regenerate. Cf todo.md task 3.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function download($arr = null)
+    {
+        return $this->downloadPdf($arr, [
+            'objectClass'   => '\\Facture',
+            'permGroup'     => 'facture',
+            'logTag'        => 'InvoiceController',
+            'notFoundLabel' => 'Invoice',
+        ]);
+    }
+
+    /**
+     * POST invoice/{id}/payment
+     *
+     * Record a customer payment against this invoice. Delegates to
+     * PaymentTrait::addPayment which encapsulates Paiement::create + the
+     * "close on full" flag so the invoice's `paye` flips automatically
+     * when the running total reaches total_ttc.
+     *
+     * Body (cf PaymentTrait::addPayment docblock):
+     *   amount, payment_mode, payment_date, ref, fk_account, note
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function pay($arr = null)
+    {
+        return $this->addPayment($arr, [
+            'invoiceClass'  => '\\Facture',
+            'paymentClass'  => 'customer',
+            'permGroup'     => 'facture',
+            'logTag'        => 'InvoiceController',
+            'notFoundLabel' => 'Invoice',
+        ]);
     }
 }

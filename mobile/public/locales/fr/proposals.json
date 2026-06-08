@@ -65,6 +65,13 @@
         "refused": "Non signé",
         "billed": "Facturé"
     },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Validé",
+        "2": "Signé",
+        "3": "Non signé",
+        "4": "Facturé"
+    },
     "toasts": {
         "create-success": "Devis créé",
         "update-success": "Devis mis à jour",

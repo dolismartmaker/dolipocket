@@ -84,6 +84,18 @@ export const useDbInvoices = () => {
             return Array.isArray(data) ? data : [];
         },
 
+        // Lines column catalog (read-only descriptor for <DocumentLinesTable>).
+        linesColumns: async ({ signal } = {}) => {
+            const data = await get("invoice/lines/columns", { signal });
+            return Array.isArray(data) ? data : [];
+        },
+
+        // Field descriptor for <AutoForm> (objectDesc() raw output).
+        describe: async ({ signal } = {}) => {
+            const data = await get("invoice/describe", { signal });
+            return data && typeof data === "object" ? data : {};
+        },
+
         deleteBulk: async ({ ids } = {}) => {
             if (!Array.isArray(ids) || ids.length === 0) {
                 return { success: [], errors: [] };
@@ -143,6 +155,66 @@ export const useDbInvoices = () => {
                 await store.put(stripCollections(mapped)).catch(() => undefined);
             }
             return mapped;
+        },
+
+        // Generate PDF for the invoice. Backend returns
+        // { ok, file, model } -- forwarded as-is to the caller.
+        generatePdf: async (id, opts = {}) => {
+            return post(`invoice/${id}/pdf`, { json: opts });
+        },
+
+        // Download the last generated PDF as a Blob (raw response). Cf todo.md task 3.
+        downloadPdf: async (id) => {
+            const response = await get(`invoice/${id}/pdf/download`, { raw: true });
+            const blob = await response.blob();
+            return {
+                blob,
+                contentDisposition: response.headers.get("Content-Disposition") ?? "",
+            };
+        },
+
+        // Record a payment against the invoice. Backend POST
+        // /invoice/{id}/payment -- cf PaymentTrait. Body:
+        //   {amount, paymentMode, paymentDate (epoch seconds), ref,
+        //    fkAccount, note}
+        // Returns the backend payload { ok, payment_id, amount, total_paid,
+        //   remain_to_pay, paye, invoice }.
+        addPayment: async (id, payload = {}) => {
+            const json = {};
+            if (payload.amount !== undefined) json.amount = Number(payload.amount);
+            if (payload.paymentMode !== undefined) json.payment_mode = Number(payload.paymentMode);
+            if (payload.paymentDate !== undefined && payload.paymentDate !== "") {
+                json.payment_date = Number(payload.paymentDate);
+            }
+            if (payload.ref !== undefined && payload.ref !== "") json.ref = String(payload.ref);
+            if (payload.fkAccount !== undefined && payload.fkAccount > 0) {
+                json.fk_account = Number(payload.fkAccount);
+            }
+            if (payload.note !== undefined) json.note = String(payload.note);
+            const res = await post(`invoice/${id}/payment`, { json });
+            // The backend response embeds the refreshed `invoice` field --
+            // cache it locally so the page state mirrors paye=1 immediately.
+            const invoice = res?.invoice ? mapFromBackend(res.invoice) : null;
+            if (invoice && store) {
+                await store.put(stripCollections(invoice)).catch(() => undefined);
+            }
+            return { ...res, invoice };
+        },
+
+        // Send the invoice by email with the last generated PDF attached.
+        // Backend POST /invoice/{id}/send -- cf SendEmailTrait.
+        sendEmail: async (id, payload = {}) => {
+            const json = {};
+            if (payload.to !== undefined) json.to = String(payload.to);
+            if (payload.cc !== undefined && payload.cc !== "") json.cc = String(payload.cc);
+            if (payload.bcc !== undefined && payload.bcc !== "") json.bcc = String(payload.bcc);
+            if (payload.subject !== undefined) json.subject = String(payload.subject);
+            if (payload.body !== undefined) json.body = String(payload.body);
+            if (payload.attachmentPath !== undefined && payload.attachmentPath !== "") {
+                json.attachment_path = String(payload.attachmentPath);
+            }
+            if (payload.ishtml !== undefined) json.ishtml = Number(payload.ishtml) ? 1 : 0;
+            return post(`invoice/${id}/send`, { json });
         },
 
         createFromOrder: async (orderId) => {

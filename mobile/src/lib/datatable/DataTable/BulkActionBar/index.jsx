@@ -13,7 +13,7 @@ export const BulkActionBar = ({
 
     return (
         <div
-            className="fixed left-1/2 bottom-4 z-30 transition-all duration-200"
+            className="fixed left-1/2 bottom-4 z-30 transition-[transform,opacity] duration-200"
             style={{
                 transform: visible ? "translateX(-50%) translateY(0)" : "translateX(-50%) translateY(120%)",
                 opacity: visible ? 1 : 0,

@@ -1,17 +1,19 @@
-import { FaCheck, FaDesktop, FaMobileScreen, FaWandMagicSparkles } from "react-icons/fa6";
+import { FaCheck, FaDesktop, FaMobileScreen, FaTabletScreenButton, FaWandMagicSparkles } from "react-icons/fa6";
 
 import { useViewport } from "src/lib/viewport";
 
-// Three radio-like options. We use the same component in two contexts:
+// Four radio-like options. We use the same component in three contexts:
 // - desktop dropdown attached to the email in TopBar (`density="compact"`)
+// - tablet NavRail account popover (`density="comfortable"`)
 // - mobile MoreMenu footer (`density="comfortable"`)
 //
 // Selecting an option already triggers a confirm() + reload() inside
 // setPreference(), so we don't need a "Save" button here.
 const OPTIONS = [
-    { value: "auto",    label: "Automatique", icon: FaWandMagicSparkles, hint: "Selon la taille de l'écran" },
-    { value: "desktop", label: "Bureau",      icon: FaDesktop,           hint: "Forcer la vue ordinateur" },
-    { value: "mobile",  label: "Mobile",      icon: FaMobileScreen,      hint: "Forcer la vue smartphone" },
+    { value: "auto",    label: "Automatique", icon: FaWandMagicSparkles,    hint: "Selon le type d'appareil" },
+    { value: "desktop", label: "Bureau",      icon: FaDesktop,              hint: "Forcer la vue ordinateur" },
+    { value: "tablet",  label: "Tablette",    icon: FaTabletScreenButton,   hint: "Forcer la vue tablette paysage" },
+    { value: "mobile",  label: "Mobile",      icon: FaMobileScreen,         hint: "Forcer la vue smartphone" },
 ];
 
 export const ViewportSwitcher = ({ density = "comfortable", onAfterSelect }) => {

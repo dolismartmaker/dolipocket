@@ -65,6 +65,13 @@
         "refused": "Not signed",
         "billed": "Billed"
     },
+    "status-code": {
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Signed",
+        "3": "Not signed",
+        "4": "Billed"
+    },
     "toasts": {
         "create-success": "Proposal created",
         "update-success": "Proposal updated",

@@ -70,6 +70,12 @@ export const useDbWarehouses = () => {
             return Array.isArray(data) ? data : [];
         },
 
+        // Field descriptor for <AutoForm> (objectDesc() raw output).
+        describe: async ({ signal } = {}) => {
+            const data = await get("warehouse/describe", { signal });
+            return data && typeof data === "object" ? data : {};
+        },
+
         // Bulk delete by ids. Server returns {success: [...], errors: [...]}.
         deleteBulk: async ({ ids } = {}) => {
             if (!Array.isArray(ids) || ids.length === 0) {

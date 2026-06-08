@@ -50,6 +50,20 @@ export const test = base.extend({
         const { testUser } = backendInfo;
         if (!testUser) throw new Error('backendInfo.testUser missing -- did init.php run?');
 
+        // Diagnostic: capture browser console + page errors so a failure of
+        // the Blade->handoff->PWA flow surfaces the in-page log instead of a
+        // bare "element not found".
+        const consoleLines = [];
+        const networkErrors = [];
+        page.on('console', (msg) => consoleLines.push(`[${msg.type()}] ${msg.text()}`));
+        page.on('pageerror', (err) => consoleLines.push(`[pageerror] ${err.message}`));
+        page.on('response', (resp) => {
+            const status = resp.status();
+            if (status === 401 || status === 403 || status === 404) {
+                networkErrors.push(`[${status}] ${resp.request().method()} ${resp.url()}`);
+            }
+        });
+
         // Step 1: open the Blade login page directly via the backend port.
         await page.goto(`${BLADE_BASE}/login`, { waitUntil: 'domcontentloaded' });
 
@@ -79,7 +93,73 @@ export const test = base.extend({
 
         // Step 5: HomePage renders the gradient brand "Dolipocket". Once that
         // is visible we know the protected layout has finished mounting.
-        await expect(page.getByText(/Dolipocket/i).first()).toBeVisible({ timeout: 15_000 });
+        try {
+            // Strong assertion first: localStorage MUST carry the SmartAuth
+            // user blob. If it does not, the smoke check on "Dolipocket"
+            // would silently match a meta tag or alt-attr and the spec would
+            // fail later with confusing UI errors. Fail fast here so the
+            // diagnostic dump in the catch surfaces the real cause.
+            await page.waitForFunction(
+                () => {
+                    try {
+                        const g = JSON.parse(window.localStorage.getItem('global') || '{}');
+                        return g && g.user && g.user.accessToken;
+                    } catch { return false; }
+                },
+                null,
+                { timeout: 20_000 },
+            );
+            // Wait for the URL to settle on the protected root (HomePage). If
+            // anything bounces us back to /login the URL will land there
+            // and this assertion fails fast with the diagnostic dump.
+            await page.waitForFunction(
+                () => {
+                    const h = window.location.hash || '';
+                    return h === '' || h === '#' || h === '#/' || h.startsWith('#/?');
+                },
+                null,
+                { timeout: 10_000 },
+            );
+            // Hard sanity check: if the PWA bounced us back to /login (auth
+            // hydration broken after the hard reload), refuse to proceed.
+            // getByText(/Dolipocket/i) used to silently match the <title> tag
+            // even when the actual login form was shown, masking the bug.
+            await page.waitForTimeout(500); // allow PrivatePagesLayout to mount
+            const finalHash = await page.evaluate(() => window.location.hash);
+            if (finalHash.startsWith('#/login') || finalHash.startsWith('#/welcome')) {
+                throw new Error(
+                    'AUTH FIXTURE: handoff completed (localStorage has user) but '
+                    + 'the PWA bounced to ' + finalHash + ' on first paint. '
+                    + 'PrivatePagesLayout did not see api.user on the first render -- '
+                    + 'check useGlobalStates initial hydration from localStorage["global"].'
+                );
+            }
+            await expect(page.getByText(/Dolipocket/i).first()).toBeVisible({ timeout: 10_000 });
+        } catch (err) {
+            // Diagnostic dump: localStorage + URL + recent console output.
+            // The Blade->handoff->hard-reload chain has many race conditions;
+            // surfacing this state in the test output makes the failure
+            // actionable instead of a stack trace into the matcher.
+            const diag = await page.evaluate(() => ({
+                url: window.location.href,
+                hash: window.location.hash,
+                pathname: window.location.pathname,
+                global: window.localStorage.getItem('global'),
+                hasUserKey: (() => {
+                    try {
+                        const g = JSON.parse(window.localStorage.getItem('global') || '{}');
+                        return Object.keys(g);
+                    } catch { return null; }
+                })(),
+            }));
+            // eslint-disable-next-line no-console
+            console.error('AUTH FIXTURE DIAGNOSTIC:', JSON.stringify(diag, null, 2));
+            // eslint-disable-next-line no-console
+            console.error('CONSOLE LINES (last 30):', consoleLines.slice(-30).join('\n'));
+            // eslint-disable-next-line no-console
+            console.error('NETWORK ERRORS (4xx):', networkErrors.join('\n'));
+            throw err;
+        }
 
         await use(page);
     },
