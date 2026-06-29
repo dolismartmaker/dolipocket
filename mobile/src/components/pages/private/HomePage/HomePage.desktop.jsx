@@ -7,23 +7,30 @@ import {
     FaUsers, FaIdCard, FaBoxOpen,
 } from "react-icons/fa6";
 
+import { AgendaHomeWidget } from "src/lib/calendar";
+import { useMenu } from "src/lib/permissions";
+
 import { fmt, fmtDate } from "./useHomeData";
 
 // Quick "create" buttons. Kept compact (icon + label) and grouped in the
-// right rail so the main content area can breathe.
+// right rail so the main content area can breathe. Each tile is gated by the
+// matching create permission (same contract as the tablet view) so a user
+// without a given right does not see a button leading to an "Access denied"
+// toast.
 const QUICK_ACTIONS = [
-    { to: "/proposals/new",       label: "Nouveau devis",      icon: FaFileLines,    accent: "primary"   },
-    { to: "/invoices/new",        label: "Nouvelle facture",   icon: FaFileInvoice,  accent: "secondary" },
-    { to: "/orders/new",          label: "Nouvelle commande",  icon: FaCartShopping, accent: "tertiary"  },
-    { to: "/supplier-orders/new", label: "Cde fournisseur",    icon: FaTruck,        accent: "primary"   },
-    { to: "/thirdparties/new",    label: "Nouveau tiers",      icon: FaUsers,        accent: "tertiary"  },
+    { to: "/proposals/new",       label: "Devis",              icon: FaFileLines,    accent: "primary",   permission: "proposal.create" },
+    { to: "/invoices/new",        label: "Facture",            icon: FaFileInvoice,  accent: "secondary", permission: "invoice.create" },
+    { to: "/orders/new",          label: "Commande",           icon: FaCartShopping, accent: "tertiary",  permission: "order.create" },
+    { to: "/supplier-orders/new", label: "Cde fournisseur",    icon: FaTruck,        accent: "primary",   permission: "supplierorder.create" },
+    { to: "/thirdparties/new",    label: "Tiers",              icon: FaUsers,        accent: "tertiary",  permission: "thirdparty.create" },
 ];
 
 // Browse shortcuts (read-only navigation, no creation). Renders as a small
-// chip cluster under the quick-create stack.
+// chip cluster under the quick-create stack. Gated by the matching read
+// permission.
 const BROWSE_SHORTCUTS = [
-    { to: "/contacts",     label: "Contacts",  icon: FaIdCard },
-    { to: "/products",     label: "Produits",  icon: FaBoxOpen },
+    { to: "/contacts",     label: "Contacts",  icon: FaIdCard,  permission: "contact.read" },
+    { to: "/products",     label: "Produits",  icon: FaBoxOpen, permission: "product.read" },
 ];
 
 export const HomePageDesktop = (props) => {
@@ -39,9 +46,13 @@ export const HomePageDesktop = (props) => {
         totalDocuments,
         now,
         INVOICE_STATUS,
+        agendaEvents,
     } = props;
 
     const navigate = useNavigate();
+    const { has } = useMenu();
+    const quickActions = QUICK_ACTIONS.filter((a) => has(a.permission));
+    const shortcuts = BROWSE_SHORTCUTS.filter((s) => has(s.permission));
 
     return (
         <div className="w-full min-h-full bg-medium-bg overflow-y-auto">
@@ -51,7 +62,7 @@ export const HomePageDesktop = (props) => {
                     {user?.username ? `Bonjour, ${user.username}` : "Tableau de bord"}
                 </h1>
                 <p className="text-sm text-soft-text mt-0.5">
-                    Vue d'ensemble de votre activité
+                    Vue d&apos;ensemble de votre activité
                 </p>
             </div>
 
@@ -123,8 +134,9 @@ export const HomePageDesktop = (props) => {
 
             {/* Main two-column grid: activity (2/3) + actions rail (1/3) */}
             <div className="px-8 py-6 grid grid-cols-3 gap-6 items-start">
-                {/* LEFT : Activity (col-span-2) */}
-                <section className="col-span-2 bg-white rounded-xl border border-soft-border overflow-hidden">
+                {/* LEFT : Activity + agenda (col-span-2) */}
+                <div className="col-span-2 flex flex-col gap-6">
+                <section className="bg-white rounded-xl border border-soft-border overflow-hidden">
                     <header className="flex items-center justify-between px-4 py-2.5 border-b border-soft-border">
                         <div className="text-sm font-semibold text-strong-text">
                             Activité récente
@@ -209,8 +221,12 @@ export const HomePageDesktop = (props) => {
                     )}
                 </section>
 
+                <AgendaHomeWidget events={agendaEvents} />
+                </div>
+
                 {/* RIGHT : Action rail (col-span-1) */}
                 <aside className="col-span-1 flex flex-col gap-4">
+                    {quickActions.length > 0 && (
                     <section className="bg-white rounded-xl border border-soft-border overflow-hidden">
                         <header className="px-4 py-2.5 border-b border-soft-border">
                             <div className="text-sm font-semibold text-strong-text">
@@ -218,7 +234,7 @@ export const HomePageDesktop = (props) => {
                             </div>
                         </header>
                         <div className="flex flex-col p-2">
-                            {QUICK_ACTIONS.map((action) => {
+                            {quickActions.map((action) => {
                                 const Icon = action.icon;
                                 return (
                                     <button
@@ -241,7 +257,9 @@ export const HomePageDesktop = (props) => {
                             })}
                         </div>
                     </section>
+                    )}
 
+                    {shortcuts.length > 0 && (
                     <section className="bg-white rounded-xl border border-soft-border overflow-hidden">
                         <header className="px-4 py-2.5 border-b border-soft-border">
                             <div className="text-sm font-semibold text-strong-text">
@@ -249,7 +267,7 @@ export const HomePageDesktop = (props) => {
                             </div>
                         </header>
                         <div className="flex flex-wrap gap-2 p-3">
-                            {BROWSE_SHORTCUTS.map((s) => {
+                            {shortcuts.map((s) => {
                                 const Icon = s.icon;
                                 return (
                                     <button
@@ -265,6 +283,7 @@ export const HomePageDesktop = (props) => {
                             })}
                         </div>
                     </section>
+                    )}
                 </aside>
             </div>
         </div>

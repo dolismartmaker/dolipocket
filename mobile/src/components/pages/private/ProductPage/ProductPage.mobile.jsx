@@ -2,6 +2,8 @@ import { FaArrowLeft, FaPen, FaTrash, FaBox, FaWrench, FaBarcode, FaWeight, FaRu
 
 import { Page, Button } from "@cap-rel/smartcommon";
 
+import { ProductExtrasSection } from "src/lib/components/ProductExtrasSection";
+
 // Mobile rendering of the product detail page. Extracted verbatim from the
 // previous monolithic index.jsx -- visually unchanged on mobile. Data and
 // handlers come from useProductData via props.
@@ -9,6 +11,7 @@ export const ProductPageMobile = (props) => {
     const {
         product, loading, error, deleting,
         handleBack, handleEdit, handleDelete, handleStockNav,
+        dataSource,
     } = props;
 
     return (
@@ -129,6 +132,12 @@ export const ProductPageMobile = (props) => {
                             </div>
                         )}
                     </div>
+
+                    {/* Read-only product extras: stock, supplier prices, price levels */}
+                    <ProductExtrasSection
+                        productId={Number(product.id)}
+                        dataSource={dataSource}
+                    />
 
                     {/* Mobile actions */}
                     <div className="flex gap-3 pt-2">

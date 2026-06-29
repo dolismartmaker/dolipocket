@@ -1,6 +1,8 @@
 import { FaArrowLeft, FaPen, FaTrash } from "react-icons/fa6";
 
 import { DocumentHeaderFields } from "src/lib/datatable";
+import { ThirdPartyCategoriesSection } from "src/lib/components/ThirdPartyCategoriesSection";
+import { ThirdPartyBankSection } from "src/lib/components/ThirdPartyBankSection";
 
 // Desktop rendering of the third party detail page. Single-column centered
 // layout (no lines feature here -- read-only document with header only).
@@ -98,15 +100,30 @@ export const ThirdPartyPageDesktop = (props) => {
                 )}
 
                 {!loading && item && (
-                    <div className="max-w-[1200px] mx-auto">
-                        <DocumentHeaderFields
-                            object={item}
-                            feature="thirdparty"
-                            dataSource={dataSource}
-                            storageKey="dolipocket.thirdpartypage.header"
-                            title="Informations"
-                            overrides={HEADER_OVERRIDES}
-                        />
+                    <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-4 items-start">
+                        {/* Main column: header fields */}
+                        <div className="flex-1 min-w-0 w-full">
+                            <DocumentHeaderFields
+                                object={item}
+                                feature="thirdparty"
+                                dataSource={dataSource}
+                                storageKey="dolipocket.thirdpartypage.header"
+                                title="Informations"
+                                overrides={HEADER_OVERRIDES}
+                            />
+                        </div>
+
+                        {/* Side column: categories + bank accounts */}
+                        <div className="w-full lg:w-[340px] shrink-0 flex flex-col gap-4">
+                            <ThirdPartyCategoriesSection
+                                thirdpartyId={Number(item.id)}
+                                dataSource={dataSource}
+                            />
+                            <ThirdPartyBankSection
+                                thirdpartyId={Number(item.id)}
+                                dataSource={dataSource}
+                            />
+                        </div>
                     </div>
                 )}
             </div>

@@ -219,6 +219,62 @@ export const useDbProposals = () => {
             return mapped;
         },
 
+        setDraft: async (id) => {
+            const raw = await post(`proposal/${id}/setdraft`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        classifyBilled: async (id) => {
+            const raw = await post(`proposal/${id}/classifybilled`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Duplicate the proposal (Dolibarr createFromClone). Returns the new
+        // draft; the caller navigates to it.
+        clone: async (id) => {
+            const raw = await post(`proposal/${id}/clone`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Contacts/addresses tab: linked contacts + available types.
+        listContacts: async (id, { signal } = {}) => {
+            const data = await get(`proposal/${id}/contacts`, { signal });
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+        addContact: async (id, { contactId, typeId, source } = {}) => {
+            const json = { contact_id: Number(contactId), type_id: Number(typeId) };
+            if (source) json.source = String(source);
+            return post(`proposal/${id}/contact`, { json });
+        },
+        removeContact: async (id, rowid) => {
+            await del(`proposal/${id}/contact/${rowid}`);
+            const data = await get(`proposal/${id}/contacts`);
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+
+        // Linked objects (document chain).
+        listLinks: async (id, { signal } = {}) => {
+            const data = await get(`proposal/${id}/links`, { signal });
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+        removeLink: async (id, rowid) => {
+            await del(`proposal/${id}/link/${rowid}`);
+            const data = await get(`proposal/${id}/links`);
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+
         addLine: async (docId, line) => {
             const raw = await post(`proposal/${docId}/line`, { json: mapLineToBackend(line) });
             return mapFromBackend(raw);

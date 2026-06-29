@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
+
 // Data pipeline for the DataTable.
 //
 // Two operating modes (cf DATATABLE_SPEC.md §3):
@@ -209,6 +211,7 @@ export const useDataPipeline = ({
             } catch (err) {
                 if (cancelled || seq !== requestSeq.current) return;
                 console.error("[DataTable] probe error", err);
+                notifyAccessDenied(err);
                 setError(err);
             } finally {
                 if (!cancelled && seq === requestSeq.current) {
@@ -248,6 +251,7 @@ export const useDataPipeline = ({
             } catch (err) {
                 if (cancelled || seq !== requestSeq.current) return;
                 console.error("[DataTable] listPaged error", err);
+                notifyAccessDenied(err);
                 setError(err);
             } finally {
                 if (!cancelled && seq === requestSeq.current) {

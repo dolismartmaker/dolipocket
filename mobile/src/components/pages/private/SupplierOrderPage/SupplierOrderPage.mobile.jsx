@@ -1,6 +1,7 @@
 import {
     FaArrowLeft, FaPen, FaTrash, FaCheck, FaTruck, FaFileInvoice, FaThumbsUp,
 } from "react-icons/fa6";
+import { FaUndo, FaCopy } from "react-icons/fa";
 
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
@@ -17,9 +18,11 @@ import { STATUS_LABELS, fmtAmount, fmtDate } from "./useSupplierOrderData";
 export const SupplierOrderPageMobile = (props) => {
     const {
         id, order, loading, error, actionPending,
-        statut, isDraft, canApprove, canOrder, canReceive, canConvertToInvoice,
+        statut, isDraft, isValidated, canApprove, canOrder, canReceive, canConvertToInvoice,
         handleValidate, handleApprove, handleOrder, handleReceive,
+        handleSetDraft,
         handleDelete, handleConvertToInvoice,
+        handleClone,
         goEdit, goBack,
         dataSource, setSupplierOrder,
     } = props;
@@ -136,6 +139,16 @@ export const SupplierOrderPageMobile = (props) => {
                                 Approuver
                             </Button>
                         )}
+                        {isValidated && (
+                            <Button
+                                onClick={handleSetDraft}
+                                icon={FaUndo}
+                                buttonProps={{ className: "w-full p-3 bg-gray-200 text-gray-800 rounded-lg flex items-center justify-center gap-2" }}
+                                disabled={actionPending}
+                            >
+                                Repasser en brouillon
+                            </Button>
+                        )}
                         {canOrder && (
                             <Button
                                 onClick={handleOrder}
@@ -166,6 +179,14 @@ export const SupplierOrderPageMobile = (props) => {
                                 Créer une facture
                             </Button>
                         )}
+                        <Button
+                            onClick={handleClone}
+                            icon={FaCopy}
+                            buttonProps={{ className: "w-full p-3 bg-gray-200 text-gray-800 rounded-lg flex items-center justify-center gap-2" }}
+                            disabled={actionPending}
+                        >
+                            Dupliquer
+                        </Button>
                         <Button
                             onClick={handleDelete}
                             icon={FaTrash}

@@ -153,6 +153,58 @@ export const useDbSupplierInvoices = () => {
             return cache(mapFromBackend(raw));
         },
 
+        setDraft: async (id) => {
+            const raw = await post(`supplierinvoice/${id}/setdraft`);
+            return cache(mapFromBackend(raw));
+        },
+
+        // Classify as paid (status 2). Optional { closeCode, closeNote }.
+        setPaid: async (id, { closeCode, closeNote } = {}) => {
+            const json = {};
+            if (closeCode !== undefined && closeCode !== "") json.close_code = String(closeCode);
+            if (closeNote !== undefined && closeNote !== "") json.close_note = String(closeNote);
+            const raw = await post(`supplierinvoice/${id}/setpaid`, { json });
+            return cache(mapFromBackend(raw));
+        },
+
+        setUnpaid: async (id) => {
+            const raw = await post(`supplierinvoice/${id}/setunpaid`);
+            return cache(mapFromBackend(raw));
+        },
+
+        // Duplicate the supplier invoice (Dolibarr createFromClone).
+        clone: async (id) => {
+            const raw = await post(`supplierinvoice/${id}/clone`);
+            return cache(mapFromBackend(raw));
+        },
+
+        // Contacts/addresses tab: linked contacts + available types.
+        listContacts: async (id, { signal } = {}) => {
+            const data = await get(`supplierinvoice/${id}/contacts`, { signal });
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+        addContact: async (id, { contactId, typeId, source } = {}) => {
+            const json = { contact_id: Number(contactId), type_id: Number(typeId) };
+            if (source) json.source = String(source);
+            return post(`supplierinvoice/${id}/contact`, { json });
+        },
+        removeContact: async (id, rowid) => {
+            await del(`supplierinvoice/${id}/contact/${rowid}`);
+            const data = await get(`supplierinvoice/${id}/contacts`);
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+
+        // Linked objects (document chain).
+        listLinks: async (id, { signal } = {}) => {
+            const data = await get(`supplierinvoice/${id}/links`, { signal });
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+        removeLink: async (id, rowid) => {
+            await del(`supplierinvoice/${id}/link/${rowid}`);
+            const data = await get(`supplierinvoice/${id}/links`);
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+
         // Generate PDF for the supplier invoice. Backend returns
         // { ok, file, model } -- forwarded as-is to the caller.
         generatePdf: async (id, opts = {}) => {

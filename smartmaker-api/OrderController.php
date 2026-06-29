@@ -31,6 +31,8 @@ use Propal;
 use Dolipocket\Api\Trait\PaginatedListTrait;
 use Dolipocket\Api\Trait\SendEmailTrait;
 use Dolipocket\Api\Trait\PdfDownloadTrait;
+use Dolipocket\Api\Trait\DocumentContactTrait;
+use Dolipocket\Api\Trait\DocumentLinkTrait;
 use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
@@ -56,6 +58,8 @@ class OrderController
     use PaginatedListTrait;
     use SendEmailTrait;
     use PdfDownloadTrait;
+    use DocumentContactTrait;
+    use DocumentLinkTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -409,7 +413,14 @@ class OrderController
         }
         $cmd->fetch_lines();
 
-        return [$this->mapper->exportMappedData($cmd), 200];
+        $data = $this->mapper->exportMappedData($cmd);
+        // Hydrate thirdparty name + email for the detail summary band + default
+        // email recipient (the mapper only publishes the raw socid).
+        $cmd->fetch_thirdparty();
+        $data->socname = ($cmd->thirdparty && !empty($cmd->thirdparty->name)) ? $cmd->thirdparty->name : '';
+        $data->socEmail = ($cmd->thirdparty && !empty($cmd->thirdparty->email)) ? $cmd->thirdparty->email : '';
+
+        return [$data, 200];
     }
 
     /**
@@ -622,6 +633,238 @@ class OrderController
         $cmd->fetch($id);
         $cmd->fetch_lines();
         return [$this->mapper->exportMappedData($cmd), 200];
+    }
+
+    /**
+     * Set a validated order back to draft (status 0).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setDraft($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('commande', 'creer')) {
+            dol_syslog("DPK OrderController::setDraft forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK OrderController::setDraft missing id", LOG_WARNING);
+            return [['error' => 'Order id is required'], 400];
+        }
+
+        $cmd = new Commande($db);
+        if ($cmd->fetch($id) <= 0) {
+            dol_syslog("DPK OrderController::setDraft not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Order not found'], 404];
+        }
+
+        $result = $cmd->setDraft($user);
+        if ($result <= 0) {
+            dol_syslog("DPK OrderController::setDraft setDraft() failed: " . $cmd->error, LOG_ERR);
+            return [['error' => 'Failed to set order back to draft: ' . $cmd->error], 500];
+        }
+
+        $cmd->fetch($id);
+        $cmd->fetch_lines();
+        return [$this->mapper->exportMappedData($cmd), 200];
+    }
+
+    /**
+     * Classify an order as billed (set facturee flag).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function classifyBilled($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('commande', 'creer')) {
+            dol_syslog("DPK OrderController::classifyBilled forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK OrderController::classifyBilled missing id", LOG_WARNING);
+            return [['error' => 'Order id is required'], 400];
+        }
+
+        $cmd = new Commande($db);
+        if ($cmd->fetch($id) <= 0) {
+            dol_syslog("DPK OrderController::classifyBilled not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Order not found'], 404];
+        }
+
+        $result = $cmd->classifyBilled($user);
+        if ($result <= 0) {
+            dol_syslog("DPK OrderController::classifyBilled classifyBilled() failed: " . $cmd->error, LOG_ERR);
+            return [['error' => 'Failed to classify order as billed: ' . $cmd->error], 500];
+        }
+
+        $cmd->fetch($id);
+        $cmd->fetch_lines();
+        return [$this->mapper->exportMappedData($cmd), 200];
+    }
+
+    /**
+     * Close an order (classer livree, status 3).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function closeOrder($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('commande', 'creer')) {
+            dol_syslog("DPK OrderController::closeOrder forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK OrderController::closeOrder missing id", LOG_WARNING);
+            return [['error' => 'Order id is required'], 400];
+        }
+
+        $cmd = new Commande($db);
+        if ($cmd->fetch($id) <= 0) {
+            dol_syslog("DPK OrderController::closeOrder not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Order not found'], 404];
+        }
+
+        $result = $cmd->cloture($user);
+        if ($result <= 0) {
+            dol_syslog("DPK OrderController::closeOrder cloture() failed: " . $cmd->error, LOG_ERR);
+            return [['error' => 'Failed to close order: ' . $cmd->error], 500];
+        }
+
+        $cmd->fetch($id);
+        $cmd->fetch_lines();
+        return [$this->mapper->exportMappedData($cmd), 200];
+    }
+
+    /**
+     * Cancel a validated order (status 6).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function cancel($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('commande', 'creer')) {
+            dol_syslog("DPK OrderController::cancel forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK OrderController::cancel missing id", LOG_WARNING);
+            return [['error' => 'Order id is required'], 400];
+        }
+
+        $cmd = new Commande($db);
+        if ($cmd->fetch($id) <= 0) {
+            dol_syslog("DPK OrderController::cancel not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Order not found'], 404];
+        }
+
+        $result = $cmd->cancel();
+        if ($result <= 0) {
+            dol_syslog("DPK OrderController::cancel cancel() failed: " . $cmd->error, LOG_ERR);
+            return [['error' => 'Failed to cancel order: ' . $cmd->error], 500];
+        }
+
+        $cmd->fetch($id);
+        $cmd->fetch_lines();
+        return [$this->mapper->exportMappedData($cmd), 200];
+    }
+
+    /**
+     * Duplicate an order (Dolibarr createFromClone). Returns the new draft.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function cloneDocument($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('commande', 'creer')) {
+            dol_syslog("DPK OrderController::cloneDocument forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK OrderController::cloneDocument missing id", LOG_WARNING);
+            return [['error' => 'Order id is required'], 400];
+        }
+
+        $cmd = new Commande($db);
+        if ($cmd->fetch($id) <= 0) {
+            dol_syslog("DPK OrderController::cloneDocument not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Order not found'], 404];
+        }
+
+        $newId = $cmd->createFromClone($user);
+        if ($newId <= 0) {
+            dol_syslog("DPK OrderController::cloneDocument createFromClone() failed: " . $cmd->error, LOG_ERR);
+            return [['error' => 'Failed to clone order: ' . $cmd->error], 500];
+        }
+
+        $clone = new Commande($db);
+        $clone->fetch($newId);
+        $clone->fetch_lines();
+        return [$this->mapper->exportMappedData($clone), 201];
+    }
+
+    /** Wiring for the shared DocumentContactTrait (Contacts/addresses tab). */
+    private function contactConfig()
+    {
+        return [
+            'class'         => '\\Commande',
+            'permGroup'     => 'commande',
+            'logTag'        => 'OrderController',
+            'notFoundLabel' => 'Order',
+        ];
+    }
+
+    /** GET order/{id}/contacts -- linked contacts + available types. */
+    public function contacts($arr = null)
+    {
+        return $this->listContacts($arr, $this->contactConfig());
+    }
+
+    /** POST order/{id}/contact -- link a contact. */
+    public function contactAdd($arr = null)
+    {
+        return $this->addContact($arr, $this->contactConfig());
+    }
+
+    /** DELETE order/{id}/contact/{rowid} -- unlink a contact. */
+    public function contactRemove($arr = null)
+    {
+        return $this->removeContact($arr, $this->contactConfig());
+    }
+
+    /** GET order/{id}/links -- linked objects (document chain). */
+    public function links($arr = null)
+    {
+        return $this->listLinks($arr, $this->contactConfig());
+    }
+
+    /** DELETE order/{id}/link/{rowid} -- unlink a related object. */
+    public function linkRemove($arr = null)
+    {
+        return $this->removeLink($arr, $this->contactConfig());
     }
 
     /**

@@ -133,6 +133,49 @@ export const useDbThirdParties = () => {
             }
         },
 
+        // Categories/tags tab: assigned + available customer/supplier categories.
+        // Each call returns { assigned, available } so the UI stays in sync.
+        listCategories: async (id, { signal } = {}) => {
+            const data = await get(`thirdparty/${id}/categories`, { signal });
+            return data && typeof data === "object" ? data : { assigned: [], available: [] };
+        },
+        addCategory: async (id, { categoryId, type } = {}) => {
+            const json = { category_id: Number(categoryId) };
+            if (type) json.type = String(type);
+            return post(`thirdparty/${id}/category`, { json });
+        },
+        removeCategory: async (id, categoryId) => {
+            await del(`thirdparty/${id}/category/${categoryId}`);
+            const data = await get(`thirdparty/${id}/categories`);
+            return data && typeof data === "object" ? data : { assigned: [], available: [] };
+        },
+
+        // Bank accounts (RIB) tab: list + create + delete.
+        listBankAccounts: async (id, { signal } = {}) => {
+            const data = await get(`thirdparty/${id}/bankaccounts`, { signal });
+            return Array.isArray(data?.accounts) ? data.accounts : [];
+        },
+        addBankAccount: async (id, payload = {}) => {
+            const json = {};
+            ["label", "bank", "iban", "bic"].forEach((k) => { if (payload[k] != null) json[k] = String(payload[k]); });
+            if (payload.ownerName != null) json.owner_name = String(payload.ownerName);
+            const data = await post(`thirdparty/${id}/bankaccount`, { json });
+            return Array.isArray(data?.accounts) ? data.accounts : [];
+        },
+        removeBankAccount: async (id, accountId) => {
+            await del(`thirdparty/${id}/bankaccount/${accountId}`);
+            const data = await get(`thirdparty/${id}/bankaccounts`);
+            return Array.isArray(data?.accounts) ? data.accounts : [];
+        },
+
+        // Tier A - A5c - reusable discounts AVAILABLE for this thirdparty (not yet
+        // consumed). Backend GET thirdparty/{id}/discounts -> { discounts: [...] }
+        // where each row carries { id, type, applyMode, amountHt, amountTtc, ... }.
+        discounts: async (id, { signal } = {}) => {
+            const data = await get(`thirdparty/${id}/discounts`, { signal });
+            return Array.isArray(data?.discounts) ? data.discounts : [];
+        },
+
         cacheLocal: (item) => (store ? store.put(item) : Promise.resolve()),
         cacheList: (items) => (store ? store.bulkPut(items) : Promise.resolve()),
         readCache: async ({ q, client, fournisseur } = {}) => {

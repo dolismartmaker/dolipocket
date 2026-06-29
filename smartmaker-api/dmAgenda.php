@@ -76,6 +76,8 @@ class dmAgenda extends dmBase
         'contact_id'     => 'fk_contact',
         'fk_element'     => 'fk_element',
         'elementtype'    => 'elementtype',
+        'priority'       => 'priority',
+        'fk_project'     => 'fk_project',
         'status'         => 'status',
     ];
 
@@ -110,6 +112,8 @@ class dmAgenda extends dmBase
         'contact_id',
         'fk_element',
         'elementtype',
+        'priority',
+        'fk_project',
         'status',
     ];
 

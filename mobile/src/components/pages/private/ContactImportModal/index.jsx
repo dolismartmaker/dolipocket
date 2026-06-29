@@ -247,7 +247,7 @@ export const ContactImportModal = ({ onClose, onImportComplete, defaultSocId }) 
                                 <div className="text-center py-8">
                                     <FaAddressBook className="mx-auto text-5xl text-gray-300 mb-4" />
                                     <p className="text-gray-600 mb-4">
-                                        Sélectionnez des contacts depuis le carnet d'adresses de votre téléphone
+                                        Sélectionnez des contacts depuis le carnet d&apos;adresses de votre téléphone
                                     </p>
                                     <button
                                         type="button"

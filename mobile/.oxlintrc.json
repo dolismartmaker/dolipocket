@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react"],
+  "categories": {
+    "correctness": "error"
+  },
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+  "ignorePatterns": ["dist"],
+  "rules": {
+    "eqeqeq": ["error", "always", { "null": "ignore" }],
+    "no-unsafe-optional-chaining": "error",
+    "array-callback-return": ["error", { "allowImplicit": true }],
+    "no-prototype-builtins": "error",
+
+    "no-unused-vars": "off",
+    "react-hooks/exhaustive-deps": "off"
+  },
+  "overrides": [
+    {
+      "files": ["vite.config.js", "vitest.config.js", "scripts/**/*.js"],
+      "env": {
+        "node": true,
+        "es2024": true
+      }
+    }
+  ]
+}

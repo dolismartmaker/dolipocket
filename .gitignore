@@ -33,3 +33,17 @@ eric_debug.md
 /test/mobile/test-results/
 /test/mobile/playwright-report/
 /test/mobile/.playwright-cache/
+# Mobile PWA build artefacts
+/mobile/node_modules/
+/mobile/dist/
+# Local environment files / secrets (never commit)
+.env
+.env.*
+# Generated build marker
+.build-number
+# Stray root-level node_modules (real deps live in mobile/node_modules)
+/node_modules/
+# Lock files (not tracked in this project)
+/composer.lock
+/mobile/package-lock.json
+/test/mobile/package-lock.json

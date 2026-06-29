@@ -30,7 +30,9 @@ import { FkPicker } from "../FkPicker";
 //       overrides={{ key: {type, label, options, formatter} }}
 //       groupings={[{ id, title, keys: [...] }, ...]}
 //       excludeKeys={["foo","bar"]}
+//       includeKeys={["ref_client", ...]}   // optional whitelist (+ extrafields kept)
 //       mode="create" | "update"            // visibility filter, default "create"
+//       singleColumn                        // force a single-column field grid
 //       submitLabel="Enregistrer"           // optional, hides submit if not provided
 //   >
 //       {(form) => <CustomFooterUsing form />}   // optional render-prop
@@ -42,6 +44,7 @@ const noop = () => {};
 // FormContext is internal to the bundle (not re-exported), so any field
 // component that does NOT consume `useField` (here: <FkPicker>) must be
 // wired explicitly against form.values + form.set.
+// eslint-disable-next-line react/display-name -- this is a render-helper factory, not a React component
 const buildRenderField = (form) => (field) => {
     const common = {
         key: field.id,
@@ -125,7 +128,9 @@ export const AutoForm = (props) => {
         overrides,
         groupings,
         excludeKeys,
+        includeKeys,
         mode = "create",
+        singleColumn = false,
         submitLabel,
         children,
     } = props;
@@ -159,8 +164,8 @@ export const AutoForm = (props) => {
 
     const schema = useMemo(() => {
         if (!desc) return null;
-        return objectDescToFormSchema(desc, { overrides, groupings, excludeKeys, mode });
-    }, [desc, overrides, groupings, excludeKeys, mode]);
+        return objectDescToFormSchema(desc, { overrides, groupings, excludeKeys, includeKeys, mode });
+    }, [desc, overrides, groupings, excludeKeys, includeKeys, mode]);
 
     // Initial values: schema defaults + seeded `value` (parent wins).
     const initialValues = useMemo(() => {
@@ -190,6 +195,7 @@ export const AutoForm = (props) => {
             onChange={onChange ?? noop}
             onSubmit={onSubmit ?? noop}
             submitLabel={submitLabel}
+            singleColumn={singleColumn}
         >
             {children}
         </AutoFormBody>
@@ -199,7 +205,7 @@ export const AutoForm = (props) => {
 // AutoFormBody is mounted only once the schema is ready so that useForm's
 // initial defaultValues are stable. Otherwise re-mounting would reset state
 // every time the parent passes a fresh `value` reference.
-const AutoFormBody = ({ schema, initialValues, onChange, onSubmit, submitLabel, children }) => {
+const AutoFormBody = ({ schema, initialValues, onChange, onSubmit, submitLabel, singleColumn, children }) => {
     const form = useForm({ defaultValues: initialValues });
     const renderField = buildRenderField(form);
 
@@ -208,13 +214,18 @@ const AutoFormBody = ({ schema, initialValues, onChange, onSubmit, submitLabel, 
     //   mobile  -> single column
     //   tablet  -> two columns (landscape, larger gap, regardless of CSS width)
     //   desktop -> single column that becomes two at the md: breakpoint
+    // `singleColumn` forces one column regardless of viewport: used when the
+    // form is hosted in a narrow side rail (e.g. the edit page's 1/3 header
+    // column) where a 2-up grid would crush the fields.
     const { isMobile, isTablet } = useViewport();
-    const gridClass = isMobile
+    const gridClass = singleColumn
         ? "grid-cols-1 gap-4"
-        : isTablet
-            ? "grid-cols-2 gap-5"
-            : "grid-cols-1 md:grid-cols-2 gap-4";
-    const fullSpanClass = isMobile ? "" : isTablet ? "col-span-2" : "md:col-span-2";
+        : isMobile
+            ? "grid-cols-1 gap-4"
+            : isTablet
+                ? "grid-cols-2 gap-5"
+                : "grid-cols-1 md:grid-cols-2 gap-4";
+    const fullSpanClass = singleColumn ? "" : isMobile ? "" : isTablet ? "col-span-2" : "md:col-span-2";
 
     // Bubble form values changes to parent. Cheap deep-compare via JSON to
     // avoid spamming the parent on identity-only changes.

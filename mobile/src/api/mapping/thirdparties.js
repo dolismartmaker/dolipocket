@@ -1,71 +1,57 @@
 // Mapping backend (Dolibarr Societe) <-> front (Dolipocket UI).
 //
-// Reference for the conventions: ~/docs/PWA-GUIDELINES.md section 5.
-// - mapFromBackend(raw): server payload -> normalised local object stored in Dexie.
-// - mapToBackend(local): local object -> payload accepted by the smartmaker API.
+// Standard A (cf ~/docs/PWA-GUIDELINES.md section 13) : la correspondance des
+// champs est declaree UNE fois dans un schema `Mapping` smartcommon, qui derive
+// les deux sens. Les options utilisees ici :
+//   - type      : coercition declarative (remplace les toInt/toStr manuels)
+//   - default   : shape de sortie stable et complete
+//   - aliases   : lecture multi-source (id <- id|rowid)
+//   - readOnly  : champ lu mais jamais renvoye au serveur (id, dates calculees)
 //
-// Both functions are pure: no HTTP, no Dexie, no global state.
+// On conserve mapFromBackend/mapToBackend comme interface publique (les hooks
+// useDb<Feature> les consomment) ; thirdpartyMapping est exporte pour l'acces
+// direct au schema.
 
-const toInt = (value, fallback = 0) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+import { Mapping } from "@cap-rel/smartcommon";
+
+const schema = {
+    id:               { key: "id",               type: "int",    default: 0, aliases: ["rowid"], readOnly: true },
+    name:             { key: "name",             type: "string", default: "" },
+    name_alias:       { key: "nameAlias",        type: "string", default: "" },
+    code_client:      { key: "codeClient",       type: "string", default: "" },
+    code_fournisseur: { key: "codeFournisseur",  type: "string", default: "" },
+    client:           { key: "client",           type: "int",    default: 0 },
+    fournisseur:      { key: "fournisseur",      type: "int",    default: 0 },
+    address:          { key: "address",          type: "string", default: "" },
+    zip:              { key: "zip",               type: "string", default: "" },
+    town:             { key: "town",              type: "string", default: "" },
+    country_code:     { key: "countryCode",       type: "string", default: "" },
+    phone:            { key: "phone",             type: "string", default: "" },
+    email:            { key: "email",             type: "string", default: "" },
+    url:              { key: "url",               type: "string", default: "" },
+    siren:            { key: "siren",             type: "string", default: "" },
+    siret:            { key: "siret",             type: "string", default: "" },
+    ape:              { key: "ape",               type: "string", default: "" },
+    idprof4:          { key: "idprof4",           type: "string", default: "" },
+    tva_intra:        { key: "tvaIntra",          type: "string", default: "" },
+    tva_assuj:        { key: "tvaAssuj",          type: "int",    default: 1 },
+    code_compta:      { key: "codeCompta",        type: "string", default: "" },
+    code_compta_fournisseur: { key: "codeComptaFournisseur", type: "string", default: "" },
+    note_public:      { key: "notePublic",        type: "string", default: "" },
+    note_private:     { key: "notePrivate",       type: "string", default: "" },
+    status:           { key: "status",            type: "int",    default: 1 },
+    datec:            { key: "createdAt",          type: "int",    default: 0, readOnly: true },
+    tms:              { key: "updatedAt",          type: "int",    default: 0, readOnly: true },
 };
 
-const toStr = (value) => (value === undefined || value === null ? "" : String(value));
+export const thirdpartyMapping = new Mapping({ schema, strict: true });
 
 export const mapFromBackend = (raw) => {
     if (!raw || typeof raw !== "object") return null;
-    return {
-        id: toInt(raw.id ?? raw.rowid),
-        name: toStr(raw.name),
-        nameAlias: toStr(raw.name_alias),
-        codeClient: toStr(raw.code_client),
-        codeFournisseur: toStr(raw.code_fournisseur),
-        client: toInt(raw.client),
-        fournisseur: toInt(raw.fournisseur),
-        address: toStr(raw.address),
-        zip: toStr(raw.zip),
-        town: toStr(raw.town),
-        countryCode: toStr(raw.country_code),
-        phone: toStr(raw.phone),
-        email: toStr(raw.email),
-        url: toStr(raw.url),
-        siren: toStr(raw.siren),
-        siret: toStr(raw.siret),
-        ape: toStr(raw.ape),
-        idprof4: toStr(raw.idprof4),
-        tvaIntra: toStr(raw.tva_intra),
-        notePublic: toStr(raw.note_public),
-        notePrivate: toStr(raw.note_private),
-        status: toInt(raw.status, 1),
-        createdAt: toInt(raw.datec),
-        updatedAt: toInt(raw.tms),
-    };
+    return thirdpartyMapping.map(raw);
 };
 
 export const mapToBackend = (local) => {
     if (!local || typeof local !== "object") return {};
-    return {
-        name: toStr(local.name),
-        name_alias: toStr(local.nameAlias),
-        code_client: toStr(local.codeClient),
-        code_fournisseur: toStr(local.codeFournisseur),
-        client: toInt(local.client),
-        fournisseur: toInt(local.fournisseur),
-        address: toStr(local.address),
-        zip: toStr(local.zip),
-        town: toStr(local.town),
-        country_code: toStr(local.countryCode),
-        phone: toStr(local.phone),
-        email: toStr(local.email),
-        url: toStr(local.url),
-        siren: toStr(local.siren),
-        siret: toStr(local.siret),
-        ape: toStr(local.ape),
-        idprof4: toStr(local.idprof4),
-        tva_intra: toStr(local.tvaIntra),
-        note_public: toStr(local.notePublic),
-        note_private: toStr(local.notePrivate),
-        status: toInt(local.status, 1),
-    };
+    return thirdpartyMapping.reverse(local);
 };

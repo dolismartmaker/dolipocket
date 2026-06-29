@@ -1,6 +1,10 @@
 import { FaArrowLeft, FaPen, FaTrash, FaBoxesStacked } from "react-icons/fa6";
 
 import { DocumentHeaderFields } from "src/lib/datatable";
+import { ProductExtrasSection } from "src/lib/components/ProductExtrasSection";
+import { ProductVariantsSection } from "src/lib/components/ProductVariantsSection";
+import { DocumentsSection } from "src/lib/components/DocumentsSection";
+import { useMenu } from "src/lib/permissions";
 
 // Desktop rendering of the product detail page. Single-column centered
 // layout (header-only document, no lines).
@@ -39,6 +43,10 @@ export const ProductPageDesktop = (props) => {
         handleBack, handleEdit, handleDelete, handleStockNav,
         dataSource,
     } = props;
+
+    // Tier A - A4: enable the price write forms when the user can edit products.
+    const { has } = useMenu();
+    const canEditPrices = has("product.write");
 
     return (
         <div className="flex flex-col h-full w-full bg-medium-bg overflow-hidden">
@@ -112,7 +120,7 @@ export const ProductPageDesktop = (props) => {
                 )}
 
                 {!loading && product && (
-                    <div className="max-w-[1200px] mx-auto">
+                    <div className="max-w-[1200px] mx-auto flex flex-col gap-4">
                         <DocumentHeaderFields
                             object={product}
                             feature="product"
@@ -120,6 +128,20 @@ export const ProductPageDesktop = (props) => {
                             storageKey="dolipocket.productpage.header"
                             title="Informations"
                             overrides={HEADER_OVERRIDES}
+                        />
+                        <ProductExtrasSection
+                            productId={Number(product.id)}
+                            dataSource={dataSource}
+                            editable={canEditPrices}
+                        />
+                        <ProductVariantsSection
+                            productId={Number(product.id)}
+                            dataSource={dataSource}
+                            editable={canEditPrices}
+                        />
+                        <DocumentsSection
+                            objectType="product"
+                            objectId={Number(product.id)}
                         />
                     </div>
                 )}

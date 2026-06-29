@@ -28,6 +28,8 @@ use Dolipocket\Api\Trait\PaginatedListTrait;
 use Dolipocket\Api\Trait\SendEmailTrait;
 use Dolipocket\Api\Trait\PaymentTrait;
 use Dolipocket\Api\Trait\PdfDownloadTrait;
+use Dolipocket\Api\Trait\DocumentContactTrait;
+use Dolipocket\Api\Trait\DocumentLinkTrait;
 use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
@@ -43,6 +45,8 @@ class SupplierInvoiceController
     use SendEmailTrait;
     use PaymentTrait;
     use PdfDownloadTrait;
+    use DocumentContactTrait;
+    use DocumentLinkTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -403,11 +407,14 @@ class SupplierInvoiceController
 
         $data = $this->mapper->exportMappedData($obj);
 
-        // Attach thirdparty summary for display
+        // Attach thirdparty summary for display (name + email for the summary
+        // band and the default send-by-email recipient).
         if (!empty($obj->socid)) {
             $soc = new Societe($db);
             if ($soc->fetch($obj->socid) > 0) {
                 $data->thirdparty_name = $soc->name;
+                $data->socname = $soc->name;
+                $data->socEmail = !empty($soc->email) ? $soc->email : '';
             }
         }
 
@@ -669,6 +676,211 @@ class SupplierInvoiceController
         $obj->fetch_lines();
 
         return [$this->mapper->exportMappedData($obj), 200];
+    }
+
+    /**
+     * Set a supplier invoice back to draft (status 0).
+     *
+     * @param  array|null $arr Route id
+     * @return array            [data, httpCode]
+     */
+    public function setDraft($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+            dol_syslog('DPK SupplierInvoiceController::setDraft access denied for user '.$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        if (empty($arr['id'])) {
+            dol_syslog('DPK SupplierInvoiceController::setDraft missing id', LOG_WARNING);
+            return [['error' => 'Supplier invoice id is required'], 400];
+        }
+
+        $id = (int) $arr['id'];
+        $obj = new FactureFournisseur($db);
+        if ($obj->fetch($id) <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setDraft not found id='.$id, LOG_WARNING);
+            return [['error' => 'Supplier invoice not found'], 404];
+        }
+
+        $res = $obj->setDraft($user);
+        if ($res <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setDraft failed: '.$obj->error, LOG_ERR);
+            return [['error' => 'Failed to set supplier invoice back to draft: '.$obj->error], 500];
+        }
+
+        $obj->fetch($id);
+        $obj->fetch_optionals();
+        $obj->fetch_lines();
+
+        return [$this->mapper->exportMappedData($obj), 200];
+    }
+
+    /**
+     * Classify a supplier invoice as paid (status 2). Optional close_code /
+     * close_note describe a non-standard settlement.
+     *
+     * @param  array|null $arr Route id + body
+     * @return array            [data, httpCode]
+     */
+    public function setPaid($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+            dol_syslog('DPK SupplierInvoiceController::setPaid access denied for user '.$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        if (empty($arr['id'])) {
+            dol_syslog('DPK SupplierInvoiceController::setPaid missing id', LOG_WARNING);
+            return [['error' => 'Supplier invoice id is required'], 400];
+        }
+
+        $id = (int) $arr['id'];
+        $obj = new FactureFournisseur($db);
+        if ($obj->fetch($id) <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setPaid not found id='.$id, LOG_WARNING);
+            return [['error' => 'Supplier invoice not found'], 404];
+        }
+
+        $closeCode = isset($arr['close_code']) ? (string) $arr['close_code'] : '';
+        $closeNote = isset($arr['close_note']) ? (string) $arr['close_note'] : '';
+        $res = $obj->setPaid($user, $closeCode, $closeNote);
+        if ($res <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setPaid failed: '.$obj->error, LOG_ERR);
+            return [['error' => 'Failed to classify supplier invoice as paid: '.$obj->error], 500];
+        }
+
+        $obj->fetch($id);
+        $obj->fetch_optionals();
+        $obj->fetch_lines();
+
+        return [$this->mapper->exportMappedData($obj), 200];
+    }
+
+    /**
+     * Revert a paid supplier invoice back to validated/unpaid (status 1).
+     *
+     * @param  array|null $arr Route id
+     * @return array            [data, httpCode]
+     */
+    public function setUnpaid($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+            dol_syslog('DPK SupplierInvoiceController::setUnpaid access denied for user '.$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        if (empty($arr['id'])) {
+            dol_syslog('DPK SupplierInvoiceController::setUnpaid missing id', LOG_WARNING);
+            return [['error' => 'Supplier invoice id is required'], 400];
+        }
+
+        $id = (int) $arr['id'];
+        $obj = new FactureFournisseur($db);
+        if ($obj->fetch($id) <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setUnpaid not found id='.$id, LOG_WARNING);
+            return [['error' => 'Supplier invoice not found'], 404];
+        }
+
+        $res = $obj->setUnpaid($user);
+        if ($res <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::setUnpaid failed: '.$obj->error, LOG_ERR);
+            return [['error' => 'Failed to set supplier invoice as unpaid: '.$obj->error], 500];
+        }
+
+        $obj->fetch($id);
+        $obj->fetch_optionals();
+        $obj->fetch_lines();
+
+        return [$this->mapper->exportMappedData($obj), 200];
+    }
+
+    /**
+     * Duplicate a supplier invoice (Dolibarr createFromClone). Returns the new draft.
+     *
+     * @param  array|null $arr Route id
+     * @return array            [data, httpCode]
+     */
+    public function cloneDocument($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+            dol_syslog('DPK SupplierInvoiceController::cloneDocument access denied for user '.$user->id, LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        if (empty($arr['id'])) {
+            dol_syslog('DPK SupplierInvoiceController::cloneDocument missing id', LOG_WARNING);
+            return [['error' => 'Supplier invoice id is required'], 400];
+        }
+
+        $id = (int) $arr['id'];
+        $obj = new FactureFournisseur($db);
+        if ($obj->fetch($id) <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::cloneDocument not found id='.$id, LOG_WARNING);
+            return [['error' => 'Supplier invoice not found'], 404];
+        }
+
+        $newId = $obj->createFromClone($user, $obj->id);
+        if ($newId <= 0) {
+            dol_syslog('DPK SupplierInvoiceController::cloneDocument createFromClone() failed: '.$obj->error, LOG_ERR);
+            return [['error' => 'Failed to clone supplier invoice: '.$obj->error], 500];
+        }
+
+        $clone = new FactureFournisseur($db);
+        $clone->fetch($newId);
+        $clone->fetch_optionals();
+        $clone->fetch_lines();
+
+        return [$this->mapper->exportMappedData($clone), 201];
+    }
+
+    /** Wiring for the shared DocumentContactTrait (Contacts/addresses tab). */
+    private function contactConfig()
+    {
+        return [
+            'class'         => '\\FactureFournisseur',
+            'permGroup'     => ['fournisseur', 'facture'],
+            'logTag'        => 'SupplierInvoiceController',
+            'notFoundLabel' => 'Supplier invoice',
+        ];
+    }
+
+    /** GET supplierinvoice/{id}/contacts -- linked contacts + available types. */
+    public function contacts($arr = null)
+    {
+        return $this->listContacts($arr, $this->contactConfig());
+    }
+
+    /** POST supplierinvoice/{id}/contact -- link a contact. */
+    public function contactAdd($arr = null)
+    {
+        return $this->addContact($arr, $this->contactConfig());
+    }
+
+    /** DELETE supplierinvoice/{id}/contact/{rowid} -- unlink a contact. */
+    public function contactRemove($arr = null)
+    {
+        return $this->removeContact($arr, $this->contactConfig());
+    }
+
+    /** GET supplierinvoice/{id}/links -- linked objects (document chain). */
+    public function links($arr = null)
+    {
+        return $this->listLinks($arr, $this->contactConfig());
+    }
+
+    /** DELETE supplierinvoice/{id}/link/{rowid} -- unlink a related object. */
+    public function linkRemove($arr = null)
+    {
+        return $this->removeLink($arr, $this->contactConfig());
     }
 
     /**

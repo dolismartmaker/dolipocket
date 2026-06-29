@@ -41,6 +41,12 @@ clean:
 	rm -rf mobile/node_modules
 	npm cache clean --force
 	rm -rf {mobile/dist,pwa}/*.js {mobile/dist,pwa}/{assets,images,locales}/*
+	# Module Federation: local test copy of a plugin remote (capmail) under dist/.
+	rm -rf {mobile/dist,pwa}/capmail-remote
+	# Obsolete POC leftovers (superseded by src/lib/plugins/ + merged harness).
+	# Transitional: harmless no-op once removed from git -- drop these 2 lines then.
+	rm -rf mobile/src/components/pages/PluginDemoPage
+	rm -f test/mobile/poc-screenshot.mjs
 
 mobile/node_modules:
 	cd mobile; npm i && echo ""

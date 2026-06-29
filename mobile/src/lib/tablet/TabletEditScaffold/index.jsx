@@ -16,7 +16,7 @@ import { AutoForm } from "src/lib/forms/AutoForm";
 //       loading={loading} saving={saving} error={error}
 //       describe={describe} value={initialValues}
 //       mode={isNew ? "create" : "update"}
-//       excludeKeys={[...]} overrides={...} groupings={...}
+//       excludeKeys={[...]} includeKeys={[...]} overrides={...} groupings={...}
 //       onCancel={cancel} onSave={save}            // save(values) => Promise
 //       renderLines={() => <DocumentLinesEditor ... />}   // optional
 //   />
@@ -29,6 +29,7 @@ export const TabletEditScaffold = ({
     value,
     mode = "create",
     excludeKeys,
+    includeKeys,
     overrides,
     groupings,
     onCancel,
@@ -91,6 +92,7 @@ export const TabletEditScaffold = ({
                             value={value}
                             mode={mode}
                             excludeKeys={excludeKeys}
+                            includeKeys={includeKeys}
                             overrides={overrides}
                             groupings={groupings}
                             onChange={(v) => { valuesRef.current = v; }}

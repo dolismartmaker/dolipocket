@@ -1,0 +1,58 @@
+{
+    "title": "Demandes de prix",
+    "title-singular": "Demande de prix",
+    "list": {
+        "search-placeholder": "Rechercher une demande de prix...",
+        "empty": "Aucune demande de prix",
+        "create": "Nouvelle demande de prix",
+        "filter-status": "Statut",
+        "filter-all": "Tous"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes",
+        "section-totals": "Totaux",
+        "section-notes": "Notes",
+        "ref": "Référence",
+        "supplier": "Fournisseur",
+        "date-creation": "Créée le",
+        "delivery-date": "Date de livraison souhaitée"
+    },
+    "edit": {
+        "title-create": "Nouvelle demande de prix",
+        "title-edit": "Modifier la demande de prix",
+        "supplier": "Fournisseur",
+        "delivery-date": "Date de livraison souhaitée",
+        "note-public": "Note publique",
+        "note-private": "Note privée",
+        "save": "Enregistrer"
+    },
+    "actions": {
+        "validate": "Valider",
+        "sign": "Signer",
+        "unsign": "Non signée",
+        "reopen": "Rouvrir",
+        "set-draft": "Repasser en brouillon",
+        "clone": "Dupliquer",
+        "delete": "Supprimer"
+    },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Signée",
+        "3": "Non signée",
+        "4": "Fermée"
+    },
+    "toasts": {
+        "create-success": "Demande de prix créée",
+        "update-success": "Demande de prix mise à jour",
+        "validate-success": "Demande de prix validée",
+        "sign-success": "Demande de prix signée",
+        "unsign-success": "Demande de prix classée non signée",
+        "reopen-success": "Demande de prix rouverte",
+        "clone-success": "Demande de prix dupliquée",
+        "delete-success": "Demande de prix supprimée",
+        "load-error": "Impossible de charger les demandes de prix",
+        "action-error": "L'action a échoué"
+    }
+}

@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa6";
 
 import { useMenu } from "src/lib/permissions";
+import { AgendaHomeWidget } from "src/lib/calendar";
 
 import { fmt, fmtDate } from "./useHomeData";
 
@@ -17,11 +18,11 @@ import { fmt, fmtDate } from "./useHomeData";
 
 // Quick "create" tiles, each gated by the matching create permission.
 const QUICK_ACTIONS = [
-    { to: "/proposals/new",       label: "Nouveau devis",     icon: FaFileLines,    accent: "primary",   permission: "proposal.create" },
-    { to: "/invoices/new",        label: "Nouvelle facture",  icon: FaFileInvoice,  accent: "secondary", permission: "invoice.create" },
-    { to: "/orders/new",          label: "Nouvelle commande", icon: FaCartShopping, accent: "tertiary",  permission: "order.create" },
+    { to: "/proposals/new",       label: "Devis",             icon: FaFileLines,    accent: "primary",   permission: "proposal.create" },
+    { to: "/invoices/new",        label: "Facture",           icon: FaFileInvoice,  accent: "secondary", permission: "invoice.create" },
+    { to: "/orders/new",          label: "Commande",          icon: FaCartShopping, accent: "tertiary",  permission: "order.create" },
     { to: "/supplier-orders/new", label: "Cde fournisseur",   icon: FaTruck,        accent: "primary",   permission: "supplierorder.create" },
-    { to: "/thirdparties/new",    label: "Nouveau tiers",     icon: FaUsers,        accent: "tertiary",  permission: "thirdparty.create" },
+    { to: "/thirdparties/new",    label: "Tiers",             icon: FaUsers,        accent: "tertiary",  permission: "thirdparty.create" },
 ];
 
 const BROWSE_SHORTCUTS = [
@@ -67,6 +68,7 @@ export const HomePageTablet = (props) => {
         totalDocuments,
         now,
         INVOICE_STATUS,
+        agendaEvents,
     } = props;
 
     const navigate = useNavigate();
@@ -144,6 +146,9 @@ export const HomePageTablet = (props) => {
                         <FaArrowRight className="text-red-500 shrink-0" />
                     </button>
                 )}
+
+                {/* Agenda widget */}
+                <AgendaHomeWidget events={agendaEvents} />
 
                 {/* Quick actions (large touch tiles) */}
                 {quickActions.length > 0 && (

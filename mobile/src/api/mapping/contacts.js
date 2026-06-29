@@ -1,61 +1,52 @@
 // Mapping backend (Dolibarr Contact) <-> front (Dolipocket UI).
 //
-// Reference for the conventions: ~/docs/PWA-GUIDELINES.md section 5.
-// - mapFromBackend(raw): server payload -> normalised local object stored in Dexie.
-// - mapToBackend(local): local object -> payload accepted by the smartmaker API.
+// Standard A (cf ~/docs/PWA-GUIDELINES.md section 13) : la correspondance des
+// champs est declaree UNE fois dans un schema `Mapping` smartcommon, qui derive
+// les deux sens. Les options utilisees ici :
+//   - type      : coercition declarative (remplace les toInt/toStr manuels)
+//   - default   : shape de sortie stable et complete (lecture ET ecriture)
+//   - aliases   : lecture multi-source (id <- id|rowid, civility <- civility|civility_code)
+//   - readOnly  : champ lu mais jamais renvoye au serveur (id, dates calculees)
 //
-// Both functions are pure: no HTTP, no Dexie, no global state.
+// On conserve mapFromBackend/mapToBackend comme interface publique (les hooks
+// useDb<Feature> les consomment) ; contactMapping est exporte pour l'acces
+// direct au schema. Aucune ligne (Contact n'est pas un document a lignes).
 
-const toInt = (value, fallback = 0) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+import { Mapping } from "@cap-rel/smartcommon";
+
+const schema = {
+    id:           { key: "id",          type: "int",    default: 0, aliases: ["rowid"], readOnly: true },
+    lastname:     { key: "lastname",    type: "string", default: "" },
+    firstname:    { key: "firstname",   type: "string", default: "" },
+    civility:     { key: "civility",    type: "string", default: "", aliases: ["civility_code"] },
+    fk_soc:       { key: "fkSoc",       type: "int",    default: 0 },
+    address:      { key: "address",     type: "string", default: "" },
+    zip:          { key: "zip",         type: "string", default: "" },
+    town:         { key: "town",        type: "string", default: "" },
+    country_code: { key: "countryCode", type: "string", default: "" },
+    phone_pro:    { key: "phonePro",    type: "string", default: "" },
+    phone_mobile: { key: "phoneMobile", type: "string", default: "" },
+    phone_perso:  { key: "phonePerso",  type: "string", default: "" },
+    fax:          { key: "fax",         type: "string", default: "" },
+    email:        { key: "email",       type: "string", default: "" },
+    statut:       { key: "statut",      type: "int",    default: 1 },
+    poste:        { key: "poste",       type: "string", default: "" },
+    priv:         { key: "priv",        type: "int",    default: 0 },
+    default_lang: { key: "defaultLang", type: "string", default: "" },
+    note_public:  { key: "notePublic",  type: "string", default: "" },
+    note_private: { key: "notePrivate", type: "string", default: "" },
+    datec:        { key: "createdAt",   type: "int",    default: 0, readOnly: true },
+    tms:          { key: "updatedAt",   type: "int",    default: 0, readOnly: true },
 };
 
-const toStr = (value) => (value === undefined || value === null ? "" : String(value));
+export const contactMapping = new Mapping({ schema, strict: true });
 
 export const mapFromBackend = (raw) => {
     if (!raw || typeof raw !== "object") return null;
-    return {
-        id: toInt(raw.id ?? raw.rowid),
-        lastname: toStr(raw.lastname),
-        firstname: toStr(raw.firstname),
-        civility: toStr(raw.civility ?? raw.civility_code),
-        fkSoc: toInt(raw.fk_soc),
-        address: toStr(raw.address),
-        zip: toStr(raw.zip),
-        town: toStr(raw.town),
-        countryCode: toStr(raw.country_code),
-        phonePro: toStr(raw.phone_pro),
-        phoneMobile: toStr(raw.phone_mobile),
-        fax: toStr(raw.fax),
-        email: toStr(raw.email),
-        statut: toInt(raw.statut, 1),
-        poste: toStr(raw.poste),
-        notePublic: toStr(raw.note_public),
-        notePrivate: toStr(raw.note_private),
-        createdAt: toInt(raw.datec),
-        updatedAt: toInt(raw.tms),
-    };
+    return contactMapping.map(raw);
 };
 
 export const mapToBackend = (local) => {
     if (!local || typeof local !== "object") return {};
-    return {
-        lastname: toStr(local.lastname),
-        firstname: toStr(local.firstname),
-        civility: toStr(local.civility),
-        fk_soc: toInt(local.fkSoc),
-        address: toStr(local.address),
-        zip: toStr(local.zip),
-        town: toStr(local.town),
-        country_code: toStr(local.countryCode),
-        phone_pro: toStr(local.phonePro),
-        phone_mobile: toStr(local.phoneMobile),
-        fax: toStr(local.fax),
-        email: toStr(local.email),
-        statut: toInt(local.statut, 1),
-        poste: toStr(local.poste),
-        note_public: toStr(local.notePublic),
-        note_private: toStr(local.notePrivate),
-    };
+    return contactMapping.reverse(local);
 };

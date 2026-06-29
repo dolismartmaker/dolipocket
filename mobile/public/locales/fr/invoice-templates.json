@@ -1,0 +1,60 @@
+{
+    "title": "Factures récurrentes",
+    "title-singular": "Modèle récurrent",
+    "list": {
+        "search-placeholder": "Rechercher un modèle...",
+        "empty": "Aucun modèle récurrent",
+        "filter-status": "Statut",
+        "filter-all": "Tous"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes du modèle",
+        "section-settings": "Réglages de récurrence",
+        "section-totals": "Totaux",
+        "customer": "Client",
+        "frequency": "Récurrence",
+        "next-gen": "Prochaine génération",
+        "last-gen": "Dernière génération",
+        "generated": "Générées",
+        "auto-validate": "Validation auto",
+        "title-field": "Titre du modèle",
+        "unit": "Unité",
+        "nb-gen-max": "Nombre max de générations",
+        "use-new-price": "Rafraîchir les prix produits à la génération"
+    },
+    "create": {
+        "title": "Nouveau modèle récurrent",
+        "first-gen": "Première génération",
+        "submit": "Créer le modèle"
+    },
+    "actions": {
+        "generate": "Générer maintenant",
+        "suspend": "Suspendre",
+        "reactivate": "Réactiver",
+        "save": "Enregistrer les réglages",
+        "delete": "Supprimer",
+        "create": "Créer un modèle récurrent"
+    },
+    "units": {
+        "d": "jour(s)",
+        "w": "semaine(s)",
+        "m": "mois",
+        "y": "an(s)"
+    },
+    "status-code": {
+        "0": "Actif",
+        "1": "Suspendu"
+    },
+    "toasts": {
+        "create-success": "Modèle récurrent créé",
+        "update-success": "Modèle mis à jour",
+        "generate-success": "Facture générée depuis le modèle",
+        "generate-none": "Aucune facture générée : le modèle n'est pas encore échu",
+        "suspend-success": "Modèle suspendu",
+        "reactivate-success": "Modèle réactivé",
+        "delete-success": "Modèle supprimé",
+        "load-error": "Impossible de charger les modèles récurrents",
+        "action-error": "L'action a échoué"
+    }
+}

@@ -1,4 +1,4 @@
-import { FaArrowLeft, FaTrash, FaPen, FaCheck } from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaCheckCircle, FaCopy } from "react-icons/fa";
 
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
@@ -31,8 +31,8 @@ const formatAmount = (value) => {
 export const SupplierInvoicePageMobile = (props) => {
     const {
         id, invoice, loading, error, actionPending,
-        statut, isPaid,
-        handleValidate, handleDelete,
+        statut, isValidated, isPaid,
+        handleValidate, handleSetDraft, handleSetPaid, handleSetUnpaid, handleClone, handleDelete,
         goEdit, goBack,
         dataSource, setSupplierInvoice,
     } = props;
@@ -196,6 +196,48 @@ export const SupplierInvoicePageMobile = (props) => {
                                 <FaCheck /> Valider
                             </Button>
                         )}
+                        {isValidated && (
+                            <Button
+                                buttonProps={{
+                                    onClick: handleSetDraft,
+                                    disabled: actionPending,
+                                    className: "w-full p-3 rounded-lg bg-gray-200 text-gray-800 flex items-center justify-center gap-2 disabled:opacity-50",
+                                }}
+                            >
+                                <FaUndo /> Repasser en brouillon
+                            </Button>
+                        )}
+                        {isValidated && (
+                            <Button
+                                buttonProps={{
+                                    onClick: handleSetPaid,
+                                    disabled: actionPending,
+                                    className: "w-full p-3 rounded-lg bg-green-600 text-white flex items-center justify-center gap-2 disabled:opacity-50",
+                                }}
+                            >
+                                <FaCheckCircle /> Classer payée
+                            </Button>
+                        )}
+                        {statut === 2 && (
+                            <Button
+                                buttonProps={{
+                                    onClick: handleSetUnpaid,
+                                    disabled: actionPending,
+                                    className: "w-full p-3 rounded-lg bg-gray-200 text-gray-800 flex items-center justify-center gap-2 disabled:opacity-50",
+                                }}
+                            >
+                                <FaUndo /> Repasser en impayée
+                            </Button>
+                        )}
+                        <Button
+                            buttonProps={{
+                                onClick: handleClone,
+                                disabled: actionPending,
+                                className: "w-full p-3 rounded-lg bg-gray-200 text-gray-800 flex items-center justify-center gap-2 disabled:opacity-50",
+                            }}
+                        >
+                            <FaCopy /> Dupliquer
+                        </Button>
                         <Button
                             buttonProps={{
                                 onClick: handleDelete,

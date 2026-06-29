@@ -5,7 +5,6 @@ import { Link, useLocation } from "react-router-dom";
 import { Page, Button } from "@cap-rel/smartcommon";
 
 import icon from "src/assets/images/icon.png";
-import logo from "src/assets/images/logo.png";
 import { APP_VERSION } from "src/utils";
 import { AnimationLayout } from "src/components";
 
@@ -24,21 +23,14 @@ export const WelcomePage = () => {
             >
                 <Waves />
 
-                <div className="flex flex-col gap-4 justify-center items-center px-8">
+                <div className="flex flex-col gap-2 justify-center items-center px-8">
                     <img
                         src={icon}
                         loading="lazy"
                         className="w-60"
                     />
-                    <div className="flex gap-1">
-                        <img
-                            src={logo}
-                            loading="lazy"
-                            className="w-60"
-                        />
-                        <div className="italic text-soft-text self-end leading-none text-xs">
-                            {APP_VERSION}
-                        </div>
+                    <div className="italic text-soft-text leading-none text-xs">
+                        {APP_VERSION}
                     </div>
                 </div>
 

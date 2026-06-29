@@ -1,0 +1,60 @@
+{
+    "title": "Recurring invoices",
+    "title-singular": "Recurring template",
+    "list": {
+        "search-placeholder": "Search a template...",
+        "empty": "No recurring template",
+        "filter-status": "Status",
+        "filter-all": "All"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Template lines",
+        "section-settings": "Recurrence settings",
+        "section-totals": "Totals",
+        "customer": "Customer",
+        "frequency": "Recurrence",
+        "next-gen": "Next generation",
+        "last-gen": "Last generation",
+        "generated": "Generated",
+        "auto-validate": "Auto validate",
+        "title-field": "Template title",
+        "unit": "Unit",
+        "nb-gen-max": "Max generations",
+        "use-new-price": "Refresh product prices at generation"
+    },
+    "create": {
+        "title": "New recurring template",
+        "first-gen": "First generation",
+        "submit": "Create the template"
+    },
+    "actions": {
+        "generate": "Generate now",
+        "suspend": "Suspend",
+        "reactivate": "Reactivate",
+        "save": "Save settings",
+        "delete": "Delete",
+        "create": "Create a recurring template"
+    },
+    "units": {
+        "d": "day(s)",
+        "w": "week(s)",
+        "m": "month(s)",
+        "y": "year(s)"
+    },
+    "status-code": {
+        "0": "Active",
+        "1": "Suspended"
+    },
+    "toasts": {
+        "create-success": "Recurring template created",
+        "update-success": "Template updated",
+        "generate-success": "Invoice generated from template",
+        "generate-none": "No invoice generated: the template is not due yet",
+        "suspend-success": "Template suspended",
+        "reactivate-success": "Template reactivated",
+        "delete-success": "Template deleted",
+        "load-error": "Failed to load recurring templates",
+        "action-error": "Action failed"
+    }
+}

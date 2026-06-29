@@ -1,0 +1,57 @@
+{
+    "title": "Réceptions",
+    "title-singular": "Réception",
+    "list": {
+        "search-placeholder": "Rechercher une réception...",
+        "empty": "Aucune réception",
+        "filter-status": "Statut",
+        "filter-all": "Tous"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes reçues",
+        "section-totals": "Totaux",
+        "section-notes": "Notes",
+        "ref": "Référence",
+        "supplier": "Fournisseur",
+        "ref-supplier": "Réf. fournisseur",
+        "date-reception": "Date de réception",
+        "date-delivery": "Livraison prévue",
+        "tracking-number": "N° de suivi",
+        "weight": "Poids",
+        "qty-asked": "Qté commandée",
+        "qty-received": "Qté reçue",
+        "warehouse": "Entrepôt",
+        "batch": "Lot/Série"
+    },
+    "create": {
+        "title": "Nouvelle réception",
+        "lines": "Lignes à recevoir",
+        "details": "Détails de la réception",
+        "submit": "Créer la réception",
+        "empty": "Aucune ligne produit réceptionnable sur cette commande."
+    },
+    "actions": {
+        "validate": "Valider",
+        "close": "Classer reçue",
+        "reopen": "Rouvrir",
+        "set-draft": "Repasser en brouillon",
+        "delete": "Supprimer",
+        "create": "Créer une réception"
+    },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Reçue"
+    },
+    "toasts": {
+        "create-success": "Réception créée",
+        "validate-success": "Réception validée",
+        "close-success": "Réception classée reçue",
+        "reopen-success": "Réception rouverte",
+        "set-draft-success": "Réception repassée en brouillon",
+        "delete-success": "Réception supprimée",
+        "load-error": "Impossible de charger les réceptions",
+        "action-error": "L'action a échoué"
+    }
+}

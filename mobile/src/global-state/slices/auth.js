@@ -1,14 +1,16 @@
 import { createSlice } from "@reduxjs/toolkit";
-import { getLocal, setLocal, removeLocal } from "@cap-rel/smartcommon";
+import { setLocal, removeLocal } from "@cap-rel/smartcommon";
+
+import { readBootLocal } from "./_bootLocal";
 
 const authSlice = createSlice({
   name: "auth",
   initialState: {
-    token: getLocal("auth_token") || null,
-    user: getLocal("auth_user") || null,
-    apiUrl: getLocal("auth_api_url") || null,
-    dolibarr_url: getLocal("auth_dolibarr_url") || null,
-    isAuthenticated: !!(getLocal("auth_token") && getLocal("auth_user")),
+    token: readBootLocal("auth_token") || null,
+    user: readBootLocal("auth_user") || null,
+    apiUrl: readBootLocal("auth_api_url") || null,
+    dolibarr_url: readBootLocal("auth_dolibarr_url") || null,
+    isAuthenticated: !!(readBootLocal("auth_token") && readBootLocal("auth_user")),
   },
   reducers: {
     setAuth(state, action) {

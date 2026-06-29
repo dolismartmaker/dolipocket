@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { useConfirm } from "@cap-rel/smartcommon";
+
 // useDocumentLinesEditor()
 //
 // Shared business logic for the 5 document line editors
@@ -34,6 +36,7 @@ import { useState } from "react";
 export const useDocumentLinesEditor = ({ docId, lines, dataSource, onChange, readOnly = false }) => {
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState(null);
+    const { confirm } = useConfirm();
 
     const safeLines = Array.isArray(lines) ? lines : [];
 
@@ -84,7 +87,16 @@ export const useDocumentLinesEditor = ({ docId, lines, dataSource, onChange, rea
             console.error("[useDocumentLinesEditor] deleteLine skipped", { docId, lineId, readOnly });
             return null;
         }
-        if (!skipConfirm && !window.confirm("Supprimer cette ligne ?")) return null;
+        if (!skipConfirm) {
+            const ok = await confirm({
+                type: "delete",
+                title: "Supprimer cette ligne ?",
+                message: "Cette ligne sera définitivement supprimée du document.",
+                confirmText: "Supprimer",
+                cancelText: "Annuler",
+            });
+            if (!ok) return null;
+        }
         setBusy(true);
         setError(null);
         try {

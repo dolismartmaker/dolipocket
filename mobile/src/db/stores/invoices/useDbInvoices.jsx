@@ -24,6 +24,11 @@ import { mapFromBackend, mapToBackend, mapLineToBackend } from "src/api/mapping/
 //   addLine(docId, line)                          -> Promise<Invoice>
 //   updateLine(docId, lineId, line)               -> Promise<Invoice>
 //   deleteLine(docId, lineId)                     -> Promise<void>
+//   convertToReduc(id)                            -> Promise<Invoice>
+//   listAppliedDiscounts(id, { signal })          -> Promise<Array<Discount>>
+//   applyDiscount(id, discountId)                 -> Promise<Invoice>
+//   useCreditNote(id, discountId)                 -> Promise<Invoice>
+//   removeDiscount(id, rowid)                     -> Promise<Invoice>
 //   cacheLocal(item)                              -> Dexie put (single, header only)
 //   cacheList(items)                              -> Dexie bulkPut (headers only)
 //   readCache({ socid, status, paye })            -> Dexie query (offline)
@@ -157,6 +162,88 @@ export const useDbInvoices = () => {
             return mapped;
         },
 
+        setDraft: async (id) => {
+            const raw = await post(`invoice/${id}/setdraft`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Classify as paid (status 2). Optional { closeCode, closeNote }
+        // record a non-standard settlement (discount, bad debt...).
+        setPaid: async (id, { closeCode, closeNote } = {}) => {
+            const json = {};
+            if (closeCode !== undefined && closeCode !== "") json.close_code = String(closeCode);
+            if (closeNote !== undefined && closeNote !== "") json.close_note = String(closeNote);
+            const raw = await post(`invoice/${id}/setpaid`, { json });
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        setUnpaid: async (id) => {
+            const raw = await post(`invoice/${id}/setunpaid`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Classify as abandoned (status 3). Optional { closeCode, closeNote }.
+        setCanceled: async (id, { closeCode, closeNote } = {}) => {
+            const json = {};
+            if (closeCode !== undefined && closeCode !== "") json.close_code = String(closeCode);
+            if (closeNote !== undefined && closeNote !== "") json.close_note = String(closeNote);
+            const raw = await post(`invoice/${id}/setcanceled`, { json });
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Duplicate the invoice (Dolibarr createFromClone). Returns the new draft.
+        clone: async (id) => {
+            const raw = await post(`invoice/${id}/clone`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Contacts/addresses tab: linked contacts + available types.
+        listContacts: async (id, { signal } = {}) => {
+            const data = await get(`invoice/${id}/contacts`, { signal });
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+        addContact: async (id, { contactId, typeId, source } = {}) => {
+            const json = { contact_id: Number(contactId), type_id: Number(typeId) };
+            if (source) json.source = String(source);
+            return post(`invoice/${id}/contact`, { json });
+        },
+        removeContact: async (id, rowid) => {
+            await del(`invoice/${id}/contact/${rowid}`);
+            const data = await get(`invoice/${id}/contacts`);
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+
+        // Linked objects (document chain).
+        listLinks: async (id, { signal } = {}) => {
+            const data = await get(`invoice/${id}/links`, { signal });
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+        removeLink: async (id, rowid) => {
+            await del(`invoice/${id}/link/${rowid}`);
+            const data = await get(`invoice/${id}/links`);
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+
         // Generate PDF for the invoice. Backend returns
         // { ok, file, model } -- forwarded as-is to the caller.
         generatePdf: async (id, opts = {}) => {
@@ -226,6 +313,29 @@ export const useDbInvoices = () => {
             return mapped;
         },
 
+        // Tier A - A5a - deposit invoices.
+        // Payment terms eligible for a deposit (deposit_percent defined).
+        depositTerms: async ({ signal } = {}) => {
+            const data = await get("invoice/deposit-terms", { signal });
+            return Array.isArray(data?.terms) ? data.terms : [];
+        },
+        // Create a deposit invoice (TYPE_DEPOSIT) from a proposal or order.
+        createDeposit: async ({ originType, originId, condReglementId, depositPercent, date } = {}) => {
+            const json = {
+                origin_type: String(originType),
+                origin_id: Number(originId),
+                cond_reglement_id: Number(condReglementId),
+                deposit_percent: Number(depositPercent),
+            };
+            if (date !== undefined && date !== null && date !== "") json.date = date;
+            const raw = await post("invoice/deposit", { json });
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
         addLine: async (docId, line) => {
             const raw = await post(`invoice/${docId}/line`, { json: mapLineToBackend(line) });
             return mapFromBackend(raw);
@@ -238,6 +348,71 @@ export const useDbInvoices = () => {
 
         deleteLine: async (docId, lineId) => {
             await del(`invoice/${docId}/line/${lineId}`);
+        },
+
+        // Credit notes (avoirs) attached to this invoice + the source invoice
+        // when the current document IS itself an avoir. Backend GET
+        // invoice/{id}/creditnotes -> { creditNotes, sourceInvoice, selfType }.
+        listCreditNotes: async (id, { signal } = {}) => {
+            const data = await get(`invoice/${id}/creditnotes`, { signal });
+            return data && typeof data === "object"
+                ? data
+                : { creditNotes: [], sourceInvoice: null, selfType: 0 };
+        },
+        // Create a draft credit note from this invoice (POST
+        // invoice/{id}/creditnote). Returns the new mapped invoice (.id set).
+        createCreditNote: async (id) => {
+            const raw = await post(`invoice/${id}/creditnote`);
+            return mapFromBackend(raw);
+        },
+
+        // Tier A - A5c - reusable discounts (DiscountAbsolute).
+        // Convert this invoice (avoir / deposit / standard with excess) into one
+        // or more reusable discounts on the thirdparty. Returns the refreshed
+        // source invoice (classified paid for avoir/excess).
+        convertToReduc: async (id) => {
+            const raw = await post(`invoice/${id}/converttoreduc`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+        // Discounts currently applied to THIS invoice (line or payment). Backend
+        // GET invoice/{id}/discounts -> { applied: [...] }.
+        listAppliedDiscounts: async (id, { signal } = {}) => {
+            const data = await get(`invoice/${id}/discounts`, { signal });
+            return Array.isArray(data?.applied) ? data.applied : [];
+        },
+        // Apply an available discount as a negative LINE on a draft invoice.
+        // Returns the refreshed invoice.
+        applyDiscount: async (id, discountId) => {
+            const raw = await post(`invoice/${id}/discount`, { json: { discount_id: Number(discountId) } });
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+        // Apply an available credit note as a PAYMENT on a validated unpaid
+        // invoice. Returns the refreshed invoice.
+        useCreditNote: async (id, discountId) => {
+            const raw = await post(`invoice/${id}/usecreditnote`, { json: { discount_id: Number(discountId) } });
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+        // Remove a discount applied to this invoice (line -> delete the line on a
+        // draft; payment -> unlink). Returns the refreshed invoice.
+        removeDiscount: async (id, rowid) => {
+            const raw = await del(`invoice/${id}/discount/${rowid}`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripCollections(mapped)).catch(() => undefined);
+            }
+            return mapped;
         },
 
         cacheLocal: (item) => (store ? store.put(stripCollections(item)) : Promise.resolve()),

@@ -22,9 +22,9 @@ const readCache = () => {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return null;
         const parsed = JSON.parse(raw);
-        const { fetchedAt, menu, permissions } = parsed ?? {};
+        const { fetchedAt, menu, permissions, plugins } = parsed ?? {};
         if (!fetchedAt || (Date.now() - fetchedAt) > TTL_MS) return null;
-        return { menu, permissions };
+        return { menu, permissions, plugins: Array.isArray(plugins) ? plugins : [] };
     } catch (_) {
         return null;
     }
@@ -49,7 +49,7 @@ export const useMenu = () => {
 
     const [state, setState] = useState(() => {
         const cached = readCache();
-        return cached ?? { menu: null, permissions: null };
+        return cached ?? { menu: null, permissions: null, plugins: [] };
     });
     const [loading, setLoading] = useState(state.menu === null);
 
@@ -61,6 +61,7 @@ export const useMenu = () => {
                 const next = {
                     menu: Array.isArray(data?.menu) ? data.menu : [],
                     permissions: data?.permissions ?? {},
+                    plugins: Array.isArray(data?.plugins) ? data.plugins : [],
                 };
                 setState(next);
                 writeCache(next);
@@ -89,6 +90,10 @@ export const useMenu = () => {
     return {
         menu: state.menu,
         permissions: state.permissions,
+        // Third-party module remotes advertised by GET /home (Module
+        // Federation coordinates). Empty unless a plugin module is active
+        // server-side. Consumed by usePluginRoutes() to mount remote routes.
+        plugins: state.plugins ?? [],
         loading,
         has,
     };

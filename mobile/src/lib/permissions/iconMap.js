@@ -5,8 +5,9 @@ import {
     FaHouse, FaUsers, FaIdCard,
     FaBoxOpen, FaWarehouse, FaBoxesStacked,
     FaFileLines, FaCartShopping, FaFileInvoice,
-    FaTruck, FaFileInvoiceDollar,
+    FaTruck, FaTruckFast, FaTruckRampBox, FaFileInvoiceDollar,
     FaCalendarDays, FaFolderOpen,
+    FaEnvelope, FaCommentsDollar, FaRepeat,
     FaCircle,
 } from "react-icons/fa6";
 
@@ -21,9 +22,14 @@ export const ICON_MAP = {
     "cart-shopping":       FaCartShopping,
     "file-invoice":        FaFileInvoice,
     "truck":               FaTruck,
+    "truck-fast":          FaTruckFast,
+    "truck-ramp-box":      FaTruckRampBox,
     "file-invoice-dollar": FaFileInvoiceDollar,
     "calendar-days":       FaCalendarDays,
     "folder-open":         FaFolderOpen,
+    "envelope":            FaEnvelope,
+    "comments-dollar":     FaCommentsDollar,
+    "repeat":              FaRepeat,
 };
 
 // Fallback to a neutral circle icon if the backend ships an unknown name.

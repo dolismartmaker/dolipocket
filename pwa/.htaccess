@@ -8,6 +8,8 @@
   RewriteEngine on
   # api.php -- stop (don't rewrite API calls)
   RewriteRule ^api\.php - [L]
+  # plugin.php -- stop (federated plugin asset proxy, uses PATH_INFO like api.php)
+  RewriteRule ^plugin\.php - [L]
   # Static files -- stop
   RewriteRule ^(assets|images|locales)/ - [L]
   # Existing files -- stop

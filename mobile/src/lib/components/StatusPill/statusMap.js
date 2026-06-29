@@ -56,6 +56,21 @@ export const STATUS_MAP = {
         2: { label: "Réglée",     tone: "emerald" },
         3: { label: "Abandonnée", tone: "rose"    },
     },
+    // Customer shipment (Expedition). Native fk_statut values:
+    // -1 canceled, 0 draft, 1 validated, 2 closed/processed.
+    shipment: {
+        "-1": { label: "Annulée",   tone: "rose"    },
+        0:    { label: "Brouillon", tone: "gray"    },
+        1:    { label: "Validée",   tone: "blue"    },
+        2:    { label: "Traitée",   tone: "emerald" },
+    },
+    // Supplier reception (Reception). Native fk_statut values:
+    // 0 draft, 1 validated, 2 closed/received.
+    reception: {
+        0: { label: "Brouillon", tone: "gray"    },
+        1: { label: "Validée",   tone: "blue"    },
+        2: { label: "Reçue",     tone: "emerald" },
+    },
     supplierorder: {
         "-1": { label: "Annulée",                 tone: "muted"   },
         0:    { label: "Brouillon",               tone: "gray"    },
@@ -73,6 +88,20 @@ export const STATUS_MAP = {
         1: { label: "Validée",    tone: "blue"    },
         2: { label: "Réglée",     tone: "emerald" },
         3: { label: "Abandonnée", tone: "rose"    },
+    },
+    // Supplier price request (SupplierProposal). Native fk_statut values:
+    // 0 draft, 1 validated, 2 signed, 3 not signed, 4 closed/billed.
+    supplierproposal: {
+        0: { label: "Brouillon",  tone: "gray"    },
+        1: { label: "Validée",    tone: "blue"    },
+        2: { label: "Signée",     tone: "emerald" },
+        3: { label: "Non signée", tone: "amber"   },
+        4: { label: "Fermée",     tone: "violet"  },
+    },
+    // Recurring invoice template (FactureRec). suspended flag: 0 active, 1 suspended.
+    invoicerec: {
+        0: { label: "Actif",     tone: "emerald" },
+        1: { label: "Suspendu",  tone: "amber"   },
     },
 };
 

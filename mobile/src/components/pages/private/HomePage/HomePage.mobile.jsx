@@ -9,14 +9,16 @@ import {
 
 import { Page } from "@cap-rel/smartcommon";
 
+import { AgendaHomeWidget } from "src/lib/calendar";
+
 import { fmt, fmtDate } from "./useHomeData";
 
 const QUICK_ACTIONS = [
-    { to: "/proposals/new",        label: "Nouveau devis",         icon: FaFileLines,         color: "bg-primary" },
-    { to: "/invoices/new",         label: "Nouvelle facture",      icon: FaFileInvoice,       color: "bg-secondary" },
-    { to: "/orders/new",           label: "Nouvelle commande",     icon: FaCartShopping,      color: "bg-tertiary" },
+    { to: "/proposals/new",        label: "Devis",                 icon: FaFileLines,         color: "bg-primary" },
+    { to: "/invoices/new",         label: "Facture",               icon: FaFileInvoice,       color: "bg-secondary" },
+    { to: "/orders/new",           label: "Commande",              icon: FaCartShopping,      color: "bg-tertiary" },
     { to: "/supplier-orders/new",  label: "Cde fournisseur",       icon: FaTruck,             color: "bg-primary" },
-    { to: "/thirdparties/new",     label: "Nouveau tiers",         icon: FaUsers,             color: "bg-tertiary" },
+    { to: "/thirdparties/new",     label: "Tiers",                 icon: FaUsers,             color: "bg-tertiary" },
 ];
 
 export const HomePageMobile = (props) => {
@@ -31,6 +33,7 @@ export const HomePageMobile = (props) => {
         recentItems,
         now,
         INVOICE_STATUS,
+        agendaEvents,
     } = props;
 
     const navigate = useNavigate();
@@ -101,12 +104,12 @@ export const HomePageMobile = (props) => {
                 </div>
             )}
 
-            {/* Quick actions (horizontal scroll) */}
+            {/* Quick actions (wrap to next line, no horizontal scroll) */}
             <div className="px-app-sm mt-app-base">
                 <div className="text-[11px] uppercase font-app-bold tracking-widest text-soft-text mb-app-xs px-1">
                     Actions rapides
                 </div>
-                <div className="flex gap-app-xs overflow-x-auto">
+                <div className="flex flex-wrap gap-app-xs">
                     {QUICK_ACTIONS.map((action) => {
                         const Icon = action.icon;
                         return (
@@ -123,6 +126,11 @@ export const HomePageMobile = (props) => {
                         );
                     })}
                 </div>
+            </div>
+
+            {/* Agenda widget */}
+            <div className="px-app-sm mt-app-base">
+                <AgendaHomeWidget events={agendaEvents} />
             </div>
 
             {/* Recent activity (card list) */}

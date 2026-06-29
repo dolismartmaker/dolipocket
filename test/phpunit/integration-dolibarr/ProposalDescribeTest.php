@@ -94,6 +94,30 @@ class ProposalDescribeTest extends DolibarrRealTestCase
         $this->assertSame('date', $datep['type'], 'datep must be typed as date');
     }
 
+    public function testDescribeResolvesSellistOptions(): void
+    {
+        [$data] = $this->controller->describe(null);
+
+        // fk_cond_reglement is declared as sellist:c_payment_term:libelle:rowid
+        // in dmProposal::$parentFieldsOverride. SmartAuth's propertiesFilter
+        // (via _customFilterAttributeTypeSellist) must resolve it to a
+        // populated <select> so the AutoForm renders the real payment terms
+        // instead of an empty picker. This locks in the behaviour the front
+        // relies on (objectDescToFormSchema reads raw.options verbatim).
+        $cond = $data->fk_cond_reglement ?? null;
+        $this->assertNotNull($cond, 'fk_cond_reglement entry must exist');
+        $this->assertIsArray($cond);
+        $this->assertSame('select', $cond['type'], 'payment-conditions FK must be typed select');
+        $this->assertArrayHasKey('options', $cond, 'sellist must carry an options array');
+        $this->assertIsArray($cond['options']);
+        $this->assertNotEmpty($cond['options'], 'c_payment_term dictionary must populate the select');
+
+        // Option shape consumed by the smartcommon <Select>: { label, value }.
+        $first = $cond['options'][0];
+        $this->assertArrayHasKey('label', $first, 'each option must carry a label');
+        $this->assertArrayHasKey('value', $first, 'each option must carry a value');
+    }
+
     public function testDescribeReturns403WhenLireRightIsMissing(): void
     {
         global $user;

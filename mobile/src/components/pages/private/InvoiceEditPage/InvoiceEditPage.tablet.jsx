@@ -1,32 +1,18 @@
 import { TabletEditScaffold } from "src/lib/tablet";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
 
-// Tablet edit page for an Invoice: focused full-page touch form (AutoForm in
-// two columns) + the document lines editor (touch cards variant on tablet).
-// Reuses useInvoiceEditData() and mirrors the desktop excludeKeys.
-const EXCLUDE_KEYS = [
-    "ref",
-    "totalHt",
-    "totalTva",
-    "totalTtc",
-    "fkStatut",
-    "status",
-    "statut",
-    "datec",
-    "dateValid",
-    "datev",
-    "dateCloture",
-    "lastMainDoc",
-    "modelPdf",
-    "paye",
-    "paid",
-    "payed",
-    "closeCode",
-    "closeNote",
-    "fkUserAuthor",
-    "fkUserValid",
-    "fkUserCloture",
-    "fkUserModif",
+// Tablet edit page for an Invoice: focused full-page touch form (AutoForm) +
+// the document lines editor (touch cards variant on tablet). Reuses
+// useInvoiceEditData() and the same curated header field whitelist as the
+// desktop page, aligned with dmInvoice::$writableFields (no internal Dolibarr
+// fields leaking into the user form).
+const HEADER_KEYS_CREATE = [
+    "fk_soc", "ref_client", "datef", "fk_cond_reglement", "fk_mode_reglement",
+    "note_public", "note_private",
+];
+const HEADER_KEYS_UPDATE = [
+    "ref_client", "datef", "date_lim_reglement", "fk_cond_reglement", "fk_mode_reglement",
+    "note_public", "note_private",
 ];
 
 export const InvoiceEditPageTablet = ({
@@ -42,6 +28,7 @@ export const InvoiceEditPageTablet = ({
     cancel,
     dbInvoices,
 }) => {
+    const includeKeys = isNew ? HEADER_KEYS_CREATE : HEADER_KEYS_UPDATE;
     return (
         <TabletEditScaffold
             title={isNew ? "Nouvelle facture" : `Modifier ${invoice?.ref ?? ""}`}
@@ -51,7 +38,8 @@ export const InvoiceEditPageTablet = ({
             describe={describe}
             value={initialValues}
             mode={isNew ? "create" : "update"}
-            excludeKeys={EXCLUDE_KEYS}
+            includeKeys={includeKeys}
+            groupings={[{ id: "main", title: "En-tête", keys: includeKeys }]}
             onCancel={cancel}
             onSave={save}
             renderLines={() => (

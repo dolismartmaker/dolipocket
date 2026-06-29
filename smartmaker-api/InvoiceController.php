@@ -34,6 +34,8 @@ use Dolipocket\Api\Trait\PaginatedListTrait;
 use Dolipocket\Api\Trait\SendEmailTrait;
 use Dolipocket\Api\Trait\PaymentTrait;
 use Dolipocket\Api\Trait\PdfDownloadTrait;
+use Dolipocket\Api\Trait\DocumentContactTrait;
+use Dolipocket\Api\Trait\DocumentLinkTrait;
 use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
@@ -60,6 +62,8 @@ class InvoiceController
     use SendEmailTrait;
     use PaymentTrait;
     use PdfDownloadTrait;
+    use DocumentContactTrait;
+    use DocumentLinkTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -419,6 +423,18 @@ class InvoiceController
 
         $data = $this->mapper->exportMappedData($invoice);
 
+        // Hydrate the thirdparty name + email for the detail header (summary
+        // band). The mapper only publishes socid/fk_soc (the raw id); the
+        // desktop "qui / pour quoi" band needs the human name, and the email
+        // is reused as the default recipient of the send-by-email modal.
+        $invoice->fetch_thirdparty();
+        $data->socname = ($invoice->thirdparty && !empty($invoice->thirdparty->name))
+            ? $invoice->thirdparty->name
+            : '';
+        $data->socEmail = ($invoice->thirdparty && !empty($invoice->thirdparty->email))
+            ? $invoice->thirdparty->email
+            : '';
+
         // Append payment summary (list + total) for the recap section
         $payments = $invoice->getListOfPayments();
         $sum = 0.0;
@@ -427,9 +443,19 @@ class InvoiceController
                 $sum += (float) ($p['amount'] ?? 0);
             }
         }
+        // Remain-to-pay must account for credit notes and deposits applied to
+        // the invoice, not only recorded payments. getRemainToPay() is the
+        // canonical Dolibarr computation (payments + deposits + credit notes,
+        // with the discount_vat close-code special case). The previous
+        // "total_ttc - payments" overstated the balance whenever a credit note
+        // or a deposit was applied.
+        $totalCreditNotes = (float) $invoice->getSumCreditNotesUsed();
+        $totalDeposits = (float) $invoice->getSumDepositsUsed();
         $data->payments = $payments;
         $data->total_paid = $sum;
-        $data->remain_to_pay = (float) $invoice->total_ttc - $sum;
+        $data->total_credit_notes = $totalCreditNotes;
+        $data->total_deposits = $totalDeposits;
+        $data->remain_to_pay = (float) $invoice->getRemainToPay();
 
         return [$data, 200];
     }
@@ -651,6 +677,426 @@ class InvoiceController
     }
 
     /**
+     * Set a validated invoice back to draft (status 0).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setDraft($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::setDraft forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::setDraft missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::setDraft not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $result = $invoice->setDraft($user);
+        if ($result <= 0) {
+            dol_syslog("DPK InvoiceController::setDraft setDraft() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to set invoice back to draft: ' . $invoice->error], 500];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * Classify an invoice as paid (status 2). Optional close_code /
+     * close_note describe a non-standard settlement (discount, bad debt...).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setPaid($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::setPaid forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::setPaid missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::setPaid not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $closeCode = isset($arr['close_code']) ? (string) $arr['close_code'] : '';
+        $closeNote = isset($arr['close_note']) ? (string) $arr['close_note'] : '';
+        $result = $invoice->setPaid($user, $closeCode, $closeNote);
+        if ($result <= 0) {
+            dol_syslog("DPK InvoiceController::setPaid setPaid() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to classify invoice as paid: ' . $invoice->error], 500];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * Revert a paid/abandoned invoice back to validated/unpaid (status 1).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setUnpaid($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::setUnpaid forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::setUnpaid missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::setUnpaid not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $result = $invoice->setUnpaid($user);
+        if ($result <= 0) {
+            dol_syslog("DPK InvoiceController::setUnpaid setUnpaid() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to set invoice as unpaid: ' . $invoice->error], 500];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * Classify an invoice as abandoned (status 3). Optional close_code /
+     * close_note record the reason.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setCanceled($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::setCanceled forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::setCanceled missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::setCanceled not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $closeCode = isset($arr['close_code']) ? (string) $arr['close_code'] : '';
+        $closeNote = isset($arr['close_note']) ? (string) $arr['close_note'] : '';
+        $result = $invoice->setCanceled($user, $closeCode, $closeNote);
+        if ($result <= 0) {
+            dol_syslog("DPK InvoiceController::setCanceled setCanceled() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to classify invoice as abandoned: ' . $invoice->error], 500];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * Duplicate an invoice (Dolibarr createFromClone). Returns the new draft.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function cloneDocument($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::cloneDocument forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::cloneDocument missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::cloneDocument not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $newId = $invoice->createFromClone($user, $invoice->id);
+        if ($newId <= 0) {
+            dol_syslog("DPK InvoiceController::cloneDocument createFromClone() failed: " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to clone invoice: ' . $invoice->error], 500];
+        }
+
+        $clone = new Facture($db);
+        $clone->fetch($newId);
+        $clone->fetch_lines();
+        return [$this->mapper->exportMappedData($clone), 201];
+    }
+
+    /** Wiring for the shared DocumentContactTrait (Contacts/addresses tab). */
+    private function contactConfig()
+    {
+        return [
+            'class'         => '\\Facture',
+            'permGroup'     => 'facture',
+            'logTag'        => 'InvoiceController',
+            'notFoundLabel' => 'Invoice',
+        ];
+    }
+
+    /** GET invoice/{id}/contacts -- linked contacts + available types. */
+    public function contacts($arr = null)
+    {
+        return $this->listContacts($arr, $this->contactConfig());
+    }
+
+    /** POST invoice/{id}/contact -- link a contact. */
+    public function contactAdd($arr = null)
+    {
+        return $this->addContact($arr, $this->contactConfig());
+    }
+
+    /** DELETE invoice/{id}/contact/{rowid} -- unlink a contact. */
+    public function contactRemove($arr = null)
+    {
+        return $this->removeContact($arr, $this->contactConfig());
+    }
+
+    /** GET invoice/{id}/links -- linked objects (document chain). */
+    public function links($arr = null)
+    {
+        return $this->listLinks($arr, $this->contactConfig());
+    }
+
+    /** DELETE invoice/{id}/link/{rowid} -- unlink a related object. */
+    public function linkRemove($arr = null)
+    {
+        return $this->removeLink($arr, $this->contactConfig());
+    }
+
+    /**
+     * GET invoice/{id}/creditnotes -- credit notes / replacements derived from
+     * this invoice, plus the source invoice when this one is itself a credit
+     * note. Read only.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function creditNotes($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::creditNotes forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::creditNotes missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::creditNotes not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $list = array();
+        $sql = "SELECT rowid, ref, type, total_ttc, fk_statut, paye FROM " . MAIN_DB_PREFIX . "facture";
+        $sql .= " WHERE fk_facture_source = " . ((int) $id);
+        $sql .= " AND entity IN (" . getEntity('facture') . ")";
+        $sql .= " ORDER BY rowid";
+        $resql = $db->query($sql);
+        if ($resql) {
+            while ($obj = $db->fetch_object($resql)) {
+                $list[] = array(
+                    'id'       => (int) $obj->rowid,
+                    'ref'      => $obj->ref,
+                    'type'     => (int) $obj->type,
+                    'totalTtc' => (float) $obj->total_ttc,
+                    'statut'   => (int) $obj->fk_statut,
+                    'paye'     => (int) $obj->paye,
+                );
+            }
+        } else {
+            dol_syslog("DPK InvoiceController::creditNotes query failed: " . $db->lasterror(), LOG_ERR);
+            return [['error' => 'Failed to list credit notes'], 500];
+        }
+
+        $source = null;
+        if ((int) $invoice->type === Facture::TYPE_CREDIT_NOTE && (int) $invoice->fk_facture_source > 0) {
+            $src = new Facture($db);
+            if ($src->fetch((int) $invoice->fk_facture_source) > 0) {
+                $source = array('id' => (int) $src->id, 'ref' => $src->ref);
+            }
+        }
+
+        return [array(
+            'creditNotes'   => $list,
+            'sourceInvoice' => $source,
+            'selfType'      => (int) $invoice->type,
+        ), 200];
+    }
+
+    /**
+     * POST invoice/{id}/creditnote -- create a draft credit note (avoir) from a
+     * validated standard invoice, copying the lines with inverted amounts. This
+     * mirrors the Dolibarr "Creer un avoir" flow (compta/facture/card.php).
+     * Situation invoices are out of scope (complex delta logic).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function createCreditNote($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::createCreditNote forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::createCreditNote missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $source = new Facture($db);
+        if ($source->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::createCreditNote source not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+        $source->fetch_lines();
+
+        if ((int) $source->type === Facture::TYPE_SITUATION) {
+            dol_syslog("DPK InvoiceController::createCreditNote situation invoice not supported id=" . $id, LOG_WARNING);
+            return [['error' => 'Credit notes from situation invoices are not supported'], 400];
+        }
+        if ((int) $source->statut < Facture::STATUS_VALIDATED) {
+            dol_syslog("DPK InvoiceController::createCreditNote source not validated id=" . $id, LOG_WARNING);
+            return [['error' => 'The source invoice must be validated first'], 400];
+        }
+
+        $db->begin();
+
+        $object = new Facture($db);
+        $object->socid = $source->socid;
+        $object->type = Facture::TYPE_CREDIT_NOTE;
+        $object->fk_facture_source = $source->id;
+        $object->date = dol_now();
+        $object->cond_reglement_id = $source->cond_reglement_id;
+        $object->mode_reglement_id = $source->mode_reglement_id;
+        $object->fk_account = $source->fk_account;
+        $object->fk_project = $source->fk_project;
+        $object->ref_client = $source->ref_client;
+        $object->note_public = $source->note_public;
+        $object->note_private = $source->note_private;
+        $object->model_pdf = $source->model_pdf;
+
+        $newId = $object->create($user);
+        if ($newId <= 0) {
+            dol_syslog("DPK InvoiceController::createCreditNote create() failed: " . $object->error, LOG_ERR);
+            $db->rollback();
+            return [['error' => 'Failed to create credit note: ' . $object->error], 500];
+        }
+
+        // Copy internal + external (same company) contacts like Dolibarr does.
+        $object->copy_linked_contact($source, 'internal');
+        if ((int) $source->socid === (int) $object->socid) {
+            $object->copy_linked_contact($source, 'external');
+        }
+
+        // Copy the source lines with inverted amounts (cf card.php credit note).
+        if (is_array($source->lines)) {
+            $fkParentLine = 0;
+            foreach ($source->lines as $line) {
+                if (method_exists($line, 'fetch_optionals')) {
+                    $line->fetch_optionals();
+                }
+                if (($line->product_type != 9 && empty($line->fk_parent_line)) || $line->product_type == 9) {
+                    $fkParentLine = 0;
+                }
+
+                $line->fk_facture = $object->id;
+                $line->fk_parent_line = $fkParentLine;
+
+                $line->subprice = -$line->subprice;
+                $line->total_ht = -$line->total_ht;
+                $line->total_tva = -$line->total_tva;
+                $line->total_ttc = -$line->total_ttc;
+                $line->total_localtax1 = -$line->total_localtax1;
+                $line->total_localtax2 = -$line->total_localtax2;
+                $line->multicurrency_subprice = -$line->multicurrency_subprice;
+                $line->multicurrency_total_ht = -$line->multicurrency_total_ht;
+                $line->multicurrency_total_tva = -$line->multicurrency_total_tva;
+                $line->multicurrency_total_ttc = -$line->multicurrency_total_ttc;
+
+                $line->context['createcreditnotefrominvoice'] = 1;
+                $res = $line->insert(0, 1);
+                if ($res < 0) {
+                    dol_syslog("DPK InvoiceController::createCreditNote line insert failed: " . $line->error, LOG_ERR);
+                    $db->rollback();
+                    return [['error' => 'Failed to copy invoice line: ' . $line->error], 500];
+                }
+                $object->lines[] = $line;
+                if ($res > 0 && (int) $line->product_type === 9) {
+                    $fkParentLine = $res;
+                }
+            }
+            $object->update_price(1);
+        }
+
+        $db->commit();
+
+        $object->fetch($newId);
+        $object->fetch_lines();
+        return [$this->mapper->exportMappedData($object), 201];
+    }
+
+    /**
      * Create an invoice from an existing order (commande -> facture).
      *
      * @param array|null $arr
@@ -688,6 +1134,682 @@ class InvoiceController
         $invoice->fetch($result);
         $invoice->fetch_lines();
         return [$this->mapper->exportMappedData($invoice), 201];
+    }
+
+    /**
+     * GET invoice/deposit-terms -- Tier A lot A5a.
+     *
+     * List the payment terms eligible for a deposit: those whose c_payment_term
+     * dictionary row defines a deposit_percent. The "create deposit invoice"
+     * flow needs one of these, because Facture::createDepositFromOrigin()
+     * refuses an origin whose payment condition is not deposit-capable.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function depositTerms($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::depositTerms forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $sql = "SELECT rowid, code, libelle, deposit_percent";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "c_payment_term";
+        $sql .= " WHERE active = 1";
+        $sql .= " AND deposit_percent IS NOT NULL AND deposit_percent <> '' AND deposit_percent <> 0";
+        $sql .= " AND entity IN (" . getEntity('c_payment_term') . ")";
+        $sql .= " ORDER BY libelle";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog("DPK InvoiceController::depositTerms SQL error: " . $db->lasterror(), LOG_ERR);
+            return [['error' => 'Database error'], 500];
+        }
+        $terms = [];
+        while ($obj = $db->fetch_object($resql)) {
+            $terms[] = array(
+                'id'             => (int) $obj->rowid,
+                'code'           => $obj->code,
+                'label'          => $obj->libelle,
+                'depositPercent' => (float) $obj->deposit_percent,
+            );
+        }
+        $db->free($resql);
+
+        return [['terms' => $terms], 200];
+    }
+
+    /**
+     * POST invoice/deposit -- create a deposit invoice (TYPE_DEPOSIT) from a
+     * proposal or order. Tier A lot A5a.
+     *
+     * Faithful to commande/card.php "generate_deposit": the deposit percentage
+     * is carried on $origin->deposit_percent and the eligibility comes from a
+     * deposit-capable payment term. We set both in memory only (no persistence
+     * on the origin), exactly what createDepositFromOrigin() reads. Dolibarr
+     * computes the deposit amounts and lines itself -- this controller never
+     * derives a financial amount on its own.
+     *
+     * Body:
+     *   - origin_type       ('propal'|'commande', required)
+     *   - origin_id         (int, required)
+     *   - cond_reglement_id (int, required) a deposit-eligible payment term
+     *   - deposit_percent   (float, required) the deposit percentage to apply
+     *   - date              (optional) invoice date (s or ms; defaults to now)
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function createDeposit($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::createDeposit forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $originType = isset($arr['origin_type']) ? (string) $arr['origin_type'] : '';
+        $originId = isset($arr['origin_id']) ? (int) $arr['origin_id'] : 0;
+        $condReglementId = isset($arr['cond_reglement_id']) ? (int) $arr['cond_reglement_id'] : 0;
+        $depositPercent = isset($arr['deposit_percent']) ? (float) $arr['deposit_percent'] : 0;
+
+        if (!in_array($originType, array('propal', 'commande'), true)) {
+            dol_syslog("DPK InvoiceController::createDeposit invalid origin_type=" . $originType, LOG_WARNING);
+            return [['error' => "origin_type must be 'propal' or 'commande'"], 400];
+        }
+        if ($originId <= 0) {
+            dol_syslog("DPK InvoiceController::createDeposit missing origin_id", LOG_WARNING);
+            return [['error' => 'origin_id is required'], 400];
+        }
+        if ($condReglementId <= 0) {
+            dol_syslog("DPK InvoiceController::createDeposit missing cond_reglement_id", LOG_WARNING);
+            return [['error' => 'cond_reglement_id (a deposit-eligible payment term) is required'], 400];
+        }
+        if ($depositPercent <= 0) {
+            dol_syslog("DPK InvoiceController::createDeposit invalid deposit_percent", LOG_WARNING);
+            return [['error' => 'deposit_percent must be greater than 0'], 400];
+        }
+
+        if ($originType === 'commande') {
+            $origin = new Commande($db);
+        } else {
+            require_once DOL_DOCUMENT_ROOT . '/comm/propal/class/propal.class.php';
+            $origin = new \Propal($db);
+        }
+        if ($origin->fetch($originId) <= 0) {
+            dol_syslog("DPK InvoiceController::createDeposit origin not found type=" . $originType . " id=" . $originId, LOG_WARNING);
+            return [['error' => 'Origin document not found'], 404];
+        }
+        $origin->fetch_lines();
+
+        // In-memory deposit setup (mirrors card.php setPaymentTerms but without
+        // persisting it on the origin): createDepositFromOrigin reads these.
+        $origin->cond_reglement_id = $condReglementId;
+        $origin->deposit_percent = $depositPercent;
+
+        $date = self::normalizeTimestamp($arr['date'] ?? null);
+        if ($date === null) {
+            $date = dol_now();
+        }
+
+        $deposit = \Facture::createDepositFromOrigin($origin, $date, $condReglementId, $user);
+        if (!is_object($deposit) || empty($deposit->id)) {
+            $reason = (!empty($origin->error)) ? $origin->error : 'Failed to create deposit invoice';
+            dol_syslog("DPK InvoiceController::createDeposit createDepositFromOrigin() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to create deposit invoice: ' . $reason], 400];
+        }
+
+        $deposit->fetch($deposit->id);
+        $deposit->fetch_lines();
+        return [$this->mapper->exportMappedData($deposit), 201];
+    }
+
+    /**
+     * POST invoice/{id}/converttoreduc -- Tier A lot A5c.
+     *
+     * Convert a credit note, a deposit invoice or a standard/situation invoice
+     * with excess received into one or more reusable absolute discounts
+     * (DiscountAbsolute / societe_remise_except), one per VAT rate. This is a
+     * faithful, line-by-line replica of compta/facture/card.php action
+     * "confirm_converttoreduc" (lines 821-982 in Dolibarr 18). No amount is ever
+     * derived here outside what card.php computes: VAT amounts are summed per
+     * rate, taken in absolute value, and a discount row is created per rate;
+     * for a standard invoice the discount is the TTC excess received.
+     *
+     * Eligibility ($canconvert) is reproduced exactly:
+     *   - deposit: type == TYPE_DEPOSIT and no discount already created
+     *   - credit note / standard / situation: paye == 0 and no discount yet
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function convertToReduc($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::convertToReduc forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::convertToReduc missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::convertToReduc not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+        $invoice->fetch_lines();
+        $invoice->fetch_thirdparty();
+
+        require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+
+        // Protection against duplicate creation: a discount may already exist for
+        // this source invoice (re-submit). card.php fetches by fk_facture_source.
+        $discountcheck = new \DiscountAbsolute($db);
+        $discountcheck->fetch(0, $invoice->id);
+
+        $type = (int) $invoice->type;
+        $canconvert = 0;
+        if ($type === Facture::TYPE_DEPOSIT && empty($discountcheck->id)) {
+            $canconvert = 1;
+        }
+        if (in_array($type, array(Facture::TYPE_CREDIT_NOTE, Facture::TYPE_STANDARD, Facture::TYPE_SITUATION), true)
+            && (int) $invoice->paye === 0 && empty($discountcheck->id)) {
+            $canconvert = 1;
+        }
+        if (!$canconvert) {
+            dol_syslog("DPK InvoiceController::convertToReduc not eligible id=" . $id
+                . " type=" . $type . " paye=" . $invoice->paye
+                . " existingDiscount=" . (int) $discountcheck->id, LOG_WARNING);
+            return [['error' => 'This invoice cannot be converted into a discount (wrong type, already paid, or already converted)'], 400];
+        }
+
+        $db->begin();
+
+        $amount_ht = $amount_tva = $amount_ttc = array();
+        $multicurrency_amount_ht = $multicurrency_amount_tva = $multicurrency_amount_ttc = array();
+
+        // Sum amounts per VAT rate (keyed by tva_tx plus an optional vat source
+        // code, exactly like card.php $keyforvatrate). Skip lines with
+        // product_type >= 9 (titles / sub-totals) and zero-HT lines.
+        foreach ($invoice->lines as $line) {
+            if ($line->product_type < 9 && $line->total_ht != 0) {
+                $keyforvatrate = $line->tva_tx . ($line->vat_src_code ? ' (' . $line->vat_src_code . ')' : '');
+
+                $amount_ht[$keyforvatrate] = ($amount_ht[$keyforvatrate] ?? 0) + $line->total_ht;
+                $amount_tva[$keyforvatrate] = ($amount_tva[$keyforvatrate] ?? 0) + $line->total_tva;
+                $amount_ttc[$keyforvatrate] = ($amount_ttc[$keyforvatrate] ?? 0) + $line->total_ttc;
+                $multicurrency_amount_ht[$keyforvatrate] = ($multicurrency_amount_ht[$keyforvatrate] ?? 0) + $line->multicurrency_total_ht;
+                $multicurrency_amount_tva[$keyforvatrate] = ($multicurrency_amount_tva[$keyforvatrate] ?? 0) + $line->multicurrency_total_tva;
+                $multicurrency_amount_ttc[$keyforvatrate] = ($multicurrency_amount_ttc[$keyforvatrate] ?? 0) + $line->multicurrency_total_ttc;
+            }
+        }
+
+        // Partial-refund prorate (conf-guarded, default OFF) -- faithful to
+        // card.php: only for credit notes when INVOICE_ALLOW_REUSE_OF_CREDIT_WHEN_PARTIALLY_REFUNDED.
+        if (!empty($conf->global->INVOICE_ALLOW_REUSE_OF_CREDIT_WHEN_PARTIALLY_REFUNDED) && $type === Facture::TYPE_CREDIT_NOTE) {
+            $alreadypaid = $invoice->getSommePaiement();
+            if ($alreadypaid && abs($alreadypaid) < abs($invoice->total_ttc)) {
+                $ratio = abs(($invoice->total_ttc - $alreadypaid) / $invoice->total_ttc);
+                foreach ($amount_ht as $vatrate => $val) {
+                    $amount_ht[$vatrate] = price2num($amount_ht[$vatrate] * $ratio, 'MU');
+                    $amount_tva[$vatrate] = price2num($amount_tva[$vatrate] * $ratio, 'MU');
+                    $amount_ttc[$vatrate] = price2num($amount_ttc[$vatrate] * $ratio, 'MU');
+                    $multicurrency_amount_ht[$vatrate] = price2num($multicurrency_amount_ht[$vatrate] * $ratio, 'MU');
+                    $multicurrency_amount_tva[$vatrate] = price2num($multicurrency_amount_tva[$vatrate] * $ratio, 'MU');
+                    $multicurrency_amount_ttc[$vatrate] = price2num($multicurrency_amount_ttc[$vatrate] * $ratio, 'MU');
+                }
+            }
+        }
+
+        // One discount object reused for every VAT-rate row (card.php pattern).
+        $discount = new \DiscountAbsolute($db);
+        if ($type === Facture::TYPE_CREDIT_NOTE) {
+            $discount->description = '(CREDIT_NOTE)';
+        } elseif ($type === Facture::TYPE_DEPOSIT) {
+            $discount->description = '(DEPOSIT)';
+        } elseif (in_array($type, array(Facture::TYPE_STANDARD, Facture::TYPE_REPLACEMENT, Facture::TYPE_SITUATION), true)) {
+            $discount->description = '(EXCESS RECEIVED)';
+        } else {
+            $db->rollback();
+            dol_syslog("DPK InvoiceController::convertToReduc unsupported type id=" . $id . " type=" . $type, LOG_ERR);
+            return [['error' => 'Cannot convert an invoice of this type into a discount'], 400];
+        }
+        $discount->fk_soc = $invoice->socid;
+        $discount->fk_facture_source = $invoice->id;
+
+        $error = 0;
+
+        if (in_array($type, array(Facture::TYPE_STANDARD, Facture::TYPE_REPLACEMENT, Facture::TYPE_SITUATION), true)) {
+            // Standard invoice with excess received -> single TTC discount, no VAT.
+            $sql = 'SELECT SUM(pf.amount) as total_paiements';
+            $sql .= ' FROM ' . MAIN_DB_PREFIX . 'paiement_facture as pf, ' . MAIN_DB_PREFIX . 'paiement as p';
+            $sql .= ' LEFT JOIN ' . MAIN_DB_PREFIX . 'c_paiement as c ON p.fk_paiement = c.id';
+            $sql .= ' WHERE pf.fk_facture = ' . ((int) $invoice->id);
+            $sql .= ' AND pf.fk_paiement = p.rowid';
+            $sql .= ' AND p.entity IN (' . getEntity('invoice') . ')';
+            $resql = $db->query($sql);
+            if (!$resql) {
+                $db->rollback();
+                dol_syslog("DPK InvoiceController::convertToReduc payments SQL error: " . $db->lasterror(), LOG_ERR);
+                return [['error' => 'Database error'], 500];
+            }
+            $res = $db->fetch_object($resql);
+            $total_paiements = $res ? $res->total_paiements : 0;
+
+            $total_creditnote_and_deposit = 0;
+            $sql = "SELECT re.amount_ttc FROM " . MAIN_DB_PREFIX . "societe_remise_except as re";
+            $sql .= " WHERE re.fk_facture = " . ((int) $invoice->id);
+            $resql = $db->query($sql);
+            if (!$resql) {
+                $db->rollback();
+                dol_syslog("DPK InvoiceController::convertToReduc remise SQL error: " . $db->lasterror(), LOG_ERR);
+                return [['error' => 'Database error'], 500];
+            }
+            while ($obj = $db->fetch_object($resql)) {
+                $total_creditnote_and_deposit += $obj->amount_ttc;
+            }
+
+            $discount->amount_ht = $discount->amount_ttc = $total_paiements + $total_creditnote_and_deposit - $invoice->total_ttc;
+            $discount->amount_tva = 0;
+            $discount->tva_tx = 0;
+            $discount->vat_src_code = '';
+
+            $result = $discount->create($user);
+            if ($result < 0) {
+                $error++;
+            }
+        }
+        if (in_array($type, array(Facture::TYPE_CREDIT_NOTE, Facture::TYPE_DEPOSIT), true)) {
+            foreach ($amount_ht as $tva_tx => $xxx) {
+                $discount->amount_ht = abs($amount_ht[$tva_tx]);
+                $discount->amount_tva = abs($amount_tva[$tva_tx]);
+                $discount->amount_ttc = abs($amount_ttc[$tva_tx]);
+                $discount->multicurrency_amount_ht = abs($multicurrency_amount_ht[$tva_tx]);
+                $discount->multicurrency_amount_tva = abs($multicurrency_amount_tva[$tva_tx]);
+                $discount->multicurrency_amount_ttc = abs($multicurrency_amount_ttc[$tva_tx]);
+
+                // Split the composite key back into rate + vat source code.
+                $reg = array();
+                $vat_src_code = '';
+                $tva_tx_clean = (string) $tva_tx;
+                if (preg_match('/\((.*)\)/', (string) $tva_tx, $reg)) {
+                    $vat_src_code = $reg[1];
+                    $tva_tx_clean = preg_replace('/\s*\(.*\)/', '', (string) $tva_tx);
+                }
+                $discount->tva_tx = abs((float) $tva_tx_clean);
+                $discount->vat_src_code = $vat_src_code;
+
+                $result = $discount->create($user);
+                if ($result < 0) {
+                    $error++;
+                    break;
+                }
+            }
+        }
+
+        if (empty($error)) {
+            if ($type !== Facture::TYPE_DEPOSIT) {
+                // Classify the source invoice as paid (settled via the discount).
+                $result = $invoice->setPaid($user);
+                if ($result >= 0) {
+                    $db->commit();
+                } else {
+                    $db->rollback();
+                    dol_syslog("DPK InvoiceController::convertToReduc setPaid() failed id=" . $id . ": " . $invoice->error, LOG_ERR);
+                    return [['error' => 'Could not classify the source invoice as paid: ' . $invoice->error], 500];
+                }
+            } else {
+                $db->commit();
+            }
+        } else {
+            $db->rollback();
+            dol_syslog("DPK InvoiceController::convertToReduc discount create failed id=" . $id . ": " . $discount->error, LOG_ERR);
+            return [['error' => 'Failed to create discount: ' . $discount->error], 500];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * GET invoice/{id}/discounts -- Tier A lot A5c.
+     *
+     * List the reusable absolute discounts currently APPLIED to this invoice,
+     * either as a negative line (fk_facture_line in the invoice lines) or as a
+     * payment (fk_facture = id). Read only -- the "available" discounts of the
+     * thirdparty are served by GET thirdparty/{id}/discounts.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function appliedDiscounts($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'lire')) {
+            dol_syslog("DPK InvoiceController::appliedDiscounts forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::appliedDiscounts missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::appliedDiscounts not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        $sql = "SELECT re.rowid, re.amount_ht, re.amount_ttc, re.tva_tx, re.description,";
+        $sql .= " re.fk_facture, re.fk_facture_line, re.fk_facture_source, f.ref as ref_source";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "societe_remise_except as re";
+        $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "facture as f ON re.fk_facture_source = f.rowid";
+        $sql .= " WHERE re.entity IN (" . getEntity('invoice') . ")";
+        $sql .= " AND re.discount_type = 0";
+        $sql .= " AND (re.fk_facture = " . ((int) $id);
+        $sql .= " OR re.fk_facture_line IN (SELECT fd.rowid FROM " . MAIN_DB_PREFIX . "facturedet as fd WHERE fd.fk_facture = " . ((int) $id) . "))";
+        $sql .= " ORDER BY re.rowid";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog("DPK InvoiceController::appliedDiscounts query failed: " . $db->lasterror(), LOG_ERR);
+            return [['error' => 'Failed to list applied discounts'], 500];
+        }
+
+        $applied = array();
+        while ($obj = $db->fetch_object($resql)) {
+            $applied[] = array(
+                'id'               => (int) $obj->rowid,
+                'type'             => self::classifyDiscountType((string) $obj->description),
+                'appliedAs'        => !empty($obj->fk_facture_line) ? 'line' : 'payment',
+                'description'      => (string) $obj->description,
+                'amountHt'         => (float) $obj->amount_ht,
+                'amountTtc'        => (float) $obj->amount_ttc,
+                'tvaTx'            => (float) $obj->tva_tx,
+                'sourceInvoiceId'  => !empty($obj->fk_facture_source) ? (int) $obj->fk_facture_source : 0,
+                'sourceInvoiceRef' => $obj->ref_source !== null ? (string) $obj->ref_source : '',
+            );
+        }
+        $db->free($resql);
+
+        return [['applied' => $applied], 200];
+    }
+
+    /**
+     * Classify a societe_remise_except description marker into a short type.
+     * Shared by InvoiceController and ThirdPartyController.
+     *
+     * @param string $description
+     * @return string one of credit_note|excess|deposit|discount
+     */
+    public static function classifyDiscountType($description)
+    {
+        if (strpos($description, '(CREDIT_NOTE)') !== false) {
+            return 'credit_note';
+        }
+        if (strpos($description, '(EXCESS RECEIVED)') !== false) {
+            return 'excess';
+        }
+        if (strpos($description, '(DEPOSIT)') !== false) {
+            return 'deposit';
+        }
+        return 'discount';
+    }
+
+    /**
+     * POST invoice/{id}/discount -- Tier A lot A5c.
+     *
+     * Apply an available absolute discount onto a DRAFT invoice as a NEGATIVE
+     * invoice line (Facture::insert_discount). Mirrors card.php action
+     * "setabsolutediscount" (POST field remise_id). insert_discount returns 1 on
+     * success, a negative code on failure (-5 = discount already consumed).
+     *
+     * Body: discount_id (int, required) = rowid of the DiscountAbsolute.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function applyDiscount($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::applyDiscount forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $discountId = isset($arr['discount_id']) ? (int) $arr['discount_id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::applyDiscount missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+        if ($discountId <= 0) {
+            dol_syslog("DPK InvoiceController::applyDiscount missing discount_id", LOG_WARNING);
+            return [['error' => 'discount_id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::applyDiscount not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+        if ((int) $invoice->statut !== Facture::STATUS_DRAFT) {
+            dol_syslog("DPK InvoiceController::applyDiscount invoice not draft id=" . $id . " statut=" . $invoice->statut, LOG_WARNING);
+            return [['error' => 'A discount can only be applied as a line on a draft invoice'], 400];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+        $discount = new \DiscountAbsolute($db);
+        if ($discount->fetch($discountId) <= 0) {
+            dol_syslog("DPK InvoiceController::applyDiscount discount not found rowid=" . $discountId, LOG_WARNING);
+            return [['error' => 'Discount not found'], 404];
+        }
+        if ((int) $discount->fk_soc !== (int) $invoice->socid) {
+            dol_syslog("DPK InvoiceController::applyDiscount socid mismatch discount=" . $discountId . " invoiceSoc=" . $invoice->socid, LOG_WARNING);
+            return [['error' => 'Discount does not belong to this invoice thirdparty'], 403];
+        }
+
+        $result = $invoice->insert_discount($discountId);
+        if ($result < 0) {
+            dol_syslog("DPK InvoiceController::applyDiscount insert_discount() failed id=" . $id
+                . " discount=" . $discountId . " code=" . $result . ": " . $invoice->error, LOG_ERR);
+            return [['error' => 'Failed to apply discount: ' . $invoice->error], 400];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * POST invoice/{id}/usecreditnote -- Tier A lot A5c.
+     *
+     * Apply an available credit note (or excess-received) discount onto a
+     * VALIDATED unpaid invoice as a PAYMENT (DiscountAbsolute::link_to_invoice).
+     * Mirrors card.php action "setabsolutediscount" (POST field
+     * remise_id_for_payment) and api_invoices::useCreditNote. The display
+     * condition in core/tpl/object_discounts.tpl.php gates this on a validated
+     * invoice that is not itself a credit note.
+     *
+     * Body: discount_id (int, required) = rowid of the DiscountAbsolute.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function useCreditNote($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::useCreditNote forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $discountId = isset($arr['discount_id']) ? (int) $arr['discount_id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK InvoiceController::useCreditNote missing id", LOG_WARNING);
+            return [['error' => 'Invoice id is required'], 400];
+        }
+        if ($discountId <= 0) {
+            dol_syslog("DPK InvoiceController::useCreditNote missing discount_id", LOG_WARNING);
+            return [['error' => 'discount_id is required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::useCreditNote not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+        if ((int) $invoice->statut !== Facture::STATUS_VALIDATED) {
+            dol_syslog("DPK InvoiceController::useCreditNote invoice not validated id=" . $id . " statut=" . $invoice->statut, LOG_WARNING);
+            return [['error' => 'A credit note can only be applied as a payment on a validated invoice'], 400];
+        }
+        if ((int) $invoice->type === Facture::TYPE_CREDIT_NOTE) {
+            dol_syslog("DPK InvoiceController::useCreditNote target is a credit note id=" . $id, LOG_WARNING);
+            return [['error' => 'Cannot apply a credit note onto another credit note'], 400];
+        }
+        if ((int) $invoice->paye) {
+            dol_syslog("DPK InvoiceController::useCreditNote invoice already paid id=" . $id, LOG_WARNING);
+            return [['error' => 'The invoice is already paid'], 400];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+        $discount = new \DiscountAbsolute($db);
+        if ($discount->fetch($discountId) <= 0) {
+            dol_syslog("DPK InvoiceController::useCreditNote discount not found rowid=" . $discountId, LOG_WARNING);
+            return [['error' => 'Credit note not found'], 404];
+        }
+        if ((int) $discount->fk_soc !== (int) $invoice->socid) {
+            dol_syslog("DPK InvoiceController::useCreditNote socid mismatch discount=" . $discountId . " invoiceSoc=" . $invoice->socid, LOG_WARNING);
+            return [['error' => 'Credit note does not belong to this invoice thirdparty'], 403];
+        }
+        if (!empty($discount->fk_facture) || !empty($discount->fk_facture_line)) {
+            dol_syslog("DPK InvoiceController::useCreditNote discount already used rowid=" . $discountId, LOG_WARNING);
+            return [['error' => 'This credit is already used'], 400];
+        }
+
+        $result = $discount->link_to_invoice(0, $id);
+        if ($result < 0) {
+            dol_syslog("DPK InvoiceController::useCreditNote link_to_invoice() failed id=" . $id
+                . " discount=" . $discountId . ": " . $discount->error, LOG_ERR);
+            return [['error' => 'Failed to apply credit note: ' . $discount->error], 400];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
+    }
+
+    /**
+     * DELETE invoice/{id}/discount/{rowid} -- Tier A lot A5c.
+     *
+     * Remove a discount applied to this invoice, symmetric to applyDiscount /
+     * useCreditNote:
+     *   - applied as a LINE (fk_facture_line set): delete the carrying line via
+     *     Facture::deleteline (draft only; deleteline frees the discount by
+     *     setting fk_facture_line = NULL through FactureLigne::delete).
+     *   - applied as a PAYMENT (fk_facture set): DiscountAbsolute::unlink_invoice
+     *     frees fk_facture (only while the invoice is not yet fully paid).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function removeDiscount($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('facture', 'creer')) {
+            dol_syslog("DPK InvoiceController::removeDiscount forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $rowid = isset($arr['rowid']) ? (int) $arr['rowid'] : 0;
+        if ($id <= 0 || $rowid <= 0) {
+            dol_syslog("DPK InvoiceController::removeDiscount missing id or rowid", LOG_WARNING);
+            return [['error' => 'Invoice id and discount rowid are required'], 400];
+        }
+
+        $invoice = new Facture($db);
+        if ($invoice->fetch($id) <= 0) {
+            dol_syslog("DPK InvoiceController::removeDiscount not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Invoice not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+        $discount = new \DiscountAbsolute($db);
+        if ($discount->fetch($rowid) <= 0) {
+            dol_syslog("DPK InvoiceController::removeDiscount discount not found rowid=" . $rowid, LOG_WARNING);
+            return [['error' => 'Discount not found'], 404];
+        }
+        if ((int) $discount->fk_soc !== (int) $invoice->socid) {
+            dol_syslog("DPK InvoiceController::removeDiscount socid mismatch discount=" . $rowid . " invoiceSoc=" . $invoice->socid, LOG_WARNING);
+            return [['error' => 'Discount does not belong to this invoice thirdparty'], 403];
+        }
+
+        if (!empty($discount->fk_facture_line)) {
+            // Applied as a line: find the carrying line on this invoice and delete
+            // it (draft only). deleteline frees the discount.
+            if ((int) $invoice->statut !== Facture::STATUS_DRAFT) {
+                dol_syslog("DPK InvoiceController::removeDiscount invoice not draft id=" . $id, LOG_WARNING);
+                return [['error' => 'The invoice must be a draft to remove a discount line'], 400];
+            }
+            $invoice->fetch_lines();
+            $lineId = 0;
+            foreach ($invoice->lines as $line) {
+                if ((int) ($line->fk_remise_except ?? 0) === $rowid) {
+                    $lineId = (int) $line->id;
+                    break;
+                }
+            }
+            if ($lineId <= 0) {
+                dol_syslog("DPK InvoiceController::removeDiscount line not found on invoice id=" . $id . " discount=" . $rowid, LOG_WARNING);
+                return [['error' => 'This discount is not applied as a line on this invoice'], 400];
+            }
+            $res = $invoice->deleteline($lineId, $id);
+            if ($res <= 0) {
+                dol_syslog("DPK InvoiceController::removeDiscount deleteline() failed id=" . $id . " line=" . $lineId . ": " . $invoice->error, LOG_ERR);
+                return [['error' => 'Failed to remove discount line: ' . $invoice->error], 400];
+            }
+        } elseif (!empty($discount->fk_facture)) {
+            // Applied as a payment: must target this invoice and not be paid yet.
+            if ((int) $discount->fk_facture !== $id) {
+                dol_syslog("DPK InvoiceController::removeDiscount credit applied to another invoice discount=" . $rowid, LOG_WARNING);
+                return [['error' => 'This credit is applied to another invoice'], 403];
+            }
+            if ((int) $invoice->paye) {
+                dol_syslog("DPK InvoiceController::removeDiscount invoice already paid id=" . $id, LOG_WARNING);
+                return [['error' => 'The invoice is already paid; cannot remove the applied credit'], 400];
+            }
+            $res = $discount->unlink_invoice();
+            if ($res < 0) {
+                dol_syslog("DPK InvoiceController::removeDiscount unlink_invoice() failed id=" . $id . " discount=" . $rowid . ": " . $discount->error, LOG_ERR);
+                return [['error' => 'Failed to remove applied credit note: ' . $discount->error], 400];
+            }
+        } else {
+            dol_syslog("DPK InvoiceController::removeDiscount discount not applied rowid=" . $rowid, LOG_WARNING);
+            return [['error' => 'This discount is not applied to any invoice'], 400];
+        }
+
+        $invoice->fetch($id);
+        $invoice->fetch_lines();
+        return [$this->mapper->exportMappedData($invoice), 200];
     }
 
     /**

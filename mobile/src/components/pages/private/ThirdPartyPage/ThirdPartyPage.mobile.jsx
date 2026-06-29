@@ -2,6 +2,9 @@ import { FaArrowLeft, FaPen, FaTrash, FaBuilding, FaMapMarkerAlt, FaPhone, FaEnv
 
 import { Page } from "@cap-rel/smartcommon";
 
+import { ThirdPartyCategoriesSection } from "src/lib/components/ThirdPartyCategoriesSection";
+import { ThirdPartyBankSection } from "src/lib/components/ThirdPartyBankSection";
+
 // Mobile rendering of the third party detail page. Extracted verbatim from
 // the previous monolithic index.jsx -- visually unchanged on mobile. Data
 // and handlers come from useThirdPartyData via props.
@@ -39,7 +42,7 @@ const Field = ({ label, value }) => {
 
 export const ThirdPartyPageMobile = (props) => {
     const {
-        item, loading, error, openSections,
+        item, loading, error, openSections, dataSource,
         loadThirdParty, handleBack, handleEdit, handleDelete, toggleSection,
     } = props;
 
@@ -158,6 +161,15 @@ export const ThirdPartyPageMobile = (props) => {
                             <Field label="Note publique" value={item.notePublic} />
                             <Field label="Note privée" value={item.notePrivate} />
                         </Section>
+
+                        <ThirdPartyCategoriesSection
+                            thirdpartyId={Number(item.id)}
+                            dataSource={dataSource}
+                        />
+                        <ThirdPartyBankSection
+                            thirdpartyId={Number(item.id)}
+                            dataSource={dataSource}
+                        />
                     </div>
                 )}
             </div>

@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { useDbAgenda } from "src/db/stores/agenda/useDbAgenda";
+
+// Coerce a date field to unix SECONDS. The smartcommon datetime <Input> stores
+// values in MILLISECONDS, while the backend (and an existing event loaded for
+// edit) uses seconds. Any value clearly in the millisecond range is converted.
+const toSeconds = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n === 0) return n;
+    return Math.abs(n) >= 1e11 ? Math.floor(n / 1000) : n;
+};
 
 // Data hook for the desktop AgendaEventEditPage. The mobile variant is the
 // historical monolithic implementation and does not use this hook.
@@ -12,8 +21,16 @@ export const useAgendaEventEditData = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const dbAgenda = useDbAgenda();
+    const [searchParams] = useSearchParams();
 
     const isNew = id === undefined || id === "new";
+
+    // Calendar click-to-create passes ?datep=<unix seconds>. AutoForm's
+    // datetime field expects milliseconds, so seed in ms.
+    const datepParam = Number(searchParams.get("datep"));
+    const seededDatepMs = isNew && Number.isFinite(datepParam) && datepParam > 0
+        ? datepParam * 1000
+        : null;
 
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(!isNew);
@@ -53,7 +70,7 @@ export const useAgendaEventEditData = () => {
     // Initial values to seed AutoForm with. For edit: use the loaded event.
     // For new: a minimal default that mirrors the mobile form (type AC_OTH).
     const initialValues = isNew
-        ? { typeCode: "AC_OTH", percentage: 0 }
+        ? { typeCode: "AC_OTH", percentage: 0, ...(seededDatepMs ? { datep: seededDatepMs } : {}) }
         : (event ?? {});
 
     const save = useCallback(async (values) => {
@@ -63,6 +80,14 @@ export const useAgendaEventEditData = () => {
             // Coerce numeric fields where applicable so the backend schema
             // (TYPE_INT / TYPE_BOOL) does not reject string values.
             const payload = { ...values };
+            // datep/datef come from AutoForm in milliseconds (or seconds when an
+            // untouched loaded event is re-saved); backend expects seconds.
+            if (payload.datep !== undefined && payload.datep !== null && payload.datep !== "") {
+                payload.datep = toSeconds(payload.datep);
+            }
+            if (payload.datef !== undefined && payload.datef !== null && payload.datef !== "") {
+                payload.datef = toSeconds(payload.datef);
+            }
             if (payload.percentage !== undefined) payload.percentage = Number(payload.percentage ?? 0);
             if (payload.fulldayevent !== undefined) payload.fulldayevent = payload.fulldayevent ? 1 : 0;
             if (payload.socid !== undefined) payload.socid = Number(payload.socid ?? 0);

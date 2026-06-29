@@ -29,6 +29,8 @@ use Propal;
 use Dolipocket\Api\Trait\PaginatedListTrait;
 use Dolipocket\Api\Trait\SendEmailTrait;
 use Dolipocket\Api\Trait\PdfDownloadTrait;
+use Dolipocket\Api\Trait\DocumentContactTrait;
+use Dolipocket\Api\Trait\DocumentLinkTrait;
 use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
@@ -55,6 +57,8 @@ class ProposalController
     use PaginatedListTrait;
     use SendEmailTrait;
     use PdfDownloadTrait;
+    use DocumentContactTrait;
+    use DocumentLinkTrait;
 
     /**
      * Default ORDER BY (without the leading keyword) when no sort is requested.
@@ -411,7 +415,14 @@ class ProposalController
         }
         $propal->fetch_lines();
 
-        return [$this->mapper->exportMappedData($propal), 200];
+        $data = $this->mapper->exportMappedData($propal);
+        // Hydrate thirdparty name + email for the detail summary band + default
+        // email recipient (the mapper only publishes the raw socid).
+        $propal->fetch_thirdparty();
+        $data->socname = ($propal->thirdparty && !empty($propal->thirdparty->name)) ? $propal->thirdparty->name : '';
+        $data->socEmail = ($propal->thirdparty && !empty($propal->thirdparty->email)) ? $propal->thirdparty->email : '';
+
+        return [$data, 200];
     }
 
     /**
@@ -688,6 +699,162 @@ class ProposalController
         $propal->fetch($id);
         $propal->fetch_lines();
         return [$this->mapper->exportMappedData($propal), 200];
+    }
+
+    /**
+     * Set a validated proposal back to draft (status 0).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setDraft($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('propal', 'creer')) {
+            dol_syslog("DPK ProposalController::setDraft forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProposalController::setDraft missing id", LOG_WARNING);
+            return [['error' => 'Proposal id is required'], 400];
+        }
+
+        $propal = new Propal($db);
+        if ($propal->fetch($id) <= 0) {
+            dol_syslog("DPK ProposalController::setDraft not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Proposal not found'], 404];
+        }
+
+        $result = $propal->setDraft($user);
+        if ($result <= 0) {
+            dol_syslog("DPK ProposalController::setDraft setDraft() failed: " . $propal->error, LOG_ERR);
+            return [['error' => 'Failed to set proposal back to draft: ' . $propal->error], 500];
+        }
+
+        $propal->fetch($id);
+        $propal->fetch_lines();
+        return [$this->mapper->exportMappedData($propal), 200];
+    }
+
+    /**
+     * Classify a signed proposal as billed (status 4).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function classifyBilled($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('propal', 'creer')) {
+            dol_syslog("DPK ProposalController::classifyBilled forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProposalController::classifyBilled missing id", LOG_WARNING);
+            return [['error' => 'Proposal id is required'], 400];
+        }
+
+        $propal = new Propal($db);
+        if ($propal->fetch($id) <= 0) {
+            dol_syslog("DPK ProposalController::classifyBilled not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Proposal not found'], 404];
+        }
+
+        $result = $propal->classifyBilled($user);
+        if ($result <= 0) {
+            dol_syslog("DPK ProposalController::classifyBilled classifyBilled() failed: " . $propal->error, LOG_ERR);
+            return [['error' => 'Failed to classify proposal as billed: ' . $propal->error], 500];
+        }
+
+        $propal->fetch($id);
+        $propal->fetch_lines();
+        return [$this->mapper->exportMappedData($propal), 200];
+    }
+
+    /**
+     * Duplicate a proposal (Dolibarr createFromClone). Returns the new draft.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function cloneDocument($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('propal', 'creer')) {
+            dol_syslog("DPK ProposalController::cloneDocument forbidden user=" . $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProposalController::cloneDocument missing id", LOG_WARNING);
+            return [['error' => 'Proposal id is required'], 400];
+        }
+
+        $propal = new Propal($db);
+        if ($propal->fetch($id) <= 0) {
+            dol_syslog("DPK ProposalController::cloneDocument not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Proposal not found'], 404];
+        }
+
+        $newId = $propal->createFromClone($user);
+        if ($newId <= 0) {
+            dol_syslog("DPK ProposalController::cloneDocument createFromClone() failed: " . $propal->error, LOG_ERR);
+            return [['error' => 'Failed to clone proposal: ' . $propal->error], 500];
+        }
+
+        $clone = new Propal($db);
+        $clone->fetch($newId);
+        $clone->fetch_lines();
+        return [$this->mapper->exportMappedData($clone), 201];
+    }
+
+    /** Wiring for the shared DocumentContactTrait (Contacts/addresses tab). */
+    private function contactConfig()
+    {
+        return [
+            'class'         => '\\Propal',
+            'permGroup'     => 'propal',
+            'logTag'        => 'ProposalController',
+            'notFoundLabel' => 'Proposal',
+        ];
+    }
+
+    /** GET proposal/{id}/contacts -- linked contacts + available types. */
+    public function contacts($arr = null)
+    {
+        return $this->listContacts($arr, $this->contactConfig());
+    }
+
+    /** POST proposal/{id}/contact -- link a contact. */
+    public function contactAdd($arr = null)
+    {
+        return $this->addContact($arr, $this->contactConfig());
+    }
+
+    /** DELETE proposal/{id}/contact/{rowid} -- unlink a contact. */
+    public function contactRemove($arr = null)
+    {
+        return $this->removeContact($arr, $this->contactConfig());
+    }
+
+    /** GET proposal/{id}/links -- linked objects (document chain). */
+    public function links($arr = null)
+    {
+        return $this->listLinks($arr, $this->contactConfig());
+    }
+
+    /** DELETE proposal/{id}/link/{rowid} -- unlink a related object. */
+    public function linkRemove($arr = null)
+    {
+        return $this->removeLink($arr, $this->contactConfig());
     }
 
     /**

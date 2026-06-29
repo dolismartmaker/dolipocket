@@ -268,10 +268,33 @@ export const objectDescToFormSchema = (desc, options = {}) => {
         ...(Array.isArray(options.excludeKeys) ? options.excludeKeys : []),
     ]);
 
+    // Optional whitelist. When provided, only the listed keys (matched on the
+    // raw Dolibarr key or its camelCase form) survive -- everything else is
+    // dropped. Extrafields are always kept: their `options_*` keys are dynamic
+    // and cannot be enumerated in a static whitelist. This is the robust way to
+    // curate a Dolibarr object (~40 fields) down to the handful a user should
+    // actually edit (mirror the mapper's $writableFields), instead of a fragile
+    // blacklist that must chase every internal field (type, fk_facture_source,
+    // fk_user_closing, date_closing, ...).
+    const includeKeys = (Array.isArray(options.includeKeys) && options.includeKeys.length > 0)
+        ? new Set(options.includeKeys)
+        : null;
+
+    const isAllowed = (rawKey) => {
+        if (excludeKeys.has(rawKey) || excludeKeys.has(toAppKey(rawKey))) return false;
+        if (!includeKeys) return true;
+        if (includeKeys.has(rawKey) || includeKeys.has(toAppKey(rawKey))) return true;
+        const entry = desc[rawKey];
+        const isExtra = (entry && typeof entry === "object"
+            && (entry.is_extrafield === true || entry.is_extrafield === 1))
+            || isExtrafieldKey(rawKey);
+        return isExtra;
+    };
+
     // Iterate keys preserving insertion order, then re-sort by position.
     const fields = [];
     Object.keys(desc).forEach((rawKey) => {
-        if (excludeKeys.has(rawKey) || excludeKeys.has(toAppKey(rawKey))) return;
+        if (!isAllowed(rawKey)) return;
         const built = buildField(rawKey, desc[rawKey], options);
         if (built) fields.push(built);
     });

@@ -132,6 +132,107 @@ export const useDbProducts = () => {
             }
         },
 
+        // Read-only product extras (stock by warehouse, supplier purchase
+        // prices, multi price levels). Backend routes at the singular
+        // /product/{id}/... endpoints. Used by <ProductExtrasSection>.
+        getStock: async (id, { signal } = {}) => {
+            const data = await get(`product/${id}/stock`, { signal });
+            return data && typeof data === "object" ? data : { stockReel: 0, warehouses: [] };
+        },
+        getSuppliers: async (id, { signal } = {}) => {
+            const data = await get(`product/${id}/suppliers`, { signal });
+            return Array.isArray(data?.suppliers) ? data.suppliers : [];
+        },
+        getPrices: async (id, { signal } = {}) => {
+            const data = await get(`product/${id}/prices`, { signal });
+            return data && typeof data === "object" ? data : { multiEnabled: false, levels: [] };
+        },
+
+        // Tier A - A4 - price writing. Each returns the fresh read shape so the
+        // caller can refresh without a second request.
+        setPrice: async (id, { price, priceBaseType, vatTx, level, minPrice } = {}) => {
+            const json = {
+                price: Number(price),
+                price_base_type: priceBaseType === "TTC" ? "TTC" : "HT",
+                vat_tx: Number(vatTx ?? 0),
+            };
+            if (level !== undefined && level !== null && level !== "") json.level = Number(level);
+            if (minPrice !== undefined && minPrice !== null && minPrice !== "") json.min_price = Number(minPrice);
+            const data = await post(`product/${id}/price`, { json });
+            return data && typeof data === "object" ? data : { multiEnabled: false, levels: [] };
+        },
+
+        setSupplierPrice: async (id, { supplierId, refSupplier, qty, buyPrice, priceBaseType, vatTx } = {}) => {
+            const json = {
+                supplier_id: Number(supplierId),
+                ref_supplier: String(refSupplier ?? ""),
+                buy_price: Number(buyPrice),
+                price_base_type: priceBaseType === "TTC" ? "TTC" : "HT",
+                vat_tx: Number(vatTx ?? 0),
+            };
+            if (qty !== undefined && qty !== null && qty !== "" && Number(qty) > 0) json.qty = Number(qty);
+            const data = await post(`product/${id}/supplier-price`, { json });
+            return Array.isArray(data?.suppliers) ? data.suppliers : [];
+        },
+
+        deleteSupplierPrice: async (id, rowid) => {
+            await del(`product/${id}/supplier-price/${rowid}`);
+            // Re-read the list so the caller always gets a fresh, parsed shape.
+            const data = await get(`product/${id}/suppliers`);
+            return Array.isArray(data?.suppliers) ? data.suppliers : [];
+        },
+
+        // Tier A - A6a - product variants (read-through, no Dexie cache).
+        // Global attributes + their values; mutations return the fresh
+        // attributes array. Combinations are per parent product.
+        listAttributes: async ({ signal } = {}) => {
+            const data = await get("product/attributes", { signal });
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        addAttribute: async ({ ref, label } = {}) => {
+            const data = await post("product/attribute", { json: { ref: String(ref ?? ""), label: String(label ?? "") } });
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        updateAttribute: async (id, { ref, label } = {}) => {
+            const json = {};
+            if (ref !== undefined) json.ref = String(ref);
+            if (label !== undefined) json.label = String(label);
+            const data = await put(`product/attribute/${id}`, { json });
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        deleteAttribute: async (id) => {
+            await del(`product/attribute/${id}`);
+            const data = await get("product/attributes");
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        addAttributeValue: async (id, { ref, value } = {}) => {
+            const data = await post(`product/attribute/${id}/value`, { json: { ref: String(ref ?? ""), value: String(value ?? "") } });
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        deleteAttributeValue: async (id, valueId) => {
+            await del(`product/attribute/${id}/value/${valueId}`);
+            const data = await get("product/attributes");
+            return Array.isArray(data?.attributes) ? data.attributes : [];
+        },
+        getCombinations: async (id, { signal } = {}) => {
+            const data = await get(`product/${id}/combinations`, { signal });
+            return Array.isArray(data?.combinations) ? data.combinations : [];
+        },
+        addCombination: async (id, { pairs, priceVariation, weightVariation, priceVariationPercent, ref } = {}) => {
+            const json = { pairs: Array.isArray(pairs) ? pairs : [] };
+            if (priceVariation !== undefined && priceVariation !== null && priceVariation !== "") json.price_variation = Number(priceVariation);
+            if (weightVariation !== undefined && weightVariation !== null && weightVariation !== "") json.weight_variation = Number(weightVariation);
+            if (priceVariationPercent) json.price_variation_percent = 1;
+            if (ref !== undefined && ref !== null && ref !== "") json.ref = String(ref);
+            const data = await post(`product/${id}/combination`, { json });
+            return Array.isArray(data?.combinations) ? data.combinations : [];
+        },
+        removeCombination: async (id, rowid) => {
+            await del(`product/${id}/combination/${rowid}`);
+            const data = await get(`product/${id}/combinations`);
+            return Array.isArray(data?.combinations) ? data.combinations : [];
+        },
+
         cacheLocal: (item) => (store ? store.put(item) : Promise.resolve()),
         cacheList: (items) => (store ? store.bulkPut(items) : Promise.resolve()),
         readCache: async ({ q, type } = {}) => {

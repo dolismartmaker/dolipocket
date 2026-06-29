@@ -73,6 +73,17 @@ class HomeController
         $menu = $this->getMenu($user);
         $permissions = $this->getPermissions($user);
 
+        // Third-party module plugins (e.g. capmail). Discovered at runtime so
+        // the PWA built by `make pwa` stays plugin-agnostic: the server tells
+        // it what is installed here. Active module with a manifest -> its menu
+        // section + permissions + federated remote are advertised, the PWA
+        // loads the remote and mounts its routes. Absent module -> nothing.
+        list($pluginSections, $pluginPerms, $plugins) = $this->collectPlugins($user);
+        foreach ($pluginSections as $pluginSection) {
+            $menu[] = $pluginSection;
+        }
+        $permissions = array_merge($permissions, $pluginPerms);
+
         $ret = [
             'statusCode'  => 200,
             'generic_message' => "",
@@ -80,6 +91,7 @@ class HomeController
             'home'        => "",
             'menu'        => $menu,
             'permissions' => $permissions,
+            'plugins'     => $plugins,
             // Uncomment to return field metadata from DolibarrMapping
             // 'config' => $this->mapping ? $this->mapping->objectDesc() : null,
         ];
@@ -185,10 +197,28 @@ class HomeController
                         },
                     ),
                     array(
+                        'id'      => 'shipments',
+                        'label'   => $langs->transnoentities('DolipocketMenuShipments'),
+                        'icon'    => 'truck-fast',
+                        'route'   => '/shipments',
+                        'visible' => function ($u) {
+                            return (bool) $u->hasRight('expedition', 'lire');
+                        },
+                    ),
+                    array(
                         'id'      => 'invoices',
                         'label'   => $langs->transnoentities('DolipocketMenuInvoices'),
                         'icon'    => 'file-invoice',
                         'route'   => '/invoices',
+                        'visible' => function ($u) {
+                            return (bool) $u->hasRight('facture', 'lire');
+                        },
+                    ),
+                    array(
+                        'id'      => 'invoice-templates',
+                        'label'   => $langs->transnoentities('DolipocketMenuInvoiceTemplates'),
+                        'icon'    => 'repeat',
+                        'route'   => '/invoice-templates',
                         'visible' => function ($u) {
                             return (bool) $u->hasRight('facture', 'lire');
                         },
@@ -199,12 +229,30 @@ class HomeController
                 'title' => $langs->transnoentities('DolipocketMenuPurchase'),
                 'items' => array(
                     array(
+                        'id'      => 'supplier-proposals',
+                        'label'   => $langs->transnoentities('DolipocketMenuSupplierProposals'),
+                        'icon'    => 'comments-dollar',
+                        'route'   => '/supplier-proposals',
+                        'visible' => function ($u) {
+                            return (bool) $u->hasRight('supplier_proposal', 'lire');
+                        },
+                    ),
+                    array(
                         'id'      => 'supplier-orders',
                         'label'   => $langs->transnoentities('DolipocketMenuSupplierOrders'),
                         'icon'    => 'truck',
                         'route'   => '/supplier-orders',
                         'visible' => function ($u) {
                             return (bool) $u->hasRight('fournisseur', 'commande', 'lire');
+                        },
+                    ),
+                    array(
+                        'id'      => 'receptions',
+                        'label'   => $langs->transnoentities('DolipocketMenuReceptions'),
+                        'icon'    => 'truck-ramp-box',
+                        'route'   => '/receptions',
+                        'visible' => function ($u) {
+                            return (bool) $u->hasRight('reception', 'lire');
                         },
                     ),
                     array(
@@ -383,16 +431,40 @@ class HomeController
             'order.write'            => $can('commande', 'creer'),
             'order.delete'           => $can('commande', 'supprimer'),
 
+            // Customer shipments (Expedition). Tier A lot A1.
+            'shipment.read'          => $can('expedition', 'lire'),
+            'shipment.create'        => $can('expedition', 'creer'),
+            'shipment.write'         => $can('expedition', 'creer'),
+            'shipment.delete'        => $can('expedition', 'supprimer'),
+
             'invoice.read'           => $can('facture', 'lire'),
             'invoice.create'         => $can('facture', 'creer'),
             'invoice.write'          => $can('facture', 'creer'),
             'invoice.delete'         => $can('facture', 'supprimer'),
+
+            // Recurring invoice templates (FactureRec). Tier A lot A5b.
+            'invoicerec.read'        => $can('facture', 'lire'),
+            'invoicerec.create'      => $can('facture', 'creer'),
+            'invoicerec.write'       => $can('facture', 'creer'),
+            'invoicerec.delete'      => $can('facture', 'supprimer'),
 
             // Purchase cycle (Dolibarr nests rights under fournisseur).
             'supplierorder.read'     => $can('fournisseur', 'commande', 'lire'),
             'supplierorder.create'   => $can('fournisseur', 'commande', 'creer'),
             'supplierorder.write'    => $can('fournisseur', 'commande', 'creer'),
             'supplierorder.delete'   => $can('fournisseur', 'commande', 'supprimer'),
+
+            // Supplier receptions (Reception). Tier A lot A2.
+            'reception.read'         => $can('reception', 'lire'),
+            'reception.create'       => $can('reception', 'creer'),
+            'reception.write'        => $can('reception', 'creer'),
+            'reception.delete'       => $can('reception', 'supprimer'),
+
+            // Supplier price requests (SupplierProposal). Tier A lot A3.
+            'supplierproposal.read'   => $can('supplier_proposal', 'lire'),
+            'supplierproposal.create' => $can('supplier_proposal', 'creer'),
+            'supplierproposal.write'  => $can('supplier_proposal', 'creer'),
+            'supplierproposal.delete' => $can('supplier_proposal', 'supprimer'),
 
             'supplierinvoice.read'   => $can('fournisseur', 'facture', 'lire'),
             'supplierinvoice.create' => $can('fournisseur', 'facture', 'creer'),
@@ -409,5 +481,113 @@ class HomeController
             // to show or hide a "settings" tile based on this value.
             'admin'                  => $isAdmin,
         );
+    }
+
+    /**
+     * Discover third-party module plugins exposing a dolipocket integration
+     * manifest, and turn them into menu sections + permissions + federated
+     * remote coordinates for the GET /home payload.
+     *
+     * A plugin = an ACTIVE Dolibarr module shipping
+     * <module>/integrations/dolipocket/register.php (a pure array). The PWA is
+     * built once by `make pwa` and stays plugin-agnostic; THIS is where the
+     * server advertises what is installed. The PWA then loads the federated
+     * remote and mounts its routes. Inactive/absent module -> nothing.
+     *
+     * dolipocket owns the URL + permission resolution: the manifest only
+     * DECLARES coordinates and which Dolibarr right each permission maps to.
+     *
+     * @param   \User  $user  Current user, rights loaded
+     * @return  array         [sections[], permissions{}, plugins[]]
+     */
+    private function collectPlugins($user)
+    {
+        global $langs;
+
+        // Extensible list of modules that may ship a dolipocket plugin.
+        $candidateModules = array('capmail');
+        $isAdmin = ((int) $user->admin === 1);
+
+        $sections = array();
+        $perms = array();
+        $plugins = array();
+
+        foreach ($candidateModules as $mod) {
+            if (!isModEnabled($mod)) {
+                continue;
+            }
+            $registerFile = dol_buildpath('/'.$mod.'/integrations/dolipocket/register.php', 0);
+            if (!is_file($registerFile)) {
+                dol_syslog("DPK collectPlugins: ".$mod." active but register.php missing", LOG_WARNING);
+                continue;
+            }
+            $manifest = include $registerFile;
+            if (!is_array($manifest) || empty($manifest['frontend']['remoteEntryPath'])) {
+                dol_syslog("DPK collectPlugins: ".$mod." manifest invalid", LOG_WARNING);
+                continue;
+            }
+
+            // Resolve this plugin's permissions against the current user.
+            $pluginPerms = array();
+            if (!empty($manifest['permissionsMap']) && is_array($manifest['permissionsMap'])) {
+                foreach ($manifest['permissionsMap'] as $key => $right) {
+                    if ($isAdmin) {
+                        $pluginPerms[$key] = true;
+                        continue;
+                    }
+                    $a = array_pad((array) $right, 4, '');
+                    $pluginPerms[$key] = (bool) $user->hasRight($a[0], $a[1], $a[2], $a[3]);
+                }
+            }
+            $perms = array_merge($perms, $pluginPerms);
+
+            // Load the plugin lang file so its menu labels translate.
+            $langs->load($mod.'@'.$mod);
+
+            // Menu section, items gated by their declared perm.
+            if (!empty($manifest['menu']['items']) && is_array($manifest['menu']['items'])) {
+                $items = array();
+                foreach ($manifest['menu']['items'] as $it) {
+                    $perm = isset($it['perm']) ? $it['perm'] : null;
+                    $allowed = $isAdmin || $perm === null || !empty($pluginPerms[$perm]);
+                    if (!$allowed) {
+                        continue;
+                    }
+                    $items[] = array(
+                        'id'    => $it['id'],
+                        'label' => $langs->transnoentities($it['label']),
+                        'icon'  => $it['icon'],
+                        'route' => $it['route'],
+                    );
+                }
+                if (!empty($items)) {
+                    $title = !empty($manifest['menu']['sectionTitle'])
+                        ? $langs->transnoentities($manifest['menu']['sectionTitle'])
+                        : $mod;
+                    $sections[] = array('title' => $title, 'items' => $items);
+                }
+            }
+
+            // Federated remote coordinates. The remoteEntry is served through
+            // the PWA-local proxy (pwa/plugin.php) rather than /custom/<mod>/...:
+            // the PWA is often a vhost rooted at pwa/, which cannot reach the
+            // module dir. The proxy is a sibling of api.php, same origin (no
+            // CORS), and the URL is RELATIVE so it resolves under the PWA base
+            // wherever it is served. The remote's relative chunk imports
+            // (./assets/...) keep working because the proxy preserves the path
+            // via PATH_INFO. The frontend resolves this to an absolute URL.
+            $fe = $manifest['frontend'];
+            $plugins[] = array(
+                'id'          => isset($manifest['plugin']) ? $manifest['plugin'] : $mod,
+                'version'     => isset($manifest['version']) ? $manifest['version'] : '0',
+                'remoteEntry' => 'plugin.php/'.$mod.'/'.basename($fe['remoteEntryPath']),
+                'scope'       => $fe['scope'],
+                'module'      => $fe['module'],
+                'routes'      => isset($fe['routes']) ? $fe['routes'] : array(),
+            );
+            dol_syslog("DPK collectPlugins: ".$mod." advertised");
+        }
+
+        return array($sections, $perms, $plugins);
     }
 }

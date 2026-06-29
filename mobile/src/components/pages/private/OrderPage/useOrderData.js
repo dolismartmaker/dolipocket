@@ -7,6 +7,7 @@ import { useStates, useConfirm } from "@cap-rel/smartcommon";
 import { useDbOrders } from "src/db/stores/orders/useDbOrders";
 import { useDbInvoices } from "src/db/stores/invoices/useDbInvoices";
 import { downloadBlob, filenameFromContentDisposition } from "src/lib/utils/downloadBlob";
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
 
 // Shared data layer for OrderPage (mobile + desktop). Holds the order
 // fetch, the workflow actions (validate / convertToInvoice / delete) and
@@ -114,6 +115,113 @@ export const useOrderData = (overrideId) => {
         }
     };
 
+    // Workflow transitions available while the order is validated (statut 1).
+    const handleSetDraft = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Repasser en brouillon ?",
+            message: "La commande redeviendra librement modifiable.",
+            confirmText: "Repasser en brouillon",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbOrders.setDraft(id);
+            set("order", data);
+        } catch (err) {
+            console.error("dbOrders.setDraft error", err);
+            set("error", "Erreur lors du retour en brouillon");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    const handleClassifyBilled = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Classer facturée ?",
+            message: "La commande sera marquée comme facturée.",
+            confirmText: "Classer facturée",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbOrders.classifyBilled(id);
+            set("order", data);
+        } catch (err) {
+            console.error("dbOrders.classifyBilled error", err);
+            set("error", "Erreur lors du classement en facturée");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    const handleCloseOrder = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Classer livrée ?",
+            message: "La commande sera classée livrée.",
+            confirmText: "Classer livrée",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbOrders.closeOrder(id);
+            set("order", data);
+        } catch (err) {
+            console.error("dbOrders.closeOrder error", err);
+            set("error", "Erreur lors du classement en livrée");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    const handleCancelOrder = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Annuler la commande ?",
+            message: "La commande sera annulée.",
+            confirmText: "Annuler la commande",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbOrders.cancel(id);
+            set("order", data);
+        } catch (err) {
+            console.error("dbOrders.cancel error", err);
+            set("error", "Erreur lors de l'annulation de la commande");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    // Duplicate the current order into a fresh draft, then navigate to it.
+    const handleClone = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Dupliquer cette commande ?",
+            message: "Une nouvelle commande brouillon sera créée à partir de celle-ci.",
+            confirmText: "Dupliquer",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbOrders.clone(id);
+            if (data?.id) navigate(`/orders/${data.id}`);
+        } catch (err) {
+            console.error("dbOrders.clone error", err);
+            set("error", "Erreur lors de la duplication");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
     const handleConvertToInvoice = async () => {
         const ok = await confirm({
             type: "info",
@@ -184,7 +292,7 @@ export const useOrderData = (overrideId) => {
             } else if (status === 410) {
                 toast.error("Le fichier PDF n'existe plus. Régénérez-le.");
             } else if (status === 403) {
-                toast.error("Accès refusé.");
+                notifyAccessDenied(err);
             } else {
                 toast.error("Erreur lors du téléchargement du PDF");
             }
@@ -201,17 +309,20 @@ export const useOrderData = (overrideId) => {
 
     const goEdit = () => navigate(`/orders/${id}/edit`);
     const goBack = () => navigate("/orders");
+    // Tier A - A1: jump to the "create shipment from this order" flow.
+    const goShip = () => navigate(`/orders/${id}/ship`);
 
     return {
         id,
         order, loading, error, actionPending,
         isDraft: order?.statut === 0,
         isValidated: order?.statut === 1 || order?.statut === 2,
-        handleValidate, handleDelete, handleConvertToInvoice,
+        handleValidate, handleDelete, handleConvertToInvoice, handleClone,
+        handleSetDraft, handleClassifyBilled, handleCloseOrder, handleCancelOrder,
         handleGeneratePdf,
         handleDownloadPdf,
         hasLastMainDoc: !!(order?.lastMainDoc),
-        goEdit, goBack,
+        goEdit, goBack, goShip,
         dataSource: dbOrders,
         // Expose a setter so the embedded DocumentLinesEditor can refresh
         // the order state after addLine/updateLine/deleteLine.

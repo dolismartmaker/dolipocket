@@ -6,6 +6,7 @@ import { useStates, useConfirm } from "@cap-rel/smartcommon";
 
 import { useDbSupplierInvoices } from "src/db/stores/supplierInvoices/useDbSupplierInvoices";
 import { downloadBlob, filenameFromContentDisposition } from "src/lib/utils/downloadBlob";
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
 
 // Shared data layer for SupplierInvoicePage (mobile + desktop). Mirrors
 // useInvoiceData / useSupplierOrderData patterns.
@@ -98,6 +99,94 @@ export const useSupplierInvoiceData = (overrideId) => {
         }
     };
 
+    // Status transition: validated (1) -> draft (0).
+    const handleSetDraft = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Repasser en brouillon ?",
+            message: "La facture fournisseur redeviendra librement modifiable.",
+            confirmText: "Repasser en brouillon",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSI.setDraft(id);
+            set("invoice", data);
+        } catch (err) {
+            console.error("dbSI.setDraft error", err);
+            set("error", "Erreur lors du retour en brouillon");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    // Status transition: validated (1) -> paid (2).
+    const handleSetPaid = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Classer payée ?",
+            message: "La facture sera classée payée.",
+            confirmText: "Classer payée",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSI.setPaid(id);
+            set("invoice", data);
+        } catch (err) {
+            console.error("dbSI.setPaid error", err);
+            set("error", "Erreur lors du classement payée");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    // Status transition: paid (2) -> unpaid/validated (1).
+    const handleSetUnpaid = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Repasser en impayée ?",
+            message: "La facture repassera en impayée.",
+            confirmText: "Repasser en impayée",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSI.setUnpaid(id);
+            set("invoice", data);
+        } catch (err) {
+            console.error("dbSI.setUnpaid error", err);
+            set("error", "Erreur lors du retour en impayée");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    // Duplicate the supplier invoice into a fresh draft and navigate to it.
+    const handleClone = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Dupliquer cette facture fournisseur ?",
+            message: "Une nouvelle facture fournisseur brouillon sera créée à partir de celle-ci.",
+            confirmText: "Dupliquer",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSI.clone(id);
+            if (data?.id) navigate(`/supplier-invoices/${data.id}`);
+        } catch (err) {
+            console.error("supplierInvoice.clone error", err);
+            set("error", "Erreur lors de la duplication");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
     const handleDelete = async () => {
         const ok = await confirm({
             type: "delete",
@@ -163,7 +252,7 @@ export const useSupplierInvoiceData = (overrideId) => {
             } else if (status === 410) {
                 toast.error("Le fichier PDF n'existe plus. Régénérez-le.");
             } else if (status === 403) {
-                toast.error("Accès refusé.");
+                notifyAccessDenied(err);
             } else {
                 toast.error("Erreur lors du téléchargement du PDF");
             }
@@ -204,8 +293,9 @@ export const useSupplierInvoiceData = (overrideId) => {
         invoice, loading, error, actionPending,
         statut,
         isDraft: statut === 0,
+        isValidated: statut === 1,
         isPaid,
-        handleValidate, handleDelete,
+        handleValidate, handleSetDraft, handleSetPaid, handleSetUnpaid, handleClone, handleDelete,
         handleGeneratePdf,
         handleDownloadPdf,
         hasLastMainDoc: !!(invoice?.lastMainDoc),

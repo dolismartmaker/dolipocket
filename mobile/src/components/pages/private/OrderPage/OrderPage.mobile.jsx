@@ -1,4 +1,4 @@
-import { FaArrowLeft, FaTrash, FaPen, FaCheck } from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaFileInvoiceDollar, FaTruck, FaBan, FaCopy } from "react-icons/fa";
 
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
@@ -15,7 +15,8 @@ export const OrderPageMobile = (props) => {
     const {
         order, loading, error, actionPending,
         isDraft, isValidated,
-        handleValidate, handleDelete, handleConvertToInvoice,
+        handleValidate, handleDelete, handleConvertToInvoice, handleClone,
+        handleSetDraft, handleClassifyBilled, handleCloseOrder, handleCancelOrder,
         goEdit, goBack,
         dataSource, setOrder,
     } = props;
@@ -122,6 +123,54 @@ export const OrderPageMobile = (props) => {
                                 Créer une facture
                             </Button>
                         )}
+                        {isValidated && (
+                            <Button
+                                onClick={handleSetDraft}
+                                icon={FaUndo}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Repasser en brouillon
+                            </Button>
+                        )}
+                        {isValidated && (
+                            <Button
+                                onClick={handleCloseOrder}
+                                icon={FaTruck}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Classer livrée
+                            </Button>
+                        )}
+                        {isValidated && (
+                            <Button
+                                onClick={handleClassifyBilled}
+                                icon={FaFileInvoiceDollar}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Classer facturée
+                            </Button>
+                        )}
+                        {isValidated && (
+                            <Button
+                                onClick={handleCancelOrder}
+                                icon={FaBan}
+                                buttonProps={{ className: "p-3 rounded-lg bg-red-600 text-white" }}
+                                disabled={actionPending}
+                            >
+                                Annuler la commande
+                            </Button>
+                        )}
+                        <Button
+                            onClick={handleClone}
+                            icon={FaCopy}
+                            buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                            disabled={actionPending}
+                        >
+                            Dupliquer
+                        </Button>
                         <Button
                             onClick={handleDelete}
                             icon={FaTrash}

@@ -72,7 +72,7 @@ export const WarehouseEditPageDesktop = ({
 
                     {loading ? (
                         <div className="rounded-md border border-soft-border bg-white p-4 text-sm text-soft-text">
-                            Chargement de l'entrepôt...
+                            Chargement de l&apos;entrepôt...
                         </div>
                     ) : (
                         <AutoForm

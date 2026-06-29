@@ -6,6 +6,7 @@ import {
 import toast from "react-hot-toast";
 
 import { useDbDocuments } from "src/db/stores/documents/useDbDocuments";
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
 import {
     downloadBlob, filenameFromContentDisposition,
 } from "src/lib/utils/downloadBlob";
@@ -93,7 +94,7 @@ export const DocumentsSection = ({
             } else if (status === 410) {
                 toast.error("Le fichier n'existe plus sur le serveur.");
             } else if (status === 403) {
-                toast.error("Accès refusé.");
+                notifyAccessDenied(err);
             } else {
                 toast.error("Erreur lors du téléchargement");
             }

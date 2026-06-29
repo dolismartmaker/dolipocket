@@ -1,108 +1,96 @@
 // Mapping backend (Dolibarr CommandeFournisseur) <-> front (Dolipocket UI).
 //
-// Reference for the conventions: ~/docs/PWA-GUIDELINES.md section 5.
-// - mapFromBackend(raw): server payload -> normalised local object stored in Dexie.
-// - mapToBackend(local): local object -> payload accepted by the smartmaker API.
+// Standard A (cf ~/docs/PWA-GUIDELINES.md section 13) : la correspondance des
+// champs est declaree UNE fois dans un schema `Mapping` smartcommon, qui derive
+// les deux sens. Les options utilisees ici :
+//   - type      : coercition declarative (remplace les toInt/toFloat/toStr)
+//   - default   : shape de sortie stable et complete (lecture ET ecriture)
+//   - aliases   : lecture multi-source (id <- id|rowid, socid <- socid|fk_soc)
+//   - writeFrom : fallback a l'ecriture sur une autre cle FRONT (socid <- fkSoc)
+//   - readOnly  : champ lu mais jamais renvoye au serveur (id, ref, totaux,
+//                 statut, dates calculees, lignes du header, ...)
+//   - items     : mappe chaque element du tableau `lines` (lecture seule ici)
 //
-// Both functions are pure: no HTTP, no Dexie, no global state.
-// Lines have their own pair of mappers because the backend exposes them as a
-// nested array under the header object (raw.lines).
+// On conserve mapFromBackend/mapToBackend/mapLineFromBackend/mapLineToBackend
+// comme interface publique (les hooks useDb<Feature> les consomment) ;
+// supplierOrderMapping et supplierOrderLineMapping exposent les schemas.
 
-const toInt = (value, fallback = 0) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+import { Mapping } from "@cap-rel/smartcommon";
+
+// Lignes du document. id / fk_commande / total_* sont lus mais jamais reecrits
+// (absents de l'ancien mapLineToBackend).
+const lineSchema = {
+    id:             { key: "id",            type: "int",    default: 0, aliases: ["rowid"], readOnly: true },
+    fk_commande:    { key: "fkCommande",    type: "int",    default: 0, readOnly: true },
+    fk_product:     { key: "fkProduct",     type: "int",    default: 0 },
+    ref:            { key: "ref",           type: "string", default: "" },
+    label:          { key: "label",         type: "string", default: "" },
+    description:    { key: "description",   type: "string", default: "" },
+    qty:            { key: "qty",           type: "float",  default: 0 },
+    tva_tx:         { key: "tvaTx",         type: "float",  default: 0 },
+    subprice:       { key: "subprice",      type: "float",  default: 0 },
+    remise_percent: { key: "remisePercent", type: "float",  default: 0 },
+    total_ht:       { key: "totalHt",       type: "float",  default: 0, readOnly: true },
+    total_ttc:      { key: "totalTtc",      type: "float",  default: 0, readOnly: true },
+    rang:           { key: "rang",          type: "int",    default: 0 },
+    product_type:   { key: "productType",   type: "int",    default: 0 },
+    // Section lines : product_type=9 + special_code=0 -> titre,
+    // product_type=9 + special_code=104 -> sous-total.
+    special_code:   { key: "specialCode",   type: "int",    default: 0 },
 };
 
-const toFloat = (value, fallback = 0) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? n : fallback;
+export const supplierOrderLineMapping = new Mapping({ schema: lineSchema, strict: true });
+
+const schema = {
+    id:                { key: "id",              type: "int",    default: 0, aliases: ["rowid"], readOnly: true },
+    ref:               { key: "ref",             type: "string", default: "", readOnly: true },
+    ref_supplier:      { key: "refSupplier",     type: "string", default: "" },
+    // socid est lu (socid|fk_soc) ET reecrit (avec fallback front fkSoc).
+    // fk_soc / fkSoc est lu (fk_soc|socid) mais jamais reecrit : l'ancien
+    // mapToBackend n'emettait que la cle serveur `socid`.
+    socid:             { key: "socid",           type: "int",    default: 0, aliases: ["fk_soc"], writeFrom: ["fkSoc"] },
+    fk_soc:            { key: "fkSoc",           type: "int",    default: 0, aliases: ["socid"], readOnly: true },
+    fk_user_author:    { key: "fkUserAuthor",    type: "int",    default: 0, readOnly: true },
+    date_commande:     { key: "dateCommande",    type: "int",    default: 0 },
+    date_livraison:    { key: "dateLivraison",   type: "int",    default: 0 },
+    total_ht:          { key: "totalHt",         type: "float",  default: 0, readOnly: true },
+    total_ttc:         { key: "totalTtc",        type: "float",  default: 0, readOnly: true },
+    total_tva:         { key: "totalTva",        type: "float",  default: 0, readOnly: true },
+    statut:            { key: "statut",          type: "int",    default: 0, readOnly: true },
+    note_public:       { key: "notePublic",      type: "string", default: "" },
+    note_private:      { key: "notePrivate",     type: "string", default: "" },
+    fk_cond_reglement: { key: "fkCondReglement", type: "int",    default: 0 },
+    fk_mode_reglement: { key: "fkModeReglement", type: "int",    default: 0 },
+    thirdparty_name:   { key: "thirdpartyName",  type: "string", default: "", readOnly: true },
+    // Last generated PDF (relative path under DOL_DATA_ROOT), affiche par l'UI.
+    last_main_doc:     { key: "lastMainDoc",     type: "string", default: "", readOnly: true },
+    socname:           { key: "socname",         type: "string", default: "", readOnly: true },
+    socEmail:          { key: "socEmail",        type: "string", default: "", readOnly: true },
+    // Lignes : lues via le line schema. A l'ecriture, l'ancien mapToBackend
+    // n'emettait `lines` QUE si c'etait un tableau (flux create d'une commande
+    // avec ses lignes en une action) -> omitEmpty (conditionnel, pas de backfill).
+    lines:             { key: "lines",           default: [],    items: lineSchema, omitEmpty: true },
+    tms:               { key: "updatedAt",       type: "int",    default: 0, readOnly: true },
 };
 
-const toStr = (value) => (value === undefined || value === null ? "" : String(value));
+export const supplierOrderMapping = new Mapping({ schema, strict: true });
 
 export const mapLineFromBackend = (raw) => {
     if (!raw || typeof raw !== "object") return null;
-    return {
-        id: toInt(raw.id ?? raw.rowid),
-        fkCommande: toInt(raw.fk_commande),
-        fkProduct: toInt(raw.fk_product),
-        ref: toStr(raw.ref),
-        label: toStr(raw.label),
-        description: toStr(raw.description),
-        qty: toFloat(raw.qty),
-        tvaTx: toFloat(raw.tva_tx),
-        subprice: toFloat(raw.subprice),
-        remisePercent: toFloat(raw.remise_percent),
-        totalHt: toFloat(raw.total_ht),
-        totalTtc: toFloat(raw.total_ttc),
-        rang: toInt(raw.rang),
-        productType: toInt(raw.product_type),
-        // Section lines (Lot 11). product_type=9 + special_code=0 -> title,
-        // product_type=9 + special_code=104 -> sub-total.
-        specialCode: toInt(raw.special_code),
-    };
+    return supplierOrderLineMapping.map(raw);
 };
 
 export const mapLineToBackend = (local) => {
     if (!local || typeof local !== "object") return {};
-    return {
-        fk_product: toInt(local.fkProduct),
-        ref: toStr(local.ref),
-        label: toStr(local.label),
-        description: toStr(local.description),
-        qty: toFloat(local.qty),
-        tva_tx: toFloat(local.tvaTx),
-        subprice: toFloat(local.subprice),
-        remise_percent: toFloat(local.remisePercent),
-        rang: toInt(local.rang),
-        product_type: toInt(local.productType),
-        // Section lines (Lot 11).
-        special_code: toInt(local.specialCode),
-    };
+    return supplierOrderLineMapping.reverse(local);
 };
 
 export const mapFromBackend = (raw) => {
     if (!raw || typeof raw !== "object") return null;
-    const linesRaw = Array.isArray(raw.lines) ? raw.lines : [];
-    return {
-        id: toInt(raw.id ?? raw.rowid),
-        ref: toStr(raw.ref),
-        refSupplier: toStr(raw.ref_supplier),
-        socid: toInt(raw.socid ?? raw.fk_soc),
-        fkSoc: toInt(raw.fk_soc ?? raw.socid),
-        fkUserAuthor: toInt(raw.fk_user_author),
-        dateCommande: toInt(raw.date_commande),
-        dateLivraison: toInt(raw.date_livraison),
-        totalHt: toFloat(raw.total_ht),
-        totalTtc: toFloat(raw.total_ttc),
-        totalTva: toFloat(raw.total_tva),
-        statut: toInt(raw.statut),
-        notePublic: toStr(raw.note_public),
-        notePrivate: toStr(raw.note_private),
-        fkCondReglement: toInt(raw.fk_cond_reglement),
-        fkModeReglement: toInt(raw.fk_mode_reglement),
-        thirdpartyName: toStr(raw.thirdparty_name),
-        // Last generated PDF (relative path under DOL_DATA_ROOT).
-        lastMainDoc: toStr(raw.last_main_doc),
-        lines: linesRaw.map(mapLineFromBackend).filter(Boolean),
-        updatedAt: toInt(raw.tms),
-    };
+    return supplierOrderMapping.map(raw);
 };
 
 export const mapToBackend = (local) => {
     if (!local || typeof local !== "object") return {};
-    const payload = {
-        socid: toInt(local.socid ?? local.fkSoc),
-        ref_supplier: toStr(local.refSupplier),
-        date_commande: toInt(local.dateCommande),
-        date_livraison: toInt(local.dateLivraison),
-        note_public: toStr(local.notePublic),
-        note_private: toStr(local.notePrivate),
-        fk_cond_reglement: toInt(local.fkCondReglement),
-        fk_mode_reglement: toInt(local.fkModeReglement),
-    };
-    if (Array.isArray(local.lines)) {
-        payload.lines = local.lines.map(mapLineToBackend);
-    }
-    return payload;
+    return supplierOrderMapping.reverse(local);
 };

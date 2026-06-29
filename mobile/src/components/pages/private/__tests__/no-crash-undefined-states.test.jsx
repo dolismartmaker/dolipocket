@@ -24,6 +24,10 @@ const Wrapper = ({ children }) => <>{children}</>;
 // Mock: @cap-rel/smartcommon
 // ---------------------------------------------------------------------------
 vi.mock("@cap-rel/smartcommon", () => ({
+    // Mappers constructed at module load do `new Mapping({ schema })`; a minimal
+    // stub is enough for these render-only smoke tests (they never invoke the
+    // map/reverse logic -- useApi is stubbed out).
+    Mapping: class { map(d) { return d; } reverse(d) { return d; } },
     Page: Wrapper,
     Block: Wrapper,
     Input: () => <input />,

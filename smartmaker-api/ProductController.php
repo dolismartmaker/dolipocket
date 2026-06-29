@@ -588,6 +588,865 @@ class ProductController
     }
 
     /**
+     * GET product/{id}/stock -- physical stock per warehouse (read only).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function stock($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::stock forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::stock missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::stock not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $product->load_stock();
+
+        require_once DOL_DOCUMENT_ROOT . '/product/stock/class/entrepot.class.php';
+        $warehouses = array();
+        if (is_array($product->stock_warehouse)) {
+            foreach ($product->stock_warehouse as $whId => $sw) {
+                $label = '';
+                $wh = new \Entrepot($db);
+                if ($wh->fetch((int) $whId) > 0) {
+                    $label = $wh->label;
+                }
+                $warehouses[] = array(
+                    'warehouseId' => (int) $whId,
+                    'label'       => $label,
+                    'real'        => isset($sw->real) ? (float) $sw->real : 0,
+                );
+            }
+        }
+
+        return [array(
+            'stockReel'  => (float) $product->stock_reel,
+            'warehouses' => $warehouses,
+        ), 200];
+    }
+
+    /**
+     * GET product/{id}/suppliers -- supplier purchase prices (read only).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function suppliers($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::suppliers forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::suppliers missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::suppliers not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
+        $pf = new \ProductFournisseur($db);
+        $rows = $pf->list_product_fournisseur_price($id);
+        $suppliers = array();
+        if (is_array($rows)) {
+            foreach ($rows as $r) {
+                $suppliers[] = array(
+                    'id'           => isset($r->product_fourn_price_id) ? (int) $r->product_fourn_price_id : 0,
+                    'supplierId'   => isset($r->fourn_id) ? (int) $r->fourn_id : 0,
+                    'supplierName' => isset($r->fourn_name) ? $r->fourn_name : '',
+                    'ref'          => isset($r->fourn_ref) ? $r->fourn_ref : '',
+                    'qty'          => isset($r->fourn_qty) ? (float) $r->fourn_qty : 0,
+                    'price'        => isset($r->fourn_price) ? (float) $r->fourn_price : 0,
+                    'unitPrice'    => isset($r->fourn_unitprice) ? (float) $r->fourn_unitprice : 0,
+                );
+            }
+        }
+
+        return [['suppliers' => $suppliers], 200];
+    }
+
+    /**
+     * GET product/{id}/prices -- base price + customer multiprice levels (read).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function prices($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::prices forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::prices missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::prices not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $multiEnabled = !empty($conf->global->PRODUIT_MULTIPRICES);
+        $levels = array();
+        if ($multiEnabled && is_array($product->multiprices)) {
+            $limit = (int) getDolGlobalString('PRODUIT_MULTIPRICES_LIMIT', '5');
+            for ($l = 1; $l <= $limit; $l++) {
+                if (!isset($product->multiprices[$l])) {
+                    continue;
+                }
+                $levels[] = array(
+                    'level'    => $l,
+                    'priceHt'  => (float) $product->multiprices[$l],
+                    'priceTtc' => isset($product->multiprices_ttc[$l]) ? (float) $product->multiprices_ttc[$l] : 0,
+                    'tvaTx'    => isset($product->multiprices_tva_tx[$l]) ? (float) $product->multiprices_tva_tx[$l] : 0,
+                );
+            }
+        }
+
+        return [array(
+            'multiEnabled'  => $multiEnabled,
+            'priceHt'       => (float) $product->price,
+            'priceTtc'      => (float) $product->price_ttc,
+            'tvaTx'         => (float) $product->tva_tx,
+            'priceBaseType' => $product->price_base_type,
+            'levels'        => $levels,
+        ), 200];
+    }
+
+    /**
+     * POST product/{id}/price -- set the customer selling price (base or a
+     * multiprice level). Tier A lot A4.
+     *
+     * Body:
+     *   - price            (float, required)  the price value
+     *   - price_base_type  ('HT'|'TTC')       how `price` is expressed (default HT)
+     *   - vat_tx           (float, required)  VAT rate (decimal, e.g. 20)
+     *   - level            (int, optional)    multiprice level (1..N). Defaults
+     *                       to 1 (base price). Forced to 1 when PRODUIT_MULTIPRICES
+     *                       is disabled; a level > 1 needs that option enabled.
+     *   - min_price        (float, optional)  minimum selling price (default 0)
+     *
+     * Faithful to product/price.php: Product::updatePrice() handles the TTC->HT
+     * conversion itself, so price_base_type MUST match how `price` is expressed.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setPrice($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::setPrice forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::setPrice missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+        if (!isset($arr['price']) || $arr['price'] === '') {
+            dol_syslog("DPK ProductController::setPrice missing price", LOG_WARNING);
+            return [['error' => 'price is required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::setPrice not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $price = (float) $arr['price'];
+        $priceBaseType = (isset($arr['price_base_type']) && strtoupper((string) $arr['price_base_type']) === 'TTC') ? 'TTC' : 'HT';
+        $vatTx = isset($arr['vat_tx']) ? (string) $arr['vat_tx'] : (string) $product->tva_tx;
+        $minPrice = isset($arr['min_price']) ? (float) $arr['min_price'] : 0;
+
+        // Resolve the price level. Without PRODUIT_MULTIPRICES there is a single
+        // level (1 = base price). With it, accept 1..limit.
+        $multiEnabled = !empty($conf->global->PRODUIT_MULTIPRICES);
+        $level = isset($arr['level']) ? (int) $arr['level'] : 1;
+        if ($level < 1) {
+            $level = 1;
+        }
+        if (!$multiEnabled) {
+            $level = 1;
+        } else {
+            $limit = (int) getDolGlobalString('PRODUIT_MULTIPRICES_LIMIT', '5');
+            if ($level > $limit) {
+                dol_syslog("DPK ProductController::setPrice level " . $level . " above limit " . $limit, LOG_WARNING);
+                return [['error' => 'Price level above the configured multiprice limit'], 400];
+            }
+        }
+
+        $res = $product->updatePrice($price, $priceBaseType, $user, $vatTx, $minPrice, $level);
+        if ($res <= 0) {
+            $reason = $product->error !== '' ? $product->error : 'Failed to update price';
+            dol_syslog("DPK ProductController::setPrice updatePrice() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to update price: ' . $reason], 500];
+        }
+
+        // Return the fresh price block (re-reads the product).
+        return $this->prices(['id' => $id]);
+    }
+
+    /**
+     * POST product/{id}/supplier-price -- create or update a supplier purchase
+     * price. Tier A lot A4.
+     *
+     * Body:
+     *   - supplier_id      (int, required)
+     *   - ref_supplier     (string, required) supplier product reference
+     *   - qty              (float, optional)  quantity bracket (default 1)
+     *   - buy_price        (float, required)  purchase price for `qty`
+     *   - price_base_type  ('HT'|'TTC')       default HT
+     *   - vat_tx           (float, optional)  VAT rate (default 0)
+     *
+     * Faithful to product/fournisseurs.php: add_fournisseur() ensures the
+     * (supplier, ref, qty) row exists (and sets product_fourn_price_id), then
+     * update_buyprice() fills the price. The unique key is (fk_soc, ref_fourn,
+     * quantity); changing qty creates a separate bracket.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function setSupplierPrice($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::setSupplierPrice forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $supplierId = isset($arr['supplier_id']) ? (int) $arr['supplier_id'] : 0;
+        $refSupplier = isset($arr['ref_supplier']) ? trim((string) $arr['ref_supplier']) : '';
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::setSupplierPrice missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+        if ($supplierId <= 0 || $refSupplier === '') {
+            dol_syslog("DPK ProductController::setSupplierPrice missing supplier_id or ref_supplier", LOG_WARNING);
+            return [['error' => 'supplier_id and ref_supplier are required'], 400];
+        }
+        if (!isset($arr['buy_price']) || $arr['buy_price'] === '') {
+            dol_syslog("DPK ProductController::setSupplierPrice missing buy_price", LOG_WARNING);
+            return [['error' => 'buy_price is required'], 400];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+
+        $pf = new \ProductFournisseur($db);
+        if ($pf->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::setSupplierPrice product not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $supplier = new \Societe($db);
+        if ($supplier->fetch($supplierId) <= 0) {
+            dol_syslog("DPK ProductController::setSupplierPrice supplier not found id=" . $supplierId, LOG_WARNING);
+            return [['error' => 'Supplier not found'], 404];
+        }
+
+        $qty = isset($arr['qty']) && (float) $arr['qty'] > 0 ? (float) $arr['qty'] : 1;
+        $buyPrice = (float) $arr['buy_price'];
+        $priceBaseType = (isset($arr['price_base_type']) && strtoupper((string) $arr['price_base_type']) === 'TTC') ? 'TTC' : 'HT';
+        $vatTx = isset($arr['vat_tx']) ? (float) $arr['vat_tx'] : 0;
+
+        // Ensure the (supplier, ref, qty) coupling exists and capture its
+        // product_fourn_price_id so update_buyprice updates the right row.
+        $ret = $pf->add_fournisseur($user, $supplierId, $refSupplier, $qty);
+        if ($ret == -3) {
+            $linked = isset($pf->product_id_already_linked) ? (int) $pf->product_id_already_linked : 0;
+            dol_syslog("DPK ProductController::setSupplierPrice ref already linked to product=" . $linked, LOG_WARNING);
+            return [['error' => 'This supplier reference is already linked to another product (id=' . $linked . ')'], 400];
+        }
+        if ($ret < 0) {
+            $reason = $pf->error !== '' ? $pf->error : 'Failed to register supplier reference';
+            dol_syslog("DPK ProductController::setSupplierPrice add_fournisseur() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to register supplier reference: ' . $reason], 500];
+        }
+
+        // update_buyprice signature (mirrors product/fournisseurs.php, no
+        // multicurrency): qty, buyprice, user, price_base_type, fourn(Societe),
+        // availability, ref_fourn, tva_tx, charges, remise_percent, remise,
+        // npr, delivery_time_days, supplier_reputation, localtaxes_array,
+        // defaultvatcode, mc_buyprice, mc_price_base_type, mc_tx, mc_code.
+        $res = $pf->update_buyprice($qty, $buyPrice, $user, $priceBaseType, $supplier, 0, $refSupplier, $vatTx, 0, 0, 0, 0, 0, '', array(), '', 0, 'HT', 1, '');
+        if ($res < 0) {
+            $reason = $pf->error !== '' ? $pf->error : 'Failed to update supplier price';
+            dol_syslog("DPK ProductController::setSupplierPrice update_buyprice() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to update supplier price: ' . $reason], 500];
+        }
+
+        // Return the fresh supplier price list.
+        return $this->suppliers(['id' => $id]);
+    }
+
+    /**
+     * DELETE product/{id}/supplier-price/{rowid} -- remove one supplier price
+     * bracket. Tier A lot A4.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function deleteSupplierPrice($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::deleteSupplierPrice forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $rowid = isset($arr['rowid']) ? (int) $arr['rowid'] : 0;
+        if ($id <= 0 || $rowid <= 0) {
+            dol_syslog("DPK ProductController::deleteSupplierPrice missing id or rowid", LOG_WARNING);
+            return [['error' => 'Product id and price rowid are required'], 400];
+        }
+
+        // Validate the product (respects entity isolation) before touching the
+        // price row.
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::deleteSupplierPrice product not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
+        $pf = new \ProductFournisseur($db);
+        if ($pf->fetch_product_fournisseur_price($rowid) <= 0) {
+            dol_syslog("DPK ProductController::deleteSupplierPrice price row not found rowid=" . $rowid, LOG_WARNING);
+            return [['error' => 'Supplier price not found'], 404];
+        }
+        // Make sure the price row really belongs to the product in the URL.
+        if ((int) $pf->id !== $id) {
+            dol_syslog("DPK ProductController::deleteSupplierPrice rowid=" . $rowid . " does not belong to product=" . $id, LOG_WARNING);
+            return [['error' => 'Supplier price does not belong to this product'], 400];
+        }
+
+        $res = $pf->remove_product_fournisseur_price($rowid);
+        if ($res <= 0) {
+            $reason = $pf->error !== '' ? $pf->error : 'Failed to remove supplier price';
+            dol_syslog("DPK ProductController::deleteSupplierPrice remove() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to remove supplier price: ' . $reason], 500];
+        }
+
+        return $this->suppliers(['id' => $id]);
+    }
+
+    // ======================================================================
+    // Tier A - A6a : product variants (attributes, values, combinations).
+    // Faithful to product/class/api_products.class.php + the variants module
+    // classes. Attribute refs/values refs are FORCED to UPPERCASE by the
+    // Dolibarr create() methods. Delete is blocked by isUsed() guards.
+    // ======================================================================
+
+    /** Load the Dolibarr variant module classes (idempotent). */
+    private function loadVariantClasses()
+    {
+        require_once DOL_DOCUMENT_ROOT . '/variants/class/ProductAttribute.class.php';
+        require_once DOL_DOCUMENT_ROOT . '/variants/class/ProductAttributeValue.class.php';
+        require_once DOL_DOCUMENT_ROOT . '/variants/class/ProductCombination.class.php';
+        require_once DOL_DOCUMENT_ROOT . '/variants/class/ProductCombination2ValuePair.class.php';
+    }
+
+    /**
+     * Build the global variant-attributes payload (each attribute + its values),
+     * tenant-filtered by entity (llx_product_attribute has its own entity
+     * column). Shared by attributes() and every attribute mutation endpoint
+     * (they return the fresh list).
+     *
+     * @return array<int,array>
+     */
+    private function buildAttributesPayload()
+    {
+        global $db;
+        $this->loadVariantClasses();
+
+        $attributes = array();
+        $sql = "SELECT rowid, ref, label, position FROM " . MAIN_DB_PREFIX . "product_attribute";
+        $sql .= " WHERE entity IN (" . getEntity('product') . ")";
+        $sql .= " ORDER BY position, ref";
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog("DPK ProductController::buildAttributesPayload query failed: " . $db->lasterror(), LOG_ERR);
+            return $attributes;
+        }
+        while ($obj = $db->fetch_object($resql)) {
+            $attrId = (int) $obj->rowid;
+            $values = array();
+            $valObj = new \ProductAttributeValue($db);
+            $list = $valObj->fetchAllByProductAttribute($attrId);
+            if (is_array($list)) {
+                foreach ($list as $v) {
+                    $values[] = array(
+                        'id'    => (int) $v->id,
+                        'ref'   => (string) $v->ref,
+                        'value' => (string) $v->value,
+                    );
+                }
+            }
+            $attributes[] = array(
+                'id'       => $attrId,
+                'ref'      => (string) $obj->ref,
+                'label'    => (string) $obj->label,
+                'position' => (int) $obj->position,
+                'values'   => $values,
+            );
+        }
+        $db->free($resql);
+        return $attributes;
+    }
+
+    /** GET product/attributes -- list global variant attributes + their values. */
+    public function attributes($arr = null)
+    {
+        global $user;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::attributes forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 200];
+    }
+
+    /** POST product/attribute -- create a variant attribute. Body: ref, label. */
+    public function addAttribute($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::addAttribute forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $ref = isset($arr['ref']) ? trim((string) $arr['ref']) : '';
+        $label = isset($arr['label']) ? trim((string) $arr['label']) : '';
+        if ($ref === '' || $label === '') {
+            dol_syslog("DPK ProductController::addAttribute missing ref or label", LOG_WARNING);
+            return [['error' => 'ref and label are required'], 400];
+        }
+
+        $this->loadVariantClasses();
+        $attr = new \ProductAttribute($db);
+        $attr->ref = $ref;     // create() forces UPPERCASE
+        $attr->label = $label;
+        $res = $attr->create($user);
+        if ($res <= 0) {
+            $reason = !empty($attr->error) ? $attr->error : 'Failed to create attribute';
+            dol_syslog("DPK ProductController::addAttribute create() failed: " . $reason, LOG_ERR);
+            return [['error' => 'Failed to create attribute: ' . $reason], 400];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 201];
+    }
+
+    /** PUT product/attribute/{id} -- rename a variant attribute. Body: ref, label. */
+    public function updateAttribute($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::updateAttribute forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::updateAttribute missing id", LOG_WARNING);
+            return [['error' => 'Attribute id is required'], 400];
+        }
+
+        $this->loadVariantClasses();
+        $attr = new \ProductAttribute($db);
+        if ($attr->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::updateAttribute not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Attribute not found'], 404];
+        }
+        if (isset($arr['ref']) && trim((string) $arr['ref']) !== '') {
+            $attr->ref = trim((string) $arr['ref']);
+        }
+        if (isset($arr['label'])) {
+            $attr->label = trim((string) $arr['label']);
+        }
+        $res = $attr->update($user);
+        if ($res <= 0) {
+            $reason = !empty($attr->error) ? $attr->error : 'Failed to update attribute';
+            dol_syslog("DPK ProductController::updateAttribute update() failed id=" . $id . ": " . $reason, LOG_ERR);
+            return [['error' => 'Failed to update attribute: ' . $reason], 400];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 200];
+    }
+
+    /** DELETE product/attribute/{id} -- delete an attribute (blocked if used). */
+    public function deleteAttribute($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'supprimer') && !$user->hasRight('service', 'supprimer')) {
+            dol_syslog("DPK ProductController::deleteAttribute forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::deleteAttribute missing id", LOG_WARNING);
+            return [['error' => 'Attribute id is required'], 400];
+        }
+
+        $this->loadVariantClasses();
+        $attr = new \ProductAttribute($db);
+        if ($attr->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::deleteAttribute not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Attribute not found'], 404];
+        }
+        $res = $attr->delete($user);
+        if ($res <= 0) {
+            $reason = !empty($attr->error)
+                ? $attr->error
+                : ((is_array($attr->errors) && !empty($attr->errors)) ? implode(', ', $attr->errors) : 'Attribute is used by a variant');
+            dol_syslog("DPK ProductController::deleteAttribute delete() blocked id=" . $id . ": " . $reason, LOG_WARNING);
+            return [['error' => 'Cannot delete attribute (it may be used by a variant): ' . $reason], 400];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 200];
+    }
+
+    /** POST product/attribute/{id}/value -- add a value. Body: ref, value. */
+    public function addAttributeValue($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::addAttributeValue forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $ref = isset($arr['ref']) ? trim((string) $arr['ref']) : '';
+        $value = isset($arr['value']) ? trim((string) $arr['value']) : '';
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::addAttributeValue missing attribute id", LOG_WARNING);
+            return [['error' => 'Attribute id is required'], 400];
+        }
+        if ($ref === '' || $value === '') {
+            dol_syslog("DPK ProductController::addAttributeValue missing ref or value", LOG_WARNING);
+            return [['error' => 'ref and value are required'], 400];
+        }
+
+        $this->loadVariantClasses();
+        $attr = new \ProductAttribute($db);
+        if ($attr->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::addAttributeValue attribute not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Attribute not found'], 404];
+        }
+        $val = new \ProductAttributeValue($db);
+        $val->fk_product_attribute = $id;
+        $val->ref = $ref;     // create() forces UPPERCASE
+        $val->value = $value;
+        $res = $val->create($user);
+        if ($res <= 0) {
+            $reason = !empty($val->error) ? $val->error : 'Failed to create attribute value';
+            dol_syslog("DPK ProductController::addAttributeValue create() failed attr=" . $id . ": " . $reason, LOG_ERR);
+            return [['error' => 'Failed to create attribute value: ' . $reason], 400];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 201];
+    }
+
+    /** DELETE product/attribute/{id}/value/{valueId} -- delete a value (blocked if used). */
+    public function deleteAttributeValue($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'supprimer') && !$user->hasRight('service', 'supprimer')) {
+            dol_syslog("DPK ProductController::deleteAttributeValue forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $valueId = isset($arr['valueId']) ? (int) $arr['valueId'] : 0;
+        if ($id <= 0 || $valueId <= 0) {
+            dol_syslog("DPK ProductController::deleteAttributeValue missing id or valueId", LOG_WARNING);
+            return [['error' => 'Attribute id and value id are required'], 400];
+        }
+
+        $this->loadVariantClasses();
+        $val = new \ProductAttributeValue($db);
+        if ($val->fetch($valueId) <= 0) {
+            dol_syslog("DPK ProductController::deleteAttributeValue value not found id=" . $valueId, LOG_WARNING);
+            return [['error' => 'Attribute value not found'], 404];
+        }
+        if ((int) $val->fk_product_attribute !== $id) {
+            dol_syslog("DPK ProductController::deleteAttributeValue value=" . $valueId . " not under attribute=" . $id, LOG_WARNING);
+            return [['error' => 'Attribute value does not belong to this attribute'], 400];
+        }
+        $res = $val->delete($user);
+        if ($res <= 0) {
+            $reason = !empty($val->error)
+                ? $val->error
+                : ((is_array($val->errors) && !empty($val->errors)) ? implode(', ', $val->errors) : 'Value is used by a variant');
+            dol_syslog("DPK ProductController::deleteAttributeValue delete() blocked id=" . $valueId . ": " . $reason, LOG_WARNING);
+            return [['error' => 'Cannot delete attribute value (it may be used by a variant): ' . $reason], 400];
+        }
+
+        return [['attributes' => $this->buildAttributesPayload()], 200];
+    }
+
+    /**
+     * Build the combinations payload for a parent product (each combination +
+     * its (attribute,value) pairs + the child product ref/label).
+     *
+     * @param int $productId
+     * @return array<int,array>
+     */
+    private function buildCombinationsPayload($productId)
+    {
+        global $db;
+        $this->loadVariantClasses();
+
+        $combinations = array();
+        $prodcomb = new \ProductCombination($db);
+        $list = $prodcomb->fetchAllByFkProductParent((int) $productId);
+        if (!is_array($list)) {
+            return $combinations;
+        }
+        foreach ($list as $comb) {
+            $pairs = array();
+            $c2v = new \ProductCombination2ValuePair($db);
+            $vp = $c2v->fetchByFkCombination((int) $comb->id);
+            if (is_array($vp)) {
+                foreach ($vp as $pair) {
+                    $pairs[] = array(
+                        'attributeId' => (int) $pair->fk_prod_attr,
+                        'valueId'     => (int) $pair->fk_prod_attr_val,
+                    );
+                }
+            }
+            $childRef = '';
+            $childLabel = '';
+            if (!empty($comb->fk_product_child)) {
+                $child = new Product($db);
+                if ($child->fetch((int) $comb->fk_product_child) > 0) {
+                    $childRef = (string) $child->ref;
+                    $childLabel = (string) $child->label;
+                }
+            }
+            $combinations[] = array(
+                'id'                       => (int) $comb->id,
+                'childId'                  => (int) $comb->fk_product_child,
+                'childRef'                 => $childRef,
+                'childLabel'               => $childLabel,
+                'variationPrice'           => (float) $comb->variation_price,
+                'variationPricePercentage' => $comb->variation_price_percentage ? 1 : 0,
+                'variationWeight'          => (float) $comb->variation_weight,
+                'pairs'                    => $pairs,
+            );
+        }
+        return $combinations;
+    }
+
+    /** GET product/{id}/combinations -- variant combinations of a parent product. */
+    public function combinations($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'lire') && !$user->hasRight('service', 'lire')) {
+            dol_syslog("DPK ProductController::combinations forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::combinations missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+
+        // Validate the parent product (entity isolation) before listing.
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::combinations product not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        return [['combinations' => $this->buildCombinationsPayload($id)], 200];
+    }
+
+    /**
+     * POST product/{id}/combination -- create a variant combination from a list
+     * of (attribute,value) pairs. Body:
+     *   - pairs[] : [{attribute_id, value_id}, ...] (required, >=1)
+     *   - price_variation         (float, optional) flat price impact
+     *   - weight_variation        (float, optional) flat weight impact
+     *   - price_variation_percent (bool, optional) price impact is a percentage
+     *   - ref                     (string, optional) forced child ref (else auto)
+     * Replicates api_products::addVariant -> ProductCombination::createProductCombination
+     * which auto-creates the child product. Returns the fresh combinations list.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function addCombination($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'creer') && !$user->hasRight('service', 'creer')) {
+            dol_syslog("DPK ProductController::addCombination forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ProductController::addCombination missing id", LOG_WARNING);
+            return [['error' => 'Product id is required'], 400];
+        }
+        $pairs = (isset($arr['pairs']) && is_array($arr['pairs'])) ? $arr['pairs'] : array();
+        if (empty($pairs)) {
+            dol_syslog("DPK ProductController::addCombination no pairs", LOG_WARNING);
+            return [['error' => 'At least one attribute/value pair is required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::addCombination product not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $this->loadVariantClasses();
+
+        // Build the $features map attribute_id => value_id, validating each pair.
+        $features = array();
+        $attr = new \ProductAttribute($db);
+        $val = new \ProductAttributeValue($db);
+        foreach ($pairs as $pair) {
+            $attrId = (is_array($pair) && isset($pair['attribute_id'])) ? (int) $pair['attribute_id'] : 0;
+            $valId = (is_array($pair) && isset($pair['value_id'])) ? (int) $pair['value_id'] : 0;
+            if ($attrId <= 0 || $valId <= 0) {
+                dol_syslog("DPK ProductController::addCombination invalid pair", LOG_WARNING);
+                return [['error' => 'Each pair needs a positive attribute_id and value_id'], 400];
+            }
+            if ($attr->fetch($attrId) <= 0) {
+                dol_syslog("DPK ProductController::addCombination attribute not found id=" . $attrId, LOG_WARNING);
+                return [['error' => 'Attribute not found: ' . $attrId], 404];
+            }
+            if ($val->fetch($valId) <= 0) {
+                dol_syslog("DPK ProductController::addCombination value not found id=" . $valId, LOG_WARNING);
+                return [['error' => 'Attribute value not found: ' . $valId], 404];
+            }
+            if ((int) $val->fk_product_attribute !== $attrId) {
+                dol_syslog("DPK ProductController::addCombination value=" . $valId . " not under attribute=" . $attrId, LOG_WARNING);
+                return [['error' => 'Value ' . $valId . ' does not belong to attribute ' . $attrId], 400];
+            }
+            $features[$attrId] = $valId;
+        }
+
+        $priceVar = isset($arr['price_variation']) ? (float) $arr['price_variation'] : 0.0;
+        $weightVar = isset($arr['weight_variation']) ? (float) $arr['weight_variation'] : 0.0;
+        $pricePct = !empty($arr['price_variation_percent']);
+        $ref = isset($arr['ref']) ? trim((string) $arr['ref']) : '';
+
+        // createProductCombination($user, $product, $features, $variations=[],
+        //   $price_var_percent, $forced_pricevar, $forced_weightvar, $forced_refvar, $ref_ext)
+        // Passing floats for forced price/weight skips the $variations array.
+        $prodcomb = new \ProductCombination($db);
+        $res = $prodcomb->createProductCombination($user, $product, $features, array(), $pricePct, $priceVar, $weightVar, ($ref !== '' ? $ref : false), '');
+        if ($res <= 0) {
+            $reason = !empty($prodcomb->error)
+                ? $prodcomb->error
+                : ((is_array($prodcomb->errors) && !empty($prodcomb->errors)) ? implode(', ', $prodcomb->errors) : 'Failed to create combination');
+            dol_syslog("DPK ProductController::addCombination createProductCombination() failed product=" . $id . ": " . $reason, LOG_ERR);
+            return [['error' => 'Failed to create variant combination: ' . $reason], 400];
+        }
+
+        return [['combinations' => $this->buildCombinationsPayload($id)], 201];
+    }
+
+    /**
+     * DELETE product/{id}/combination/{rowid} -- delete a variant combination.
+     * Mirrors api_products::deleteVariant (ProductCombination::delete): removes
+     * the combination and its value pairs. The auto-created child product is NOT
+     * deleted (native REST API behavior); it stays as a standalone product.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function removeCombination($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('produit', 'supprimer') && !$user->hasRight('service', 'supprimer')) {
+            dol_syslog("DPK ProductController::removeCombination forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $rowid = isset($arr['rowid']) ? (int) $arr['rowid'] : 0;
+        if ($id <= 0 || $rowid <= 0) {
+            dol_syslog("DPK ProductController::removeCombination missing id or rowid", LOG_WARNING);
+            return [['error' => 'Product id and combination rowid are required'], 400];
+        }
+
+        $product = new Product($db);
+        if ($product->fetch($id) <= 0) {
+            dol_syslog("DPK ProductController::removeCombination product not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Product not found'], 404];
+        }
+
+        $this->loadVariantClasses();
+        $prodcomb = new \ProductCombination($db);
+        if ($prodcomb->fetch($rowid) <= 0) {
+            dol_syslog("DPK ProductController::removeCombination combination not found rowid=" . $rowid, LOG_WARNING);
+            return [['error' => 'Combination not found'], 404];
+        }
+        if ((int) $prodcomb->fk_product_parent !== $id) {
+            dol_syslog("DPK ProductController::removeCombination rowid=" . $rowid . " not under product=" . $id, LOG_WARNING);
+            return [['error' => 'Combination does not belong to this product'], 400];
+        }
+        $res = $prodcomb->delete($user);
+        if ($res <= 0) {
+            $reason = !empty($prodcomb->error) ? $prodcomb->error : 'Failed to delete combination';
+            dol_syslog("DPK ProductController::removeCombination delete() failed rowid=" . $rowid . ": " . $reason, LOG_ERR);
+            return [['error' => 'Failed to delete variant combination: ' . $reason], 400];
+        }
+
+        return [['combinations' => $this->buildCombinationsPayload($id)], 200];
+    }
+
+    /**
      * Format a product through the dmProduct mapper plus a couple of fields
      * the mapper cannot derive automatically (current stock).
      *

@@ -615,6 +615,400 @@ class ThirdPartyController
     }
 
     /**
+     * GET thirdparty/{id}/categories -- assigned + available customer/supplier
+     * tags (Dolibarr "Tags/categories" of a thirdparty).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function categories($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::categories forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::categories missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::categories not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/categories/class/categorie.class.php';
+        $assigned = array();
+        $available = array();
+        foreach (array('customer', 'supplier') as $type) {
+            $cat = new \Categorie($db);
+            $cur = $cat->containing($id, $type, 'object');
+            if (is_array($cur)) {
+                foreach ($cur as $c) {
+                    $assigned[] = array('id' => (int) $c->id, 'label' => $c->label, 'type' => $type);
+                }
+            }
+            $arbo = $cat->get_full_arbo($type);
+            if (is_array($arbo)) {
+                foreach ($arbo as $a) {
+                    $label = !empty($a['fulllabel']) ? $a['fulllabel'] : (isset($a['label']) ? $a['label'] : '');
+                    $available[] = array('id' => (int) $a['id'], 'label' => $label, 'type' => $type);
+                }
+            }
+        }
+
+        return [['assigned' => $assigned, 'available' => $available], 200];
+    }
+
+    /**
+     * POST thirdparty/{id}/category -- assign a tag. Body: category_id (int),
+     * type ('customer' default | 'supplier').
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function categoryAdd($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'creer')) {
+            dol_syslog("DPK ThirdPartyController::categoryAdd forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $catId = isset($arr['category_id']) ? (int) $arr['category_id'] : 0;
+        $type = (isset($arr['type']) && $arr['type'] === 'supplier') ? 'supplier' : 'customer';
+        if ($id <= 0 || $catId <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryAdd missing id/category_id", LOG_WARNING);
+            return [['error' => 'Thirdparty id and category_id are required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryAdd thirdparty not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/categories/class/categorie.class.php';
+        $cat = new \Categorie($db);
+        if ($cat->fetch($catId) <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryAdd category not found id=" . $catId, LOG_WARNING);
+            return [['error' => 'Category not found'], 404];
+        }
+
+        $res = $cat->add_type($tp, $type);
+        if ($res < 0) {
+            dol_syslog("DPK ThirdPartyController::categoryAdd add_type() failed: " . $cat->error, LOG_ERR);
+            return [['error' => 'Failed to assign category: ' . $cat->error], 500];
+        }
+
+        return $this->categories(['id' => $id]);
+    }
+
+    /**
+     * DELETE thirdparty/{id}/category/{categoryId} -- unassign a tag. Optional
+     * 'type' (defaults to customer; both map to the same link table).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function categoryRemove($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'creer')) {
+            dol_syslog("DPK ThirdPartyController::categoryRemove forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $catId = isset($arr['categoryId']) ? (int) $arr['categoryId'] : 0;
+        $type = (isset($arr['type']) && $arr['type'] === 'supplier') ? 'supplier' : 'customer';
+        if ($id <= 0 || $catId <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryRemove missing id/categoryId", LOG_WARNING);
+            return [['error' => 'Thirdparty id and categoryId are required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryRemove thirdparty not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/categories/class/categorie.class.php';
+        $cat = new \Categorie($db);
+        if ($cat->fetch($catId) <= 0) {
+            dol_syslog("DPK ThirdPartyController::categoryRemove category not found id=" . $catId, LOG_WARNING);
+            return [['error' => 'Category not found'], 404];
+        }
+
+        $res = $cat->del_type($tp, $type);
+        if ($res < 0) {
+            dol_syslog("DPK ThirdPartyController::categoryRemove del_type() failed: " . $cat->error, LOG_ERR);
+            return [['error' => 'Failed to unassign category: ' . $cat->error], 500];
+        }
+
+        return $this->categories(['id' => $id]);
+    }
+
+    /**
+     * GET thirdparty/{id}/bankaccounts -- list the thirdparty bank accounts
+     * (Dolibarr "RIB/IBAN" tab).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function bankAccounts($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::bankAccounts forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccounts missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccounts not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/companybankaccount.class.php';
+        $accounts = array();
+        $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe_rib WHERE fk_soc = " . ((int) $id) . " AND type = 'ban' ORDER BY rowid";
+        $resql = $db->query($sql);
+        if ($resql) {
+            while ($obj = $db->fetch_object($resql)) {
+                $acc = new \CompanyBankAccount($db);
+                if ($acc->fetch($obj->rowid) > 0) {
+                    $accounts[] = array(
+                        'id'         => (int) $acc->id,
+                        'label'      => $acc->label,
+                        'bank'       => $acc->bank,
+                        'iban'       => $acc->iban,
+                        'bic'        => $acc->bic,
+                        'ownerName'  => $acc->proprio,
+                        'rum'        => $acc->rum,
+                        'defaultRib' => (int) $acc->default_rib,
+                    );
+                }
+            }
+        } else {
+            dol_syslog("DPK ThirdPartyController::bankAccounts query failed: " . $db->lasterror(), LOG_ERR);
+            return [['error' => 'Failed to list bank accounts'], 500];
+        }
+
+        return [['accounts' => $accounts], 200];
+    }
+
+    /**
+     * POST thirdparty/{id}/bankaccount -- add a bank account. Body: label,
+     * bank, iban, bic, owner_name (all optional strings).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function bankAccountAdd($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'creer')) {
+            dol_syslog("DPK ThirdPartyController::bankAccountAdd forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountAdd missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountAdd thirdparty not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/companybankaccount.class.php';
+        $acc = new \CompanyBankAccount($db);
+        $acc->socid = $id;
+        $acc->type = 'ban';
+        $acc->label = isset($arr['label']) ? (string) $arr['label'] : '';
+        $acc->bank = isset($arr['bank']) ? (string) $arr['bank'] : '';
+        $acc->iban = isset($arr['iban']) ? (string) $arr['iban'] : '';
+        $acc->bic = isset($arr['bic']) ? (string) $arr['bic'] : '';
+        $acc->proprio = isset($arr['owner_name']) ? (string) $arr['owner_name'] : '';
+
+        $res = $acc->create($user);
+        if ($res <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountAdd create() failed: " . $acc->error, LOG_ERR);
+            return [['error' => 'Failed to add bank account: ' . $acc->error], 500];
+        }
+
+        return $this->bankAccounts(['id' => $id]);
+    }
+
+    /**
+     * DELETE thirdparty/{id}/bankaccount/{accountId} -- remove a bank account.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function bankAccountRemove($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'creer')) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        $accId = isset($arr['accountId']) ? (int) $arr['accountId'] : 0;
+        if ($id <= 0 || $accId <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove missing id/accountId", LOG_WARNING);
+            return [['error' => 'Thirdparty id and accountId are required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove thirdparty not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        require_once DOL_DOCUMENT_ROOT . '/societe/class/companybankaccount.class.php';
+        $acc = new \CompanyBankAccount($db);
+        if ($acc->fetch($accId) <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove account not found id=" . $accId, LOG_WARNING);
+            return [['error' => 'Bank account not found'], 404];
+        }
+        // Tenant isolation: the account must belong to the resolved thirdparty
+        // (itself fetched under the current entity).
+        if ((int) $acc->socid !== $id) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove account socid mismatch acc=" . $accId, LOG_WARNING);
+            return [['error' => 'Bank account does not belong to this thirdparty'], 403];
+        }
+
+        $res = $acc->delete($user);
+        if ($res <= 0) {
+            dol_syslog("DPK ThirdPartyController::bankAccountRemove delete() failed: " . $acc->error, LOG_ERR);
+            return [['error' => 'Failed to remove bank account: ' . $acc->error], 500];
+        }
+
+        return $this->bankAccounts(['id' => $id]);
+    }
+
+    /**
+     * GET thirdparty/{id}/discounts -- Tier A lot A5c.
+     *
+     * List the reusable absolute discounts (DiscountAbsolute / societe_remise_except)
+     * currently AVAILABLE (not yet consumed) for this thirdparty. Each row is
+     * tagged with an apply mode that mirrors Dolibarr's two discount forms
+     * (core/tpl/object_discounts.tpl.php + compta/facture/card.php lines
+     * 4108-4109, default config):
+     *   - 'line'    : pure discounts and deposits -> applied as a NEGATIVE line
+     *                 on a DRAFT invoice (POST invoice/{id}/discount).
+     *   - 'payment' : credit notes and excess-received -> applied as a PAYMENT
+     *                 on a VALIDATED unpaid invoice (POST invoice/{id}/usecreditnote).
+     * The line/payment split is the exact $filterabsolutediscount /
+     * $filtercreditnote predicate: line = (no source invoice) OR (deposit and not
+     * excess); payment = (has source invoice) AND (not deposit OR excess).
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function discounts($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::discounts forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::discounts missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::discounts not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        // Available customer discounts only (discount_type = 0), not yet consumed
+        // (fk_facture IS NULL AND fk_facture_line IS NULL), within the tenant
+        // entity (getEntity('invoice') as DiscountAbsolute::fetch uses).
+        $sql = "SELECT re.rowid, re.amount_ht, re.amount_tva, re.amount_ttc, re.tva_tx,";
+        $sql .= " re.description, re.fk_facture_source, re.datec,";
+        $sql .= " f.ref as ref_source";
+        $sql .= " FROM " . MAIN_DB_PREFIX . "societe_remise_except as re";
+        $sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "facture as f ON re.fk_facture_source = f.rowid";
+        $sql .= " WHERE re.fk_soc = " . ((int) $id);
+        $sql .= " AND re.entity IN (" . getEntity('invoice') . ")";
+        $sql .= " AND re.discount_type = 0";
+        $sql .= " AND re.fk_facture IS NULL AND re.fk_facture_line IS NULL";
+        $sql .= " ORDER BY re.datec DESC, re.rowid DESC";
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog("DPK ThirdPartyController::discounts query failed: " . $db->lasterror(), LOG_ERR);
+            return [['error' => 'Failed to list discounts'], 500];
+        }
+
+        $discounts = array();
+        while ($obj = $db->fetch_object($resql)) {
+            $desc = (string) $obj->description;
+            $isDeposit = (strpos($desc, '(DEPOSIT)') !== false) && (strpos($desc, '(EXCESS RECEIVED)') === false);
+            $isExcess  = (strpos($desc, '(EXCESS RECEIVED)') !== false);
+            $isCredit  = (strpos($desc, '(CREDIT_NOTE)') !== false);
+            $hasSource = !empty($obj->fk_facture_source);
+
+            if ($isCredit) {
+                $type = 'credit_note';
+            } elseif ($isExcess) {
+                $type = 'excess';
+            } elseif ($isDeposit) {
+                $type = 'deposit';
+            } else {
+                $type = 'discount';
+            }
+
+            $applyMode = (!$hasSource || $isDeposit) ? 'line' : 'payment';
+
+            $discounts[] = array(
+                'id'               => (int) $obj->rowid,
+                'type'             => $type,
+                'applyMode'        => $applyMode,
+                'description'      => $desc,
+                'amountHt'         => (float) $obj->amount_ht,
+                'amountTva'        => (float) $obj->amount_tva,
+                'amountTtc'        => (float) $obj->amount_ttc,
+                'tvaTx'            => (float) $obj->tva_tx,
+                'sourceInvoiceId'  => $hasSource ? (int) $obj->fk_facture_source : 0,
+                'sourceInvoiceRef' => $obj->ref_source !== null ? (string) $obj->ref_source : '',
+            );
+        }
+        $db->free($resql);
+
+        return [['discounts' => $discounts], 200];
+    }
+
+    /**
      * Apply scalar fields from API payload onto a Societe instance.
      *
      * @param   Societe  $tp   Target Societe

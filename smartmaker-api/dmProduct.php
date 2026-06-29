@@ -67,6 +67,10 @@ class dmProduct extends dmBase
         'status'       => 'status',
         'status_buy'   => 'status_buy',
         'barcode'      => 'barcode',
+        'customcode'   => 'customcode',
+        'seuil_stock_alerte' => 'seuil_stock_alerte',
+        'desiredstock' => 'desiredstock',
+        'note_public'  => 'note_public',
         'country_code' => 'country_code',
         'date_creation' => 'datec',
         'tms'          => 'tms',
@@ -91,6 +95,10 @@ class dmProduct extends dmBase
         'status',
         'status_buy',
         'barcode',
+        'customcode',
+        'seuil_stock_alerte',
+        'desiredstock',
+        'note_public',
     ];
 
     /**

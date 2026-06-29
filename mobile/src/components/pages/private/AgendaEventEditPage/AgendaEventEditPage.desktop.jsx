@@ -72,7 +72,7 @@ export const AgendaEventEditPageDesktop = ({
 
                     {loading ? (
                         <div className="rounded-md border border-soft-border bg-white p-4 text-sm text-soft-text">
-                            Chargement de l'évènement...
+                            Chargement de l&apos;évènement...
                         </div>
                     ) : (
                         <AutoForm

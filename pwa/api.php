@@ -77,6 +77,18 @@ use Dolipocket\Api\SupplierInvoiceController;
 // Lot 5 - Agenda
 use Dolipocket\Api\AgendaController;
 
+// Tier A - A1 - Customer shipments (Expedition)
+use Dolipocket\Api\ShipmentController;
+
+// Tier A - A2 - Supplier receptions (Reception)
+use Dolipocket\Api\ReceptionController;
+
+// Tier A - A3 - Supplier price requests (SupplierProposal)
+use Dolipocket\Api\SupplierProposalController;
+
+// Tier A - A5b - Recurring invoice templates (FactureRec)
+use Dolipocket\Api\InvoiceRecController;
+
 // Lot 5 - Document attachment (consume staged uploads)
 use Dolipocket\Api\DocumentController;
 
@@ -115,6 +127,14 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::put('thirdparty/{id}',    ThirdPartyController::class, 'update',     true);
     Route::delete('thirdparty',      ThirdPartyController::class, 'deleteBulk', true);
     Route::delete('thirdparty/{id}', ThirdPartyController::class, 'delete',     true);
+    Route::get('thirdparty/{id}/categories',              ThirdPartyController::class, 'categories',        true);
+    Route::post('thirdparty/{id}/category',               ThirdPartyController::class, 'categoryAdd',       true);
+    Route::delete('thirdparty/{id}/category/{categoryId}', ThirdPartyController::class, 'categoryRemove',    true);
+    Route::get('thirdparty/{id}/bankaccounts',            ThirdPartyController::class, 'bankAccounts',      true);
+    Route::post('thirdparty/{id}/bankaccount',            ThirdPartyController::class, 'bankAccountAdd',    true);
+    Route::delete('thirdparty/{id}/bankaccount/{accountId}', ThirdPartyController::class, 'bankAccountRemove', true);
+    // Tier A - A5c - reusable discounts available for the thirdparty
+    Route::get('thirdparty/{id}/discounts',               ThirdPartyController::class, 'discounts',          true);
 
     // ********** Lot 1 - Contacts ********** //
     Route::get('contact',              ContactController::class, 'index',       true);
@@ -134,11 +154,29 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::get('product/columns',  ProductController::class, 'columns',    true);
     Route::get('product/describe', ProductController::class, 'describe',   true);
     Route::get('product/count',    ProductController::class, 'count',      true);
+    // Tier A - A6a - variant attributes (global, literal path BEFORE product/{id})
+    Route::get('product/attributes', ProductController::class, 'attributes', true);
+    Route::post('product/attribute', ProductController::class, 'addAttribute', true);
     Route::get('product/{id}',    ProductController::class, 'show',       true);
     Route::post('product',        ProductController::class, 'create',     true);
     Route::put('product/{id}',    ProductController::class, 'update',     true);
     Route::delete('product',      ProductController::class, 'deleteBulk', true);
     Route::delete('product/{id}', ProductController::class, 'delete',     true);
+    Route::get('product/{id}/stock',     ProductController::class, 'stock',     true);
+    Route::get('product/{id}/suppliers', ProductController::class, 'suppliers', true);
+    Route::get('product/{id}/prices',    ProductController::class, 'prices',    true);
+    // Tier A - A4 - product price writing (customer multiprice + supplier price)
+    Route::post('product/{id}/price',                  ProductController::class, 'setPrice',           true);
+    Route::post('product/{id}/supplier-price',         ProductController::class, 'setSupplierPrice',   true);
+    Route::delete('product/{id}/supplier-price/{rowid}', ProductController::class, 'deleteSupplierPrice', true);
+    // Tier A - A6a - variants : attribute values + combinations per product
+    Route::put('product/attribute/{id}',                    ProductController::class, 'updateAttribute',     true);
+    Route::delete('product/attribute/{id}',                 ProductController::class, 'deleteAttribute',     true);
+    Route::post('product/attribute/{id}/value',             ProductController::class, 'addAttributeValue',   true);
+    Route::delete('product/attribute/{id}/value/{valueId}', ProductController::class, 'deleteAttributeValue', true);
+    Route::get('product/{id}/combinations',                 ProductController::class, 'combinations',        true);
+    Route::post('product/{id}/combination',                 ProductController::class, 'addCombination',      true);
+    Route::delete('product/{id}/combination/{rowid}',       ProductController::class, 'removeCombination',   true);
 
     // ********** Lot 2 - Warehouses ********** //
     Route::get('warehouse',          WarehouseController::class, 'index',      true);
@@ -170,6 +208,14 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::post('proposal/{id}/validate',        ProposalController::class, 'validate',      true);
     Route::post('proposal/{id}/closesign',       ProposalController::class, 'closeSigned',   true);
     Route::post('proposal/{id}/closeunsign',     ProposalController::class, 'closeUnsigned', true);
+    Route::post('proposal/{id}/setdraft',        ProposalController::class, 'setDraft',       true);
+    Route::post('proposal/{id}/classifybilled',  ProposalController::class, 'classifyBilled', true);
+    Route::post('proposal/{id}/clone',           ProposalController::class, 'cloneDocument',  true);
+    Route::get('proposal/{id}/contacts',         ProposalController::class, 'contacts',       true);
+    Route::post('proposal/{id}/contact',         ProposalController::class, 'contactAdd',     true);
+    Route::delete('proposal/{id}/contact/{rowid}', ProposalController::class, 'contactRemove', true);
+    Route::get('proposal/{id}/links',            ProposalController::class, 'links',          true);
+    Route::delete('proposal/{id}/link/{rowid}',  ProposalController::class, 'linkRemove',     true);
     Route::post('proposal/{id}/pdf',             ProposalController::class, 'generatePdf',   true);
     Route::get('proposal/{id}/pdf/download',     ProposalController::class, 'download',      true);
     Route::post('proposal/{id}/send',            ProposalController::class, 'send',          true);
@@ -189,6 +235,16 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::delete('order',                           OrderController::class, 'deleteBulk',         true);
     Route::delete('order/{id}',                      OrderController::class, 'destroy',            true);
     Route::post('order/{id}/validate',               OrderController::class, 'validate',           true);
+    Route::post('order/{id}/setdraft',               OrderController::class, 'setDraft',           true);
+    Route::post('order/{id}/classifybilled',         OrderController::class, 'classifyBilled',     true);
+    Route::post('order/{id}/close',                  OrderController::class, 'closeOrder',         true);
+    Route::post('order/{id}/cancel',                 OrderController::class, 'cancel',             true);
+    Route::post('order/{id}/clone',                  OrderController::class, 'cloneDocument',      true);
+    Route::get('order/{id}/contacts',                OrderController::class, 'contacts',           true);
+    Route::post('order/{id}/contact',                OrderController::class, 'contactAdd',         true);
+    Route::delete('order/{id}/contact/{rowid}',      OrderController::class, 'contactRemove',      true);
+    Route::get('order/{id}/links',                   OrderController::class, 'links',              true);
+    Route::delete('order/{id}/link/{rowid}',         OrderController::class, 'linkRemove',         true);
     Route::post('order/createfromproposal/{proposalid}', OrderController::class, 'createFromProposal', true);
     Route::post('order/{id}/pdf',                    OrderController::class, 'generatePdf',        true);
     Route::get('order/{id}/pdf/download',            OrderController::class, 'download',           true);
@@ -202,6 +258,9 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::get('invoice/lines/columns',              InvoiceController::class, 'linesColumns',    true);
     Route::get('invoice/describe',                   InvoiceController::class, 'describe',        true);
     Route::get('invoice/count',                      InvoiceController::class, 'count',           true);
+    // Tier A - A5a - deposit invoices
+    Route::get('invoice/deposit-terms',              InvoiceController::class, 'depositTerms',    true);
+    Route::post('invoice/deposit',                   InvoiceController::class, 'createDeposit',   true);
     Route::get('invoice',                            InvoiceController::class, 'index',           true);
     Route::get('invoice/{id}',                       InvoiceController::class, 'show',            true);
     Route::post('invoice',                           InvoiceController::class, 'create',          true);
@@ -209,6 +268,24 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::delete('invoice',                         InvoiceController::class, 'deleteBulk',      true);
     Route::delete('invoice/{id}',                    InvoiceController::class, 'destroy',         true);
     Route::post('invoice/{id}/validate',             InvoiceController::class, 'validate',        true);
+    Route::post('invoice/{id}/setdraft',             InvoiceController::class, 'setDraft',        true);
+    Route::post('invoice/{id}/setpaid',              InvoiceController::class, 'setPaid',         true);
+    Route::post('invoice/{id}/setunpaid',            InvoiceController::class, 'setUnpaid',       true);
+    Route::post('invoice/{id}/setcanceled',          InvoiceController::class, 'setCanceled',     true);
+    Route::post('invoice/{id}/clone',                InvoiceController::class, 'cloneDocument',   true);
+    Route::get('invoice/{id}/contacts',              InvoiceController::class, 'contacts',        true);
+    Route::post('invoice/{id}/contact',              InvoiceController::class, 'contactAdd',      true);
+    Route::delete('invoice/{id}/contact/{rowid}',    InvoiceController::class, 'contactRemove',   true);
+    Route::get('invoice/{id}/links',                 InvoiceController::class, 'links',           true);
+    Route::delete('invoice/{id}/link/{rowid}',       InvoiceController::class, 'linkRemove',      true);
+    Route::get('invoice/{id}/creditnotes',           InvoiceController::class, 'creditNotes',     true);
+    Route::post('invoice/{id}/creditnote',           InvoiceController::class, 'createCreditNote', true);
+    // Tier A - A5c - reusable discounts (DiscountAbsolute)
+    Route::post('invoice/{id}/converttoreduc',       InvoiceController::class, 'convertToReduc',   true);
+    Route::get('invoice/{id}/discounts',             InvoiceController::class, 'appliedDiscounts', true);
+    Route::post('invoice/{id}/discount',             InvoiceController::class, 'applyDiscount',    true);
+    Route::post('invoice/{id}/usecreditnote',        InvoiceController::class, 'useCreditNote',    true);
+    Route::delete('invoice/{id}/discount/{rowid}',   InvoiceController::class, 'removeDiscount',   true);
     Route::post('invoice/createfromorder/{orderid}', InvoiceController::class, 'createFromOrder', true);
     Route::post('invoice/{id}/pdf',                  InvoiceController::class, 'generatePdf',     true);
     Route::get('invoice/{id}/pdf/download',          InvoiceController::class, 'download',        true);
@@ -217,6 +294,19 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::post('invoice/{id}/line',                 InvoiceController::class, 'addLine',         true);
     Route::put('invoice/{id}/line/{lineid}',         InvoiceController::class, 'updateLine',      true);
     Route::delete('invoice/{id}/line/{lineid}',      InvoiceController::class, 'deleteLine',      true);
+
+    // ********** Tier A - A5b - Recurring invoice templates (FactureRec) ********** //
+    Route::get('invoicerec/columns',         InvoiceRecController::class, 'columns',   true);
+    Route::get('invoicerec/describe',        InvoiceRecController::class, 'describe',  true);
+    Route::get('invoicerec/count',           InvoiceRecController::class, 'count',     true);
+    Route::get('invoicerec',                 InvoiceRecController::class, 'index',     true);
+    Route::get('invoicerec/{id}',            InvoiceRecController::class, 'show',      true);
+    Route::post('invoicerec',                InvoiceRecController::class, 'create',    true);
+    Route::put('invoicerec/{id}',            InvoiceRecController::class, 'update',    true);
+    Route::delete('invoicerec/{id}',         InvoiceRecController::class, 'destroy',   true);
+    Route::post('invoicerec/{id}/generate',  InvoiceRecController::class, 'generate',  true);
+    Route::post('invoicerec/{id}/suspend',   InvoiceRecController::class, 'suspend',   true);
+    Route::post('invoicerec/{id}/unsuspend', InvoiceRecController::class, 'unsuspend', true);
 
     // ********** Lot 4 - Supplier orders ********** //
     Route::get('supplierorder/columns',               SupplierOrderController::class, 'columns',      true);
@@ -233,6 +323,13 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::post('supplierorder/{id}/approve',         SupplierOrderController::class, 'approve',    true);
     Route::post('supplierorder/{id}/order',           SupplierOrderController::class, 'order',      true);
     Route::post('supplierorder/{id}/receive',         SupplierOrderController::class, 'receive',    true);
+    Route::post('supplierorder/{id}/setdraft',        SupplierOrderController::class, 'setDraft',    true);
+    Route::post('supplierorder/{id}/clone',           SupplierOrderController::class, 'cloneDocument', true);
+    Route::get('supplierorder/{id}/contacts',         SupplierOrderController::class, 'contacts',      true);
+    Route::post('supplierorder/{id}/contact',         SupplierOrderController::class, 'contactAdd',    true);
+    Route::delete('supplierorder/{id}/contact/{rowid}', SupplierOrderController::class, 'contactRemove', true);
+    Route::get('supplierorder/{id}/links',            SupplierOrderController::class, 'links',         true);
+    Route::delete('supplierorder/{id}/link/{rowid}',  SupplierOrderController::class, 'linkRemove',    true);
     Route::post('supplierorder/{id}/pdf',             SupplierOrderController::class, 'generatePdf', true);
     Route::get('supplierorder/{id}/pdf/download',     SupplierOrderController::class, 'download',    true);
     Route::post('supplierorder/{id}/send',            SupplierOrderController::class, 'send',        true);
@@ -252,6 +349,15 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::delete('supplierinvoice',                         SupplierInvoiceController::class, 'deleteBulk',      true);
     Route::delete('supplierinvoice/{id}',                    SupplierInvoiceController::class, 'delete',          true);
     Route::post('supplierinvoice/{id}/validate',             SupplierInvoiceController::class, 'validate',        true);
+    Route::post('supplierinvoice/{id}/setdraft',             SupplierInvoiceController::class, 'setDraft',        true);
+    Route::post('supplierinvoice/{id}/setpaid',              SupplierInvoiceController::class, 'setPaid',         true);
+    Route::post('supplierinvoice/{id}/setunpaid',            SupplierInvoiceController::class, 'setUnpaid',       true);
+    Route::post('supplierinvoice/{id}/clone',                SupplierInvoiceController::class, 'cloneDocument',   true);
+    Route::get('supplierinvoice/{id}/contacts',              SupplierInvoiceController::class, 'contacts',        true);
+    Route::post('supplierinvoice/{id}/contact',              SupplierInvoiceController::class, 'contactAdd',      true);
+    Route::delete('supplierinvoice/{id}/contact/{rowid}',    SupplierInvoiceController::class, 'contactRemove',   true);
+    Route::get('supplierinvoice/{id}/links',                 SupplierInvoiceController::class, 'links',           true);
+    Route::delete('supplierinvoice/{id}/link/{rowid}',       SupplierInvoiceController::class, 'linkRemove',      true);
     Route::post('supplierinvoice/createfromorder/{orderid}', SupplierInvoiceController::class, 'createFromOrder', true);
     Route::post('supplierinvoice/{id}/pdf',                  SupplierInvoiceController::class, 'generatePdf',     true);
     Route::get('supplierinvoice/{id}/pdf/download',          SupplierInvoiceController::class, 'download',        true);
@@ -270,6 +376,65 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::put('event/{id}',       AgendaController::class, 'update',   true);
     Route::post('event/{id}/done', AgendaController::class, 'done',     true);
     Route::delete('event/{id}',    AgendaController::class, 'delete',   true);
+
+    // ********** Tier A - A1 - Customer shipments (Expedition) ********** //
+    Route::get('shipment/columns',            ShipmentController::class, 'columns',      true);
+    Route::get('shipment/lines/columns',      ShipmentController::class, 'linesColumns', true);
+    Route::get('shipment/describe',           ShipmentController::class, 'describe',     true);
+    Route::get('shipment/count',              ShipmentController::class, 'count',        true);
+    Route::get('shipment',                    ShipmentController::class, 'index',        true);
+    Route::get('shipment/{id}',               ShipmentController::class, 'show',         true);
+    Route::post('shipment',                   ShipmentController::class, 'create',       true);
+    Route::put('shipment/{id}',               ShipmentController::class, 'update',       true);
+    Route::delete('shipment/{id}',            ShipmentController::class, 'destroy',      true);
+    Route::post('shipment/{id}/validate',     ShipmentController::class, 'validate',     true);
+    Route::post('shipment/{id}/close',        ShipmentController::class, 'closeShipment', true);
+    Route::post('shipment/{id}/reopen',       ShipmentController::class, 'reopen',       true);
+    Route::post('shipment/{id}/setdraft',     ShipmentController::class, 'setDraft',     true);
+    Route::post('shipment/{id}/cancel',       ShipmentController::class, 'cancel',       true);
+    Route::delete('shipment/{id}/line/{lineid}', ShipmentController::class, 'deleteLine', true);
+    Route::get('shipment/{id}/links',         ShipmentController::class, 'links',        true);
+    Route::delete('shipment/{id}/link/{rowid}', ShipmentController::class, 'linkRemove', true);
+
+    // ********** Tier A - A2 - Supplier receptions (Reception) ********** //
+    Route::get('reception/columns',           ReceptionController::class, 'columns',      true);
+    Route::get('reception/lines/columns',     ReceptionController::class, 'linesColumns', true);
+    Route::get('reception/describe',          ReceptionController::class, 'describe',     true);
+    Route::get('reception/count',             ReceptionController::class, 'count',        true);
+    Route::get('reception',                   ReceptionController::class, 'index',        true);
+    Route::get('reception/{id}',              ReceptionController::class, 'show',         true);
+    Route::post('reception',                  ReceptionController::class, 'create',       true);
+    Route::put('reception/{id}',              ReceptionController::class, 'update',       true);
+    Route::delete('reception/{id}',           ReceptionController::class, 'destroy',      true);
+    Route::post('reception/{id}/validate',    ReceptionController::class, 'validate',     true);
+    Route::post('reception/{id}/close',       ReceptionController::class, 'closeReception', true);
+    Route::post('reception/{id}/reopen',      ReceptionController::class, 'reopen',       true);
+    Route::post('reception/{id}/setdraft',    ReceptionController::class, 'setDraft',     true);
+    Route::get('reception/{id}/links',        ReceptionController::class, 'links',        true);
+    Route::delete('reception/{id}/link/{rowid}', ReceptionController::class, 'linkRemove', true);
+
+    // ********** Tier A - A3 - Supplier price requests (SupplierProposal) ********** //
+    Route::get('supplierproposal/columns',               SupplierProposalController::class, 'columns',       true);
+    Route::get('supplierproposal/lines/columns',         SupplierProposalController::class, 'linesColumns',  true);
+    Route::get('supplierproposal/describe',              SupplierProposalController::class, 'describe',      true);
+    Route::get('supplierproposal/count',                 SupplierProposalController::class, 'count',         true);
+    Route::get('supplierproposal',                       SupplierProposalController::class, 'index',         true);
+    Route::get('supplierproposal/{id}',                  SupplierProposalController::class, 'show',          true);
+    Route::post('supplierproposal',                      SupplierProposalController::class, 'create',        true);
+    Route::put('supplierproposal/{id}',                  SupplierProposalController::class, 'update',        true);
+    Route::delete('supplierproposal',                    SupplierProposalController::class, 'deleteBulk',    true);
+    Route::delete('supplierproposal/{id}',               SupplierProposalController::class, 'destroy',       true);
+    Route::post('supplierproposal/{id}/validate',        SupplierProposalController::class, 'validate',      true);
+    Route::post('supplierproposal/{id}/setdraft',        SupplierProposalController::class, 'setDraft',      true);
+    Route::post('supplierproposal/{id}/closesign',       SupplierProposalController::class, 'closeSigned',   true);
+    Route::post('supplierproposal/{id}/closeunsign',     SupplierProposalController::class, 'closeUnsigned', true);
+    Route::post('supplierproposal/{id}/reopen',          SupplierProposalController::class, 'reopen',        true);
+    Route::post('supplierproposal/{id}/clone',           SupplierProposalController::class, 'cloneDocument', true);
+    Route::get('supplierproposal/{id}/links',            SupplierProposalController::class, 'links',         true);
+    Route::delete('supplierproposal/{id}/link/{rowid}',  SupplierProposalController::class, 'linkRemove',    true);
+    Route::post('supplierproposal/{id}/line',            SupplierProposalController::class, 'addLine',       true);
+    Route::put('supplierproposal/{id}/line/{lineid}',    SupplierProposalController::class, 'updateLine',    true);
+    Route::delete('supplierproposal/{id}/line/{lineid}', SupplierProposalController::class, 'deleteLine',    true);
 
     // ********** Document attachment (consume staged upload) ********** //
     // Pairs with SmartAuth's POST /upload: the PWA stages the binary, then

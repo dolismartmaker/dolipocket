@@ -1,0 +1,57 @@
+{
+    "title": "Receptions",
+    "title-singular": "Reception",
+    "list": {
+        "search-placeholder": "Search a reception...",
+        "empty": "No reception",
+        "filter-status": "Status",
+        "filter-all": "All"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Received lines",
+        "section-totals": "Totals",
+        "section-notes": "Notes",
+        "ref": "Reference",
+        "supplier": "Supplier",
+        "ref-supplier": "Supplier ref.",
+        "date-reception": "Reception date",
+        "date-delivery": "Planned delivery",
+        "tracking-number": "Tracking number",
+        "weight": "Weight",
+        "qty-asked": "Ordered qty",
+        "qty-received": "Received qty",
+        "warehouse": "Warehouse",
+        "batch": "Lot/Serial"
+    },
+    "create": {
+        "title": "New reception",
+        "lines": "Lines to receive",
+        "details": "Reception details",
+        "submit": "Create the reception",
+        "empty": "No receivable product line on this order."
+    },
+    "actions": {
+        "validate": "Validate",
+        "close": "Mark received",
+        "reopen": "Reopen",
+        "set-draft": "Set back to draft",
+        "delete": "Delete",
+        "create": "Create a reception"
+    },
+    "status-code": {
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Received"
+    },
+    "toasts": {
+        "create-success": "Reception created",
+        "validate-success": "Reception validated",
+        "close-success": "Reception marked received",
+        "reopen-success": "Reception reopened",
+        "set-draft-success": "Reception set back to draft",
+        "delete-success": "Reception deleted",
+        "load-error": "Failed to load receptions",
+        "action-error": "Action failed"
+    }
+}

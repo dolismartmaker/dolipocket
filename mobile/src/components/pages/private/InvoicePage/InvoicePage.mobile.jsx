@@ -1,4 +1,4 @@
-import { FaArrowLeft, FaTrash, FaPen, FaCheck } from "react-icons/fa";
+import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaCheckCircle, FaBan, FaCopy } from "react-icons/fa";
 
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
@@ -15,7 +15,8 @@ export const InvoicePageMobile = (props) => {
     const {
         invoice, loading, error, actionPending,
         isDraft, isPaid,
-        handleValidate, handleDelete,
+        handleValidate, handleDelete, handleClone,
+        handleSetDraft, handleSetPaid, handleSetCanceled, handleSetUnpaid,
         goEdit, goBack,
         dataSource, setInvoice,
     } = props;
@@ -140,6 +141,54 @@ export const InvoicePageMobile = (props) => {
                                 Valider
                             </Button>
                         )}
+                        {invoice.statut === 1 && (
+                            <Button
+                                onClick={handleSetDraft}
+                                icon={FaUndo}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Repasser en brouillon
+                            </Button>
+                        )}
+                        {invoice.statut === 1 && (
+                            <Button
+                                onClick={handleSetPaid}
+                                icon={FaCheckCircle}
+                                buttonProps={{ className: "p-3 rounded-lg bg-green-600 text-white" }}
+                                disabled={actionPending}
+                            >
+                                Classer payée
+                            </Button>
+                        )}
+                        {invoice.statut === 1 && (
+                            <Button
+                                onClick={handleSetCanceled}
+                                icon={FaBan}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Classer abandonnée
+                            </Button>
+                        )}
+                        {(invoice.statut === 2 || invoice.statut === 3) && (
+                            <Button
+                                onClick={handleSetUnpaid}
+                                icon={FaUndo}
+                                buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                                disabled={actionPending}
+                            >
+                                Repasser en impayée
+                            </Button>
+                        )}
+                        <Button
+                            onClick={handleClone}
+                            icon={FaCopy}
+                            buttonProps={{ className: "p-3 rounded-lg bg-gray-200 text-gray-800" }}
+                            disabled={actionPending}
+                        >
+                            Dupliquer
+                        </Button>
                         <Button
                             onClick={handleDelete}
                             icon={FaTrash}

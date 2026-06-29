@@ -1,0 +1,61 @@
+{
+    "title": "Shipments",
+    "title-singular": "Shipment",
+    "list": {
+        "search-placeholder": "Search a shipment...",
+        "empty": "No shipment",
+        "filter-status": "Status",
+        "filter-all": "All"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Shipped lines",
+        "section-totals": "Totals",
+        "section-notes": "Notes",
+        "ref": "Reference",
+        "customer": "Customer",
+        "ref-customer": "Customer ref.",
+        "date-expedition": "Shipping date",
+        "date-delivery": "Planned delivery",
+        "tracking-number": "Tracking number",
+        "shipping-method": "Carrier",
+        "weight": "Weight",
+        "qty-asked": "Ordered qty",
+        "qty-shipped": "Shipped qty",
+        "warehouse": "Warehouse"
+    },
+    "create": {
+        "title": "New shipment",
+        "lines": "Lines to ship",
+        "details": "Shipment details",
+        "submit": "Create the shipment",
+        "empty": "No shippable product line on this order.",
+        "order-not-validated": "This order is not validated. Validate it before shipping for accurate stock tracking."
+    },
+    "actions": {
+        "validate": "Validate",
+        "close": "Mark processed",
+        "reopen": "Reopen",
+        "set-draft": "Set back to draft",
+        "cancel": "Cancel",
+        "delete": "Delete",
+        "create": "Create a shipment"
+    },
+    "status-code": {
+        "-1": "Cancelled",
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Processed"
+    },
+    "toasts": {
+        "create-success": "Shipment created",
+        "validate-success": "Shipment validated",
+        "close-success": "Shipment marked processed",
+        "reopen-success": "Shipment reopened",
+        "set-draft-success": "Shipment set back to draft",
+        "cancel-success": "Shipment cancelled",
+        "delete-success": "Shipment deleted",
+        "load-error": "Failed to load shipments",
+        "action-error": "Action failed"
+    }
+}

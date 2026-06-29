@@ -1,0 +1,61 @@
+{
+    "title": "Expéditions",
+    "title-singular": "Expédition",
+    "list": {
+        "search-placeholder": "Rechercher une expédition...",
+        "empty": "Aucune expédition",
+        "filter-status": "Statut",
+        "filter-all": "Tous"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-lines": "Lignes expédiées",
+        "section-totals": "Totaux",
+        "section-notes": "Notes",
+        "ref": "Référence",
+        "customer": "Client",
+        "ref-customer": "Réf. client",
+        "date-expedition": "Date d'expédition",
+        "date-delivery": "Livraison prévue",
+        "tracking-number": "N° de suivi",
+        "shipping-method": "Transporteur",
+        "weight": "Poids",
+        "qty-asked": "Qté commandée",
+        "qty-shipped": "Qté expédiée",
+        "warehouse": "Entrepôt"
+    },
+    "create": {
+        "title": "Nouvelle expédition",
+        "lines": "Lignes à expédier",
+        "details": "Détails de l'expédition",
+        "submit": "Créer l'expédition",
+        "empty": "Aucune ligne produit expédiable sur cette commande.",
+        "order-not-validated": "Cette commande n'est pas validée. Validez-la avant d'expédier pour un suivi de stock correct."
+    },
+    "actions": {
+        "validate": "Valider",
+        "close": "Classer traitée",
+        "reopen": "Rouvrir",
+        "set-draft": "Repasser en brouillon",
+        "cancel": "Annuler",
+        "delete": "Supprimer",
+        "create": "Créer une expédition"
+    },
+    "status-code": {
+        "-1": "Annulée",
+        "0": "Brouillon",
+        "1": "Validée",
+        "2": "Traitée"
+    },
+    "toasts": {
+        "create-success": "Expédition créée",
+        "validate-success": "Expédition validée",
+        "close-success": "Expédition classée traitée",
+        "reopen-success": "Expédition rouverte",
+        "set-draft-success": "Expédition repassée en brouillon",
+        "cancel-success": "Expédition annulée",
+        "delete-success": "Expédition supprimée",
+        "load-error": "Impossible de charger les expéditions",
+        "action-error": "L'action a échoué"
+    }
+}

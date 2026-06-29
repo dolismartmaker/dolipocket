@@ -78,7 +78,7 @@ export const WarehousePageMobile = (props) => {
                             onClick={handleStockNav}
                             className="bg-white rounded-lg border border-gray-200 p-3 text-left hover:border-primary"
                         >
-                            <div className="text-sm font-medium text-primary">Voir l'inventaire de cet entrepôt</div>
+                            <div className="text-sm font-medium text-primary">Voir l&apos;inventaire de cet entrepôt</div>
                         </button>
                     </div>
 

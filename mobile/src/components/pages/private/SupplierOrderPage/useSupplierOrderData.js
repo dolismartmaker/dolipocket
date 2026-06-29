@@ -7,6 +7,7 @@ import { useStates, useConfirm } from "@cap-rel/smartcommon";
 import { useDbSupplierOrders } from "src/db/stores/supplierOrders/useDbSupplierOrders";
 import { useDbSupplierInvoices } from "src/db/stores/supplierInvoices/useDbSupplierInvoices";
 import { downloadBlob, filenameFromContentDisposition } from "src/lib/utils/downloadBlob";
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
 
 // Shared data layer for SupplierOrderPage (mobile + desktop). Workflow
 // transitions: 0 draft -> 1 validated -> 2 approved -> 3 ordered -> 4/5 received.
@@ -101,6 +102,29 @@ export const useSupplierOrderData = (overrideId) => {
     const handleOrder    = () => runAction("Commander", () => dbSO.order(id, {}));
     const handleReceive  = () => runAction("Réceptionner", () => dbSO.receive(id, {}));
 
+    // Revert a validated (but not yet approved) supplier order back to draft so
+    // it becomes freely editable again. Gated by statut === 1 in the UI.
+    const handleSetDraft = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Repasser en brouillon ?",
+            message: "La commande fournisseur redeviendra librement modifiable.",
+            confirmText: "Repasser en brouillon",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSO.setDraft(id);
+            set("order", data);
+        } catch (err) {
+            console.error("dbSO.setDraft error", err);
+            set("error", "Erreur lors du retour en brouillon");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
     const handleDelete = async () => {
         const ok = await confirm({
             type: "delete",
@@ -117,6 +141,28 @@ export const useSupplierOrderData = (overrideId) => {
         } catch (err) {
             console.error("dbSO.remove error", err);
             set("error", "Erreur lors de la suppression");
+            set("actionPending", false);
+        }
+    };
+
+    // Duplicate the current supplier order into a fresh draft and navigate to it.
+    const handleClone = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Dupliquer cette commande fournisseur ?",
+            message: "Une nouvelle commande fournisseur brouillon sera créée à partir de celle-ci.",
+            confirmText: "Dupliquer",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbSO.clone(id);
+            if (data?.id) navigate(`/supplier-orders/${data.id}`);
+        } catch (err) {
+            console.error("supplierOrder.clone error", err);
+            set("error", "Erreur lors de la duplication");
+        } finally {
             set("actionPending", false);
         }
     };
@@ -188,7 +234,7 @@ export const useSupplierOrderData = (overrideId) => {
             } else if (status === 410) {
                 toast.error("Le fichier PDF n'existe plus. Régénérez-le.");
             } else if (status === 403) {
-                toast.error("Accès refusé.");
+                notifyAccessDenied(err);
             } else {
                 toast.error("Erreur lors du téléchargement du PDF");
             }
@@ -205,6 +251,8 @@ export const useSupplierOrderData = (overrideId) => {
 
     const goEdit = () => navigate(`/supplier-orders/${id}/edit`);
     const goBack = () => navigate("/supplier-orders");
+    // Tier A - A2: jump to the "create reception from this supplier order" flow.
+    const goReception = () => navigate(`/supplier-orders/${id}/reception`);
 
     const statut = Number(order?.statut ?? 0);
 
@@ -213,16 +261,19 @@ export const useSupplierOrderData = (overrideId) => {
         order, loading, error, actionPending,
         statut,
         isDraft: statut === 0,
+        isValidated: statut === 1,
         canApprove: statut === 1,
         canOrder: statut === 2,
         canReceive: statut === 3 || statut === 4,
         canConvertToInvoice: statut >= 3,
         handleValidate, handleApprove, handleOrder, handleReceive,
+        handleSetDraft,
         handleDelete, handleConvertToInvoice,
+        handleClone,
         handleGeneratePdf,
         handleDownloadPdf,
         hasLastMainDoc: !!(order?.lastMainDoc),
-        goEdit, goBack,
+        goEdit, goBack, goReception,
         dataSource: dbSO,
         // Expose a setter so the embedded DocumentLinesEditor can refresh
         // the supplier order state after addLine/updateLine/deleteLine.

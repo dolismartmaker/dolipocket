@@ -1,4 +1,4 @@
-import { HashRouter, Route, Routes } from "react-router-dom";
+import { Route, Routes } from "react-router-dom";
 
 import {
     // App layouts + bootstrapped pages
@@ -20,16 +20,34 @@ import {
     // Lot 4 - Cycle achat
     SupplierOrdersPage, SupplierOrderPage, SupplierOrderEditPage,
     SupplierInvoicesPage, SupplierInvoicePage, SupplierInvoiceEditPage,
+    // Tier A - A1 - Expeditions (Expedition)
+    ShipmentsPage, ShipmentPage, ShipmentCreatePage,
+    // Tier A - A2 - Receptions (Reception)
+    ReceptionsPage, ReceptionPage, ReceptionCreatePage,
+    // Tier A - A3 - Supplier price requests (SupplierProposal)
+    SupplierProposalsPage, SupplierProposalPage, SupplierProposalEditPage,
+    // Tier A - A5b - Recurring invoice templates (FactureRec)
+    InvoiceTemplatesPage, InvoiceTemplatePage,
     // Lot 5 - Agenda + GED
     AgendaPage, AgendaEventPage, AgendaEventEditPage,
     DocumentsPage, DocumentsObjectPage,
 } from "src/components";
 
 import { RequirePermission } from "src/lib/permissions";
+// Runtime-discovered features shipped by OTHER Dolibarr modules (e.g. capmail),
+// loaded via Module Federation. The set is advertised by GET /home and mounted
+// dynamically -- the host bundle (built by `make pwa`) knows nothing about them.
+import { usePluginRoutes } from "src/lib/plugins/PluginRoutes";
 
+// The HashRouter is mounted by smartcommon's <Provider> (config.router:"hash",
+// set in SmartCommonProvider). This component only declares the route tree and
+// renders INSIDE that router -- so it returns <Routes> directly, no Router here.
 export const Router = () => {
+    // Routes contributed by discovered plugin remotes (empty unless a plugin
+    // module is active server-side). Mounted under the AppShell below.
+    const pluginRoutes = usePluginRoutes();
+
     return (
-        <HashRouter>
             <Routes>
                 <Route element={<PagesLayout />}>
                     <Route element={<PublicPagesLayout />}>
@@ -116,12 +134,44 @@ export const Router = () => {
                                         <Route path="/invoices/:id/edit" element={<InvoiceEditPage />} />
                                     </Route>
 
+                                    {/* Tier A - A1 - Expeditions (Expedition) */}
+                                    <Route element={<RequirePermission perm="shipment.read" />}>
+                                        <Route path="/shipments" element={<ShipmentsPage />} />
+                                        <Route path="/shipments/:id" element={<ShipmentPage />} />
+                                    </Route>
+                                    <Route element={<RequirePermission perm="shipment.create" />}>
+                                        <Route path="/orders/:id/ship" element={<ShipmentCreatePage />} />
+                                    </Route>
+
+                                    {/* Tier A - A3 - Demandes de prix fournisseur */}
+                                    <Route element={<RequirePermission perm="supplierproposal.read" />}>
+                                        <Route path="/supplier-proposals" element={<SupplierProposalsPage />} />
+                                        <Route path="/supplier-proposals/new" element={<SupplierProposalEditPage />} />
+                                        <Route path="/supplier-proposals/:id" element={<SupplierProposalPage />} />
+                                        <Route path="/supplier-proposals/:id/edit" element={<SupplierProposalEditPage />} />
+                                    </Route>
+
+                                    {/* Tier A - A5b - Factures récurrentes */}
+                                    <Route element={<RequirePermission perm="invoicerec.read" />}>
+                                        <Route path="/invoice-templates" element={<InvoiceTemplatesPage />} />
+                                        <Route path="/invoice-templates/:id" element={<InvoiceTemplatePage />} />
+                                    </Route>
+
                                     {/* Lot 4 - Commandes fournisseur */}
                                     <Route element={<RequirePermission perm="supplierorder.read" />}>
                                         <Route path="/supplier-orders" element={<SupplierOrdersPage />} />
                                         <Route path="/supplier-orders/new" element={<SupplierOrderEditPage />} />
                                         <Route path="/supplier-orders/:id" element={<SupplierOrderPage />} />
                                         <Route path="/supplier-orders/:id/edit" element={<SupplierOrderEditPage />} />
+                                    </Route>
+
+                                    {/* Tier A - A2 - Receptions (Reception) */}
+                                    <Route element={<RequirePermission perm="reception.read" />}>
+                                        <Route path="/receptions" element={<ReceptionsPage />} />
+                                        <Route path="/receptions/:id" element={<ReceptionPage />} />
+                                    </Route>
+                                    <Route element={<RequirePermission perm="reception.create" />}>
+                                        <Route path="/supplier-orders/:id/reception" element={<ReceptionCreatePage />} />
                                     </Route>
 
                                     {/* Lot 4 - Factures fournisseur */}
@@ -139,6 +189,11 @@ export const Router = () => {
                                         <Route path="/agenda/:id" element={<AgendaEventPage />} />
                                         <Route path="/agenda/:id/edit" element={<AgendaEventEditPage />} />
                                     </Route>
+
+                                    {/* Routes contributed by discovered plugin remotes
+                                        (e.g. capmail "/mail"). Empty unless a plugin
+                                        module is active server-side. */}
+                                    {pluginRoutes}
                                 </Route>
                             </Route>
                         </Route>
@@ -146,6 +201,5 @@ export const Router = () => {
                     <Route path="*" element={<Error404Page />} />
                 </Route>
             </Routes>
-        </HashRouter>
     );
 };

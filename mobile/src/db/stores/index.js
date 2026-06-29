@@ -11,3 +11,7 @@ export * from "./invoices";
 export * from "./supplierOrders";
 export * from "./supplierInvoices";
 export * from "./agenda";
+export * from "./shipments";
+export * from "./receptions";
+export * from "./supplierProposals";
+export * from "./invoiceRecs";

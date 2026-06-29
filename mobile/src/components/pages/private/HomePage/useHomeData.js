@@ -10,6 +10,8 @@ import { useDbProposals } from "src/db/stores/proposals/useDbProposals";
 import { useDbOrders } from "src/db/stores/orders/useDbOrders";
 import { useDbSupplierInvoices } from "src/db/stores/supplierInvoices/useDbSupplierInvoices";
 import { useDbSupplierOrders } from "src/db/stores/supplierOrders/useDbSupplierOrders";
+import { useDbAgenda } from "src/db/stores/agenda/useDbAgenda";
+import { startOfMonth, endOfMonth, dateToTs, addDays } from "src/lib/calendar";
 
 // -- formatting helpers (presentational but pure, kept here so both
 // mobile and desktop views render identical numbers/dates).
@@ -28,6 +30,15 @@ export const fmtDate = (ts) => {
 const sum = (items, field) =>
     (items ?? []).reduce((acc, it) => acc + Number(it[field] ?? 0), 0);
 
+// Resolve a dashboard list fetch, logging (never swallowing) any failure so a
+// partial outage surfaces in the console instead of silently showing 0 KPIs.
+// Respects the project "No silent failures" rule.
+const loadOr = (promise, label) =>
+    promise.catch((err) => {
+        console.error(`[useHomeData] ${label} load failed`, err);
+        return [];
+    });
+
 const INVOICE_STATUS = { DRAFT: 0, VALIDATED: 1, PAID: 2, ABANDONED: 3 };
 const PROPOSAL_STATUS = { DRAFT: 0, VALIDATED: 1, SIGNED: 2, REFUSED: 3, BILLED: 4 };
 const ORDER_STATUS = { DRAFT: 0, VALIDATED: 1, SHIPPED: 2, BILLED: 3 };
@@ -44,6 +55,7 @@ export const useHomeData = () => {
     const dbOrders = useDbOrders();
     const dbSI = useDbSupplierInvoices();
     const dbSO = useDbSupplierOrders();
+    const dbAgenda = useDbAgenda();
     const hasClient = !!dbInvoices.list;
 
     const { states, set } = useStates({
@@ -53,6 +65,7 @@ export const useHomeData = () => {
         orders: [],
         supplierInvoices: [],
         supplierOrders: [],
+        agendaEvents: [],
     });
 
     const {
@@ -62,6 +75,7 @@ export const useHomeData = () => {
         orders,
         supplierInvoices,
         supplierOrders,
+        agendaEvents,
     } = states ?? {};
 
     useEffect(() => {
@@ -72,19 +86,26 @@ export const useHomeData = () => {
 
     const loadDashboard = async () => {
         set("loading", true);
+        // Agenda window: the whole current month (for the mini-month dots)
+        // plus a 2-week spillover (for the "upcoming" list).
+        const now = new Date();
+        const agendaStart = dateToTs(startOfMonth(now));
+        const agendaEnd = dateToTs(addDays(endOfMonth(now), 14));
         try {
-            const [inv, prop, ord, sinv, sord] = await Promise.all([
-                dbInvoices.list({}).catch(() => []),
-                dbProposals.list({}).catch(() => []),
-                dbOrders.list({}).catch(() => []),
-                dbSI.list({}).catch(() => []),
-                dbSO.list({}).catch(() => []),
+            const [inv, prop, ord, sinv, sord, agenda] = await Promise.all([
+                loadOr(dbInvoices.list({}), "invoices"),
+                loadOr(dbProposals.list({}), "proposals"),
+                loadOr(dbOrders.list({}), "orders"),
+                loadOr(dbSI.list({}), "supplierInvoices"),
+                loadOr(dbSO.list({}), "supplierOrders"),
+                loadOr(dbAgenda.list({ start: agendaStart, end: agendaEnd }), "agenda"),
             ]);
             set("invoices",         Array.isArray(inv)  ? inv  : []);
             set("proposals",        Array.isArray(prop) ? prop : []);
             set("orders",           Array.isArray(ord)  ? ord  : []);
             set("supplierInvoices", Array.isArray(sinv) ? sinv : []);
             set("supplierOrders",   Array.isArray(sord) ? sord : []);
+            set("agendaEvents",     Array.isArray(agenda) ? agenda : []);
         } finally {
             set("loading", false);
         }
@@ -154,6 +175,7 @@ export const useHomeData = () => {
         invoices,
         proposals,
         orders,
+        agendaEvents,
         // KPIs
         unpaidInvoices,
         unpaidTotal,

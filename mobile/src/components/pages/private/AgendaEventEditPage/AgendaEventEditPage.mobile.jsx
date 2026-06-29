@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft, FaSave } from "react-icons/fa";
 
 import { Page, useStates } from "@cap-rel/smartcommon";
@@ -47,8 +47,15 @@ export const AgendaEventEditPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const dbAgenda = useDbAgenda();
+    const [searchParams] = useSearchParams();
 
     const isNew = !id;
+
+    // Calendar click-to-create passes ?datep=<unix seconds>; prefill the start.
+    const datepParam = Number(searchParams.get("datep"));
+    const seededDatep = isNew && Number.isFinite(datepParam) && datepParam > 0
+        ? tsToInput(datepParam)
+        : "";
 
     const { states, set } = useStates({
         loading: !isNew,
@@ -57,7 +64,7 @@ export const AgendaEventEditPage = () => {
         form: {
             label: "",
             typeCode: "AC_OTH",
-            datep: "",
+            datep: seededDatep,
             datef: "",
             fulldayevent: false,
             location: "",
@@ -71,7 +78,18 @@ export const AgendaEventEditPage = () => {
 
     const { loading, saving, error, form } = states ?? {};
 
-    // Guard: wait for states to be initialized
+    const hasClient = !!dbAgenda.list;
+
+    useEffect(() => {
+        if (isNew) return;
+        if (!hasClient || !id) return;
+        loadEvent();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasClient, id, isNew]);
+
+    // Guard: wait for states to be initialized. MUST come AFTER all hooks
+    // (here the useEffect above) -- an early return placed before a hook
+    // violates the Rules of Hooks (react-hooks/rules-of-hooks).
     if (!form) {
         return (
             <Page contentProps={{ className: "bg-gray-50 min-h-screen" }}>
@@ -81,15 +99,6 @@ export const AgendaEventEditPage = () => {
             </Page>
         );
     }
-
-    const hasClient = !!dbAgenda.list;
-
-    useEffect(() => {
-        if (isNew) return;
-        if (!hasClient || !id) return;
-        loadEvent();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hasClient, id, isNew]);
 
     const loadEvent = async () => {
         set("loading", true);

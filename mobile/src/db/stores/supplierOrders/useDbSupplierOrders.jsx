@@ -154,6 +154,44 @@ export const useDbSupplierOrders = () => {
             return cache(mapFromBackend(raw));
         },
 
+        setDraft: async (id) => {
+            const raw = await post(`supplierorder/${id}/setdraft`);
+            return cache(mapFromBackend(raw));
+        },
+
+        // Duplicate the supplier order (Dolibarr createFromClone).
+        clone: async (id) => {
+            const raw = await post(`supplierorder/${id}/clone`);
+            return cache(mapFromBackend(raw));
+        },
+
+        // Contacts/addresses tab: linked contacts + available types.
+        listContacts: async (id, { signal } = {}) => {
+            const data = await get(`supplierorder/${id}/contacts`, { signal });
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+        addContact: async (id, { contactId, typeId, source } = {}) => {
+            const json = { contact_id: Number(contactId), type_id: Number(typeId) };
+            if (source) json.source = String(source);
+            return post(`supplierorder/${id}/contact`, { json });
+        },
+        removeContact: async (id, rowid) => {
+            await del(`supplierorder/${id}/contact/${rowid}`);
+            const data = await get(`supplierorder/${id}/contacts`);
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+
+        // Linked objects (document chain).
+        listLinks: async (id, { signal } = {}) => {
+            const data = await get(`supplierorder/${id}/links`, { signal });
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+        removeLink: async (id, rowid) => {
+            await del(`supplierorder/${id}/link/${rowid}`);
+            const data = await get(`supplierorder/${id}/links`);
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+
         // Generate PDF for the supplier order. Backend returns
         // { ok, file, model } -- forwarded as-is to the caller.
         generatePdf: async (id, opts = {}) => {

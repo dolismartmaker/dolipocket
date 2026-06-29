@@ -7,11 +7,15 @@ import { SearchPicker } from "../../../common/SearchPicker";
 
 import { useDbSupplierInvoices } from "src/db/stores/supplierInvoices/useDbSupplierInvoices";
 
+// Values MUST match Dolibarr FactureFournisseur type constants
+// (fournisseur.facture.class.php): TYPE_STANDARD=0, TYPE_REPLACEMENT=1,
+// TYPE_CREDIT_NOTE=2, TYPE_DEPOSIT=3. The previous labelling was shifted
+// (1=Avoir, 2=Acompte) and silently wrote the wrong type to the database.
 const TYPE_OPTIONS = [
     { value: "0", label: "Standard" },
-    { value: "1", label: "Avoir" },
-    { value: "2", label: "Acompte" },
-    { value: "3", label: "Acompte (variant)" },
+    { value: "1", label: "Remplacement" },
+    { value: "2", label: "Avoir" },
+    { value: "3", label: "Acompte" },
 ];
 
 const toDateInput = (value) => {

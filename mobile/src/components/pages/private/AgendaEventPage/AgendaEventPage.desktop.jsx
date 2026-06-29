@@ -1,6 +1,7 @@
 import { FaArrowLeft, FaPen, FaTrash, FaCircleCheck } from "react-icons/fa6";
 
 import { DocumentHeaderFields } from "src/lib/datatable";
+import { DocumentsSection } from "src/lib/components/DocumentsSection";
 
 // Desktop rendering of the agenda event detail page. Single-column centered
 // layout (read-only document with header only -- no lines). Driven by the
@@ -138,6 +139,10 @@ export const AgendaEventPageDesktop = (props) => {
                             storageKey="dolipocket.agendaeventpage.header"
                             title="Informations"
                             overrides={HEADER_OVERRIDES}
+                        />
+                        <DocumentsSection
+                            objectType="event"
+                            objectId={Number(item.id)}
                         />
                     </div>
                 )}

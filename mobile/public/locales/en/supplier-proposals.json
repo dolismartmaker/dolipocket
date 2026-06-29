@@ -1,0 +1,58 @@
+{
+    "title": "Price requests",
+    "title-singular": "Price request",
+    "list": {
+        "search-placeholder": "Search a price request...",
+        "empty": "No price request",
+        "create": "New price request",
+        "filter-status": "Status",
+        "filter-all": "All"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-lines": "Lines",
+        "section-totals": "Totals",
+        "section-notes": "Notes",
+        "ref": "Reference",
+        "supplier": "Supplier",
+        "date-creation": "Created on",
+        "delivery-date": "Requested delivery date"
+    },
+    "edit": {
+        "title-create": "New price request",
+        "title-edit": "Edit price request",
+        "supplier": "Supplier",
+        "delivery-date": "Requested delivery date",
+        "note-public": "Public note",
+        "note-private": "Private note",
+        "save": "Save"
+    },
+    "actions": {
+        "validate": "Validate",
+        "sign": "Sign",
+        "unsign": "Not signed",
+        "reopen": "Reopen",
+        "set-draft": "Set back to draft",
+        "clone": "Duplicate",
+        "delete": "Delete"
+    },
+    "status-code": {
+        "0": "Draft",
+        "1": "Validated",
+        "2": "Signed",
+        "3": "Not signed",
+        "4": "Closed"
+    },
+    "toasts": {
+        "create-success": "Price request created",
+        "update-success": "Price request updated",
+        "validate-success": "Price request validated",
+        "sign-success": "Price request signed",
+        "unsign-success": "Price request marked not signed",
+        "reopen-success": "Price request reopened",
+        "clone-success": "Price request duplicated",
+        "delete-success": "Price request deleted",
+        "load-error": "Failed to load price requests",
+        "action-error": "Action failed"
+    }
+}

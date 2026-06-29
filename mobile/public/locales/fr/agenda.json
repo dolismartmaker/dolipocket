@@ -1,5 +1,18 @@
 {
     "title": "Agenda",
+    "today": "Aujourd'hui",
+    "tomorrow": "Demain",
+    "prev": "Précédent",
+    "next": "Suivant",
+    "all-day": "Journée",
+    "upcoming": "À venir",
+    "see-all": "Voir tout",
+    "none-upcoming": "Aucun événement à venir",
+    "stats": {
+        "events_one": "{{count}} événement",
+        "events_other": "{{count}} événements",
+        "todo": "{{count}} à faire"
+    },
     "list": {
         "search-placeholder": "Rechercher un événement...",
         "filter-all": "Tous",

@@ -7,6 +7,7 @@ import { useStates, useConfirm } from "@cap-rel/smartcommon";
 import { useDbProposals } from "src/db/stores/proposals/useDbProposals";
 import { useDbOrders } from "src/db/stores/orders/useDbOrders";
 import { downloadBlob, filenameFromContentDisposition } from "src/lib/utils/downloadBlob";
+import { notifyAccessDenied } from "src/lib/permissions/notifyAccessDenied";
 
 // Shared data layer for ProposalPage (mobile + desktop). Holds the proposal
 // fetch, the workflow actions (validate / closeSigned / closeUnsigned / delete)
@@ -138,6 +139,48 @@ export const useProposalData = (overrideId) => {
         }
     };
 
+    const handleSetDraft = async () => {
+        const ok = await confirm({
+            type: "warning",
+            title: "Repasser en brouillon ?",
+            message: "Le devis redeviendra librement modifiable.",
+            confirmText: "Repasser en brouillon",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbProposals.setDraft(id);
+            set("proposal", data);
+        } catch (err) {
+            console.error("dbProposals.setDraft error", err);
+            set("error", "Erreur lors du retour en brouillon");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    const handleClassifyBilled = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Classer facturé ?",
+            message: "Le devis sera marqué comme facturé.",
+            confirmText: "Classer facturé",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbProposals.classifyBilled(id);
+            set("proposal", data);
+        } catch (err) {
+            console.error("dbProposals.classifyBilled error", err);
+            set("error", "Erreur lors du classement facturé");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
     const handleDelete = async () => {
         const ok = await confirm({
             type: "delete",
@@ -176,6 +219,29 @@ export const useProposalData = (overrideId) => {
         } catch (err) {
             console.error("dbOrders.createFromProposal error", err);
             set("error", "Erreur lors de la création de la commande");
+        } finally {
+            set("actionPending", false);
+        }
+    };
+
+    const handleClone = async () => {
+        const ok = await confirm({
+            type: "info",
+            title: "Dupliquer ce devis ?",
+            message: "Un nouveau devis brouillon sera créé à partir de celui-ci.",
+            confirmText: "Dupliquer",
+            cancelText: "Annuler",
+        });
+        if (!ok) return;
+        set("actionPending", true);
+        try {
+            const data = await dbProposals.clone(id);
+            if (data?.id) {
+                navigate(`/proposals/${data.id}`);
+            }
+        } catch (err) {
+            console.error("dbProposals.clone error", err);
+            set("error", "Erreur lors de la duplication");
         } finally {
             set("actionPending", false);
         }
@@ -247,7 +313,7 @@ export const useProposalData = (overrideId) => {
             } else if (status === 410) {
                 toast.error("Le fichier PDF n'existe plus. Régénérez-le.");
             } else if (status === 403) {
-                toast.error("Accès refusé.");
+                notifyAccessDenied(err);
             } else {
                 toast.error("Erreur lors du téléchargement du PDF");
             }
@@ -264,8 +330,11 @@ export const useProposalData = (overrideId) => {
         proposal, loading, error, actionPending,
         isDraft: proposal?.statut === 0,
         isValidated: proposal?.statut === 1,
+        isSigned: proposal?.statut === 2,
         handleValidate, handleSign, handleUnsign, handleDelete,
+        handleSetDraft, handleClassifyBilled,
         handleConvertToOrder,
+        handleClone,
         handleGeneratePdf,
         handleDownloadPdf,
         hasLastMainDoc: !!(proposal?.lastMainDoc),

@@ -155,6 +155,79 @@ export const useDbOrders = () => {
             return mapped;
         },
 
+        setDraft: async (id) => {
+            const raw = await post(`order/${id}/setdraft`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        classifyBilled: async (id) => {
+            const raw = await post(`order/${id}/classifybilled`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        closeOrder: async (id) => {
+            const raw = await post(`order/${id}/close`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        cancel: async (id) => {
+            const raw = await post(`order/${id}/cancel`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Duplicate the order (Dolibarr createFromClone). Returns the new draft.
+        clone: async (id) => {
+            const raw = await post(`order/${id}/clone`);
+            const mapped = mapFromBackend(raw);
+            if (mapped && store) {
+                await store.put(stripLines(mapped)).catch(() => undefined);
+            }
+            return mapped;
+        },
+
+        // Contacts/addresses tab: linked contacts + available types.
+        listContacts: async (id, { signal } = {}) => {
+            const data = await get(`order/${id}/contacts`, { signal });
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+        addContact: async (id, { contactId, typeId, source } = {}) => {
+            const json = { contact_id: Number(contactId), type_id: Number(typeId) };
+            if (source) json.source = String(source);
+            return post(`order/${id}/contact`, { json });
+        },
+        removeContact: async (id, rowid) => {
+            await del(`order/${id}/contact/${rowid}`);
+            const data = await get(`order/${id}/contacts`);
+            return data && typeof data === "object" ? data : { contacts: [], types: [] };
+        },
+
+        // Linked objects (document chain).
+        listLinks: async (id, { signal } = {}) => {
+            const data = await get(`order/${id}/links`, { signal });
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+        removeLink: async (id, rowid) => {
+            await del(`order/${id}/link/${rowid}`);
+            const data = await get(`order/${id}/links`);
+            return Array.isArray(data?.links) ? data.links : [];
+        },
+
         // Generate PDF for the order. Backend returns
         // { ok, file, model } -- forwarded as-is to the caller.
         generatePdf: async (id, opts = {}) => {

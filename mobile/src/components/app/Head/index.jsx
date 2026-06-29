@@ -16,7 +16,7 @@ export const Head = () => {
             <meta name="background-color" content={backgroundColor} />
 
             <link rel="manifest" href="manifest.webmanifest" crossOrigin="use-credentials" />    
-            <title>SmartMaker</title>
+            <title>Dolipocket</title>
         </Helmet>
     );
 };
