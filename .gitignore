@@ -22,8 +22,6 @@
 # Personal scratch files
 eric_debug.md
 *.scratch.md
-# Local dev tooling (generated from .dist files)
-/Makefile
 /.phpstan.local.neon
 # PHPUnit cache
 /.phpunit.cache/
