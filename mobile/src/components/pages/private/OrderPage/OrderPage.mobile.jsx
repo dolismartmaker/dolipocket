@@ -3,6 +3,7 @@ import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaFileInvoiceDollar, FaTr
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { noteToText } from "src/lib/utils/htmlText";
 
 import { STATUS_LABELS, fmtAmount, fmtDate } from "./useOrderData";
 
@@ -81,13 +82,13 @@ export const OrderPageMobile = (props) => {
                             {order.notePublic && (
                                 <div className="mb-2">
                                     <div className="text-xs text-gray-500">Publique</div>
-                                    <div className="whitespace-pre-wrap">{order.notePublic}</div>
+                                    <div className="whitespace-pre-wrap">{noteToText(order.notePublic)}</div>
                                 </div>
                             )}
                             {order.notePrivate && (
                                 <div>
                                     <div className="text-xs text-gray-500">Privée</div>
-                                    <div className="whitespace-pre-wrap">{order.notePrivate}</div>
+                                    <div className="whitespace-pre-wrap">{noteToText(order.notePrivate)}</div>
                                 </div>
                             )}
                         </Block>

@@ -176,6 +176,31 @@ export const useDbThirdParties = () => {
             return Array.isArray(data?.discounts) ? data.discounts : [];
         },
 
+        // Cockpit: 360 synthesis of the thirdparty for the desktop fiche.
+        // Backend GET thirdparty/{id}/cockpit -> single aggregation payload
+        // { currency, permissions, counts, ca, caTotal, invoicesRecent,
+        //   invoicesUnpaid, unpaidTotal, contactsRecent, events }. Read-through
+        // only (no Dexie cache): it is a derived view, not an entity.
+        cockpit: async (id, { signal } = {}) => {
+            const data = await get(`thirdparty/${id}/cockpit`, { signal });
+            return data && typeof data === "object" ? data : null;
+        },
+
+        // Send a free email to the thirdparty (no document attachment).
+        // Backend POST thirdparty/{id}/email -> { ok, to, subject, eventId, ... }.
+        // Throws (ky HTTPError) on a 4xx/5xx so the modal surfaces the error.
+        sendEmail: async (id, { to, subject, body, cc, bcc, ishtml } = {}) => {
+            const json = {
+                to: to ?? "",
+                subject: subject ?? "",
+                body: body ?? "",
+            };
+            if (cc) json.cc = cc;
+            if (bcc) json.bcc = bcc;
+            if (ishtml) json.ishtml = 1;
+            return post(`thirdparty/${id}/email`, { json });
+        },
+
         cacheLocal: (item) => (store ? store.put(item) : Promise.resolve()),
         cacheList: (items) => (store ? store.bulkPut(items) : Promise.resolve()),
         readCache: async ({ q, client, fournisseur } = {}) => {

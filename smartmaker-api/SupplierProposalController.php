@@ -448,13 +448,7 @@ class SupplierProposalController
             return [['error' => 'Supplier proposal not found'], 404];
         }
 
-        $data = $this->mapper->exportMappedData($sp);
-        // Hydrate thirdparty (supplier) name + email for the detail summary band.
-        $sp->fetch_thirdparty();
-        $data->socname = ($sp->thirdparty && !empty($sp->thirdparty->name)) ? $sp->thirdparty->name : '';
-        $data->socEmail = ($sp->thirdparty && !empty($sp->thirdparty->email)) ? $sp->thirdparty->email : '';
-
-        return [$data, 200];
+        return [$this->mapper->exportMappedData($sp), 200];
     }
 
     /**

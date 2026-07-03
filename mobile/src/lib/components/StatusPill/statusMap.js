@@ -103,6 +103,13 @@ export const STATUS_MAP = {
         0: { label: "Actif",     tone: "emerald" },
         1: { label: "Suspendu",  tone: "amber"   },
     },
+    // Project (projet). Native fk_statut values: 0 draft, 1 open/validated,
+    // 2 closed. Lot B1.
+    project: {
+        0: { label: "Brouillon", tone: "gray"    },
+        1: { label: "Ouvert",    tone: "blue"    },
+        2: { label: "Fermé",     tone: "emerald" },
+    },
 };
 
 // Normalize the status key for lookup. Accepts numbers and strings,

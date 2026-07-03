@@ -1,44 +1,35 @@
 import { FaArrowLeft, FaPen, FaTrash } from "react-icons/fa6";
 
-import { DocumentHeaderFields } from "src/lib/datatable";
-import { ThirdPartyCategoriesSection } from "src/lib/components/ThirdPartyCategoriesSection";
-import { ThirdPartyBankSection } from "src/lib/components/ThirdPartyBankSection";
+import { useMenu } from "src/lib/permissions";
+import { ThirdPartyCockpit } from "src/lib/cockpit/ThirdPartyCockpit";
+import { ThirdPartyActions } from "./ThirdPartyActions";
 
-// Desktop rendering of the third party detail page. Single-column centered
-// layout (no lines feature here -- read-only document with header only).
+// Desktop rendering of the third party detail page: a "cockpit" -- a 360
+// synthesis of the thirdparty (coordinates, sales KPIs, turnover chart, recent
+// and unpaid invoices, contacts, events, categories, bank accounts) laid out
+// as a masonry of cards that fills the available width (cf .claude/CLAUDE.md
+// "Fiche tiers = cockpit").
 //
-// Strict adherence to .claude/CLAUDE.md "Conventions UI desktop épurées" :
+// Strict adherence to .claude/CLAUDE.md "Conventions UI desktop épurées":
 //   - bg-white rounded-xl border border-soft-border (no shadow)
-//   - density tight (p-3/p-4 max)
-//   - separators via border-b, never shadow
-//   - hover:bg-medium-bg only, no transition-all, no hover:shadow-md
-//   - no active:, no rounded-2xl, no gradient on cards.
+//   - density tight, separators via border-b, hover:bg-medium-bg only
+//   - no transition-all, no active:, no rounded-2xl, no gradient on cards.
 
-export const HEADER_OVERRIDES = {
-    name:             { defaultVisible: true },
-    nameAlias:        { defaultVisible: true },
-    codeClient:       { defaultVisible: true },
-    codeFournisseur:  { defaultVisible: true },
-    client:           { defaultVisible: true,  formatter: (v) => Number(v) > 0 ? "Oui" : "Non" },
-    fournisseur:      { defaultVisible: true,  formatter: (v) => Number(v) > 0 ? "Oui" : "Non" },
-    address:          { defaultVisible: true },
-    zip:              { defaultVisible: true },
-    town:             { defaultVisible: true },
-    countryCode:      { defaultVisible: true },
-    phone:            { defaultVisible: true },
-    email:            { defaultVisible: true },
-    url:              { defaultVisible: true },
-    siren:            { defaultVisible: false },
-    siret:            { defaultVisible: false },
-    tvaIntra:         { defaultVisible: false },
-};
+const Chip = ({ label, cls }) => (
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium ${cls}`}>
+        {label}
+    </span>
+);
 
 export const ThirdPartyPageDesktop = (props) => {
     const {
         item, loading, error, deleting,
-        handleBack, handleEdit, handleDelete,
+        handleBack, handleEdit, handleDelete, saveField,
         dataSource,
     } = props;
+
+    const { has } = useMenu();
+    const canEdit = has("thirdparty.write");
 
     return (
         <div className="flex flex-col h-full w-full bg-medium-bg overflow-hidden">
@@ -59,10 +50,29 @@ export const ThirdPartyPageDesktop = (props) => {
                     <span className="text-[12px] text-soft-text truncate">{item.nameAlias}</span>
                 )}
 
+                {!loading && item && (
+                    <div className="flex items-center gap-1.5">
+                        {(item.client === 1 || item.client === 3) && (
+                            <Chip label="Client" cls="bg-green-100 text-green-800" />
+                        )}
+                        {(item.client === 2 || item.client === 3) && (
+                            <Chip label="Prospect" cls="bg-sky-100 text-sky-800" />
+                        )}
+                        {item.fournisseur > 0 && (
+                            <Chip label="Fournisseur" cls="bg-violet-100 text-violet-800" />
+                        )}
+                        <Chip
+                            label={item.status === 0 ? "Fermé" : "Ouvert"}
+                            cls={item.status === 0 ? "bg-gray-100 text-gray-600" : "bg-emerald-100 text-emerald-800"}
+                        />
+                    </div>
+                )}
+
                 <span className="flex-1" />
 
                 {!loading && item && (
                     <div className="flex items-center gap-2">
+                        <ThirdPartyActions item={item} dataSource={dataSource} />
                         <button
                             type="button"
                             onClick={handleEdit}
@@ -91,7 +101,7 @@ export const ThirdPartyPageDesktop = (props) => {
                 </div>
             )}
 
-            {/* Centered single-column body */}
+            {/* Cockpit body */}
             <div className="flex-1 min-h-0 overflow-auto px-4 py-4">
                 {loading && (
                     <div className="text-center text-soft-text text-sm py-10">
@@ -100,31 +110,12 @@ export const ThirdPartyPageDesktop = (props) => {
                 )}
 
                 {!loading && item && (
-                    <div className="max-w-[1200px] mx-auto flex flex-col lg:flex-row gap-4 items-start">
-                        {/* Main column: header fields */}
-                        <div className="flex-1 min-w-0 w-full">
-                            <DocumentHeaderFields
-                                object={item}
-                                feature="thirdparty"
-                                dataSource={dataSource}
-                                storageKey="dolipocket.thirdpartypage.header"
-                                title="Informations"
-                                overrides={HEADER_OVERRIDES}
-                            />
-                        </div>
-
-                        {/* Side column: categories + bank accounts */}
-                        <div className="w-full lg:w-[340px] shrink-0 flex flex-col gap-4">
-                            <ThirdPartyCategoriesSection
-                                thirdpartyId={Number(item.id)}
-                                dataSource={dataSource}
-                            />
-                            <ThirdPartyBankSection
-                                thirdpartyId={Number(item.id)}
-                                dataSource={dataSource}
-                            />
-                        </div>
-                    </div>
+                    <ThirdPartyCockpit
+                        item={item}
+                        dataSource={dataSource}
+                        editable={canEdit}
+                        onSaveField={saveField}
+                    />
                 )}
             </div>
         </div>

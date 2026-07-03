@@ -35,6 +35,12 @@ export const addDays = (date, n) => {
     return d;
 };
 
+export const addHours = (date, n) => {
+    const d = new Date(date);
+    d.setHours(d.getHours() + n);
+    return d;
+};
+
 export const addMonths = (date, n) => {
     const d = new Date(date);
     d.setMonth(d.getMonth() + n);
@@ -170,3 +176,11 @@ export const fmtColumnHeader = (date, locale = "fr-FR") => {
 
 // Minutes since local midnight for a Date.
 export const minutesSinceMidnight = (date) => date.getHours() * 60 + date.getMinutes();
+
+// "YYYY-MM-DDTHH:mm" in LOCAL time, for <input type="datetime-local"> values.
+// NB: never use date.toISOString().slice(0,16) here -- that yields UTC and
+// shifts the displayed clock by the timezone offset.
+export const toLocalInputValue = (date) => {
+    const p = (n) => String(n).padStart(2, "0");
+    return `${date.getFullYear()}-${p(date.getMonth() + 1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+};

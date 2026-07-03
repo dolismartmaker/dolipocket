@@ -36,7 +36,7 @@ export const supplierProposalsListConfig = {
 
     columnsOverrides: {
         ref:          { defaultVisible: true,  defaultWidth: 160 },
-        socid:        { defaultVisible: true,  defaultWidth: 120, formatter: (v) => (v ? `#${v}` : "") },
+        socid:        { defaultVisible: true,  defaultWidth: 180, formatter: (v, row) => row?.socname || (v ? `#${v}` : "-") },
         dateCreation: { defaultVisible: true,  defaultWidth: 120, formatter: fmtDate },
         totalHt:      { defaultVisible: true,  defaultWidth: 130, formatter: fmtAmount },
         totalTtc:     { defaultVisible: false, defaultWidth: 130, formatter: fmtAmount },

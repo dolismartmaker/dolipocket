@@ -1,37 +1,15 @@
 import { TabletEditScaffold } from "src/lib/tablet";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { INVOICE_CONFIG } from "src/lib/document/documentConfig";
 
-// Tablet edit page for an Invoice: focused full-page touch form (AutoForm) +
-// the document lines editor (touch cards variant on tablet). Reuses
-// useInvoiceEditData() and the same curated header field whitelist as the
-// desktop page, aligned with dmInvoice::$writableFields (no internal Dolibarr
-// fields leaking into the user form).
-const HEADER_KEYS_CREATE = [
-    "fk_soc", "ref_client", "datef", "fk_cond_reglement", "fk_mode_reglement",
-    "note_public", "note_private",
-];
-const HEADER_KEYS_UPDATE = [
-    "ref_client", "datef", "date_lim_reglement", "fk_cond_reglement", "fk_mode_reglement",
-    "note_public", "note_private",
-];
-
-export const InvoiceEditPageTablet = ({
-    isNew,
-    invoice,
-    setInvoice,
-    loading,
-    saving,
-    error,
-    initialValues,
-    describe,
-    save,
-    cancel,
-    dbInvoices,
-}) => {
-    const includeKeys = isNew ? HEADER_KEYS_CREATE : HEADER_KEYS_UPDATE;
+// Tablet invoice edit page: touch AutoForm + lines editor. Same curated header
+// whitelist as the desktop page (INVOICE_CONFIG.editFields).
+export const InvoiceEditPageTablet = (props) => {
+    const { isNew, invoice, setInvoice, loading, saving, error, initialValues, describe, save, cancel, dbInvoices } = props;
+    const includeKeys = isNew ? INVOICE_CONFIG.editFields.create : INVOICE_CONFIG.editFields.update;
     return (
         <TabletEditScaffold
-            title={isNew ? "Nouvelle facture" : `Modifier ${invoice?.ref ?? ""}`}
+            title={isNew ? INVOICE_CONFIG.newTitle : `Modifier ${invoice?.ref ?? ""}`}
             loading={loading}
             saving={saving}
             error={error}
@@ -47,9 +25,7 @@ export const InvoiceEditPageTablet = ({
                     docId={!isNew && invoice ? Number(invoice.id) : 0}
                     lines={invoice?.lines ?? []}
                     dataSource={dbInvoices}
-                    onChange={(updatedDoc) => {
-                        if (typeof setInvoice === "function" && updatedDoc) setInvoice(updatedDoc);
-                    }}
+                    onChange={(u) => { if (typeof setInvoice === "function" && u) setInvoice(u); }}
                 />
             )}
         />

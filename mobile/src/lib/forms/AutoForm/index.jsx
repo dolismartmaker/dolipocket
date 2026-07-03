@@ -11,6 +11,7 @@ import {
 } from "@cap-rel/smartcommon";
 
 import { useViewport } from "src/lib/viewport";
+import { labelsWithFallback } from "src/utils";
 
 import { objectDescToFormSchema } from "../objectDescToFormSchema";
 import { FkPicker } from "../FkPicker";
@@ -44,8 +45,15 @@ const noop = () => {};
 // FormContext is internal to the bundle (not re-exported), so any field
 // component that does NOT consume `useField` (here: <FkPicker>) must be
 // wired explicitly against form.values + form.set.
+//
+// `initialValues` is required: smartcommon's useField seeds the form context
+// from each field's OWN `defaultValue` prop on mount (and clobbers the slot
+// with `undefined` when none is given). Passing `defaultValue` per field is
+// therefore what actually populates the form -- useForm({defaultValues}) alone
+// is overwritten field-by-field at mount. `value` is intentionally NOT passed
+// so the field stays form-controlled (form.values remains the source of truth).
 // eslint-disable-next-line react/display-name -- this is a render-helper factory, not a React component
-const buildRenderField = (form) => (field) => {
+const buildRenderField = (form, initialValues) => (field) => {
     const common = {
         key: field.id,
         name: field.id,
@@ -54,6 +62,7 @@ const buildRenderField = (form) => (field) => {
         readOnly: field.readOnly,
         disabled: field.disabled,
         placeholder: field.placeholder,
+        defaultValue: initialValues?.[field.id],
     };
 
     switch (field.type) {
@@ -62,7 +71,7 @@ const buildRenderField = (form) => (field) => {
         case "html":
             return <Editor {...common} />;
         case "boolean":
-            return <BooleanField {...common} type={field.typeVariant ?? "switch"} />;
+            return <BooleanField {...common} labels={labelsWithFallback("Boolean")} type={field.typeVariant ?? "switch"} />;
         case "select":
             // `options` for the smartcommon Select must be an array. If
             // backend has not resolved sellist FKs (e.g. payment terms), we
@@ -70,6 +79,7 @@ const buildRenderField = (form) => (field) => {
             return (
                 <Select
                     {...common}
+                    labels={labelsWithFallback("Select")}
                     multiple={field.multiple}
                     options={Array.isArray(field.options) ? field.options : []}
                 />
@@ -207,7 +217,7 @@ export const AutoForm = (props) => {
 // every time the parent passes a fresh `value` reference.
 const AutoFormBody = ({ schema, initialValues, onChange, onSubmit, submitLabel, singleColumn, children }) => {
     const form = useForm({ defaultValues: initialValues });
-    const renderField = buildRenderField(form);
+    const renderField = buildRenderField(form, initialValues);
 
     // Viewport-aware field grid. The viewport is frozen for the session, so
     // these classes never change mid-session.

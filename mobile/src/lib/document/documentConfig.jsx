@@ -18,7 +18,9 @@ import { RecurringTemplateModal } from "src/lib/components/RecurringTemplateModa
 import { DepositInvoiceModal } from "src/lib/components/DepositInvoiceModal";
 import { getStatusInfo } from "src/lib/components/StatusPill";
 
-import { fmtMoney, fmtDateFr, baseTotalsRows, noteToText } from "./DocumentDetailShell/format";
+import { noteToText } from "src/lib/utils/htmlText";
+
+import { fmtMoney, fmtDateFr, baseTotalsRows } from "./DocumentDetailShell/format";
 import { TotalRow } from "./DocumentDetailShell/InspectorRail";
 
 // Per-feature descriptors consumed by <DocumentDetailShell>. Each descriptor is
@@ -141,6 +143,11 @@ export const INVOICE_CONFIG = {
     icon: FaFileInvoiceDollar,
     title: (o) => o?.ref || "Facture",
     setObject: (d) => d.setInvoice,
+    newTitle: "Nouvelle facture",
+    editFields: {
+        create: ["fk_soc", "ref_client", "datef", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+        update: ["ref_client", "datef", "date_lim_reglement", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+    },
 
     pills: (o) => [
         { feature: "invoice", status: o.statut },
@@ -378,6 +385,11 @@ export const PROPOSAL_CONFIG = {
     icon: FaFileInvoiceDollar,
     title: (o) => o?.ref || "Devis",
     setObject: (d) => d.setProposal,
+    newTitle: "Nouveau devis",
+    editFields: {
+        create: ["fk_soc", "ref_client", "datep", "fin_validite", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+        update: ["ref_client", "datep", "fin_validite", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+    },
 
     pills: (o) => [{ feature: "proposal", status: o.statut }],
 
@@ -484,6 +496,11 @@ export const ORDER_CONFIG = {
     icon: FaFileInvoice,
     title: (o) => o?.ref || "Commande",
     setObject: (d) => d.setOrder,
+    newTitle: "Nouvelle commande",
+    editFields: {
+        create: ["fk_soc", "ref_client", "date_commande", "date_livraison", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+        update: ["ref_client", "date_commande", "date_livraison", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+    },
 
     pills: (o) => [{ feature: "order", status: o.statut }],
 
@@ -590,6 +607,11 @@ export const SUPPLIER_ORDER_CONFIG = {
     icon: FaFileInvoice,
     title: (o) => o?.ref || "Commande fournisseur",
     setObject: (d) => d.setSupplierOrder,
+    newTitle: "Nouvelle commande fournisseur",
+    editFields: {
+        create: ["fk_soc", "ref_supplier", "date_commande", "date_livraison", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+        update: ["fk_soc", "ref_supplier", "date_commande", "date_livraison", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+    },
 
     pills: (o) => [{ feature: "supplierorder", status: o.statut }],
 
@@ -692,6 +714,11 @@ export const SUPPLIER_INVOICE_CONFIG = {
     icon: FaFileInvoiceDollar,
     title: (o) => o?.ref || "Facture fournisseur",
     setObject: (d) => d.setSupplierInvoice,
+    newTitle: "Nouvelle facture fournisseur",
+    editFields: {
+        create: ["fk_soc", "ref_supplier", "libelle", "datef", "date_lim_reglement", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+        update: ["fk_soc", "ref_supplier", "libelle", "datef", "date_lim_reglement", "fk_cond_reglement", "fk_mode_reglement", "note_public", "note_private"],
+    },
 
     pills: (o) => [
         { feature: "supplierinvoice", status: o.statut },

@@ -19,6 +19,10 @@ class ProjectControllerTest extends DolibarrRealTestCase
 
         global $user, $conf;
 
+        // The controller is now a full feature backed by dmProject (extends
+        // SmartAuth\DolibarrMapping\dmBase), so the smartauth autoload must be
+        // present -- exactly as the prepend loads it in production.
+        dol_include_once('/smartauth/autoload.php');
         require_once dirname(__DIR__, 3) . '/smartmaker-api/ProjectController.php';
         require_once DOL_DOCUMENT_ROOT . '/projet/class/project.class.php';
 

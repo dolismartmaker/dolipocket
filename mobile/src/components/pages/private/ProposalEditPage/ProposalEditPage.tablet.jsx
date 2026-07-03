@@ -1,51 +1,23 @@
 import { TabletEditScaffold } from "src/lib/tablet";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { PROPOSAL_CONFIG } from "src/lib/document/documentConfig";
 
-// Tablet edit page for a Proposal: focused full-page touch form (AutoForm in
-// two columns) + the document lines editor (touch cards variant on tablet).
-// Reuses useProposalEditData() and mirrors the desktop excludeKeys.
-const EXCLUDE_KEYS = [
-    "ref",
-    "totalHt",
-    "totalTva",
-    "totalTtc",
-    "fkStatut",
-    "status",
-    "statut",
-    "datec",
-    "dateValid",
-    "datev",
-    "dateCloture",
-    "lastMainDoc",
-    "modelPdf",
-    "fkUserAuthor",
-    "fkUserValid",
-    "fkUserCloture",
-];
-
-export const ProposalEditPageTablet = ({
-    isNew,
-    proposal,
-    setProposal,
-    loading,
-    saving,
-    error,
-    initialValues,
-    describe,
-    save,
-    cancel,
-    dbProposals,
-}) => {
+// Tablet proposal edit page: touch AutoForm + lines editor. Curated header
+// whitelist from PROPOSAL_CONFIG.editFields.
+export const ProposalEditPageTablet = (props) => {
+    const { isNew, proposal, setProposal, loading, saving, error, initialValues, describe, save, cancel, dbProposals } = props;
+    const includeKeys = isNew ? PROPOSAL_CONFIG.editFields.create : PROPOSAL_CONFIG.editFields.update;
     return (
         <TabletEditScaffold
-            title={isNew ? "Nouveau devis" : `Modifier ${proposal?.ref ?? ""}`}
+            title={isNew ? PROPOSAL_CONFIG.newTitle : `Modifier ${proposal?.ref ?? ""}`}
             loading={loading}
             saving={saving}
             error={error}
             describe={describe}
             value={initialValues}
             mode={isNew ? "create" : "update"}
-            excludeKeys={EXCLUDE_KEYS}
+            includeKeys={includeKeys}
+            groupings={[{ id: "main", title: "En-tête", keys: includeKeys }]}
             onCancel={cancel}
             onSave={save}
             renderLines={() => (
@@ -53,9 +25,7 @@ export const ProposalEditPageTablet = ({
                     docId={!isNew && proposal ? Number(proposal.id) : 0}
                     lines={proposal?.lines ?? []}
                     dataSource={dbProposals}
-                    onChange={(updatedDoc) => {
-                        if (typeof setProposal === "function" && updatedDoc) setProposal(updatedDoc);
-                    }}
+                    onChange={(u) => { if (typeof setProposal === "function" && u) setProposal(u); }}
                 />
             )}
         />

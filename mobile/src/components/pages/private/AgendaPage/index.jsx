@@ -6,12 +6,12 @@ import { AgendaPageDesktop } from "./AgendaPage.desktop";
 
 // Full calendar agenda (replaces the former flat list). Viewport router:
 //   - mobile  -> month / day / list, compact cells (dots instead of chips)
-//   - desktop / tablet -> month / week / day / list, full chips + colour legend
+//   - desktop / tablet -> week / day / month / list (week first, more usable)
 //
 // useAgendaData() owns all state + handlers; the two views are pure pass-through
 // to <Calendar> so the data hook runs once in the selected branch (the viewport
 // is frozen for the session -> no remount risk).
-const DESKTOP_VIEWS = ["month", "week", "day", "list"];
+const DESKTOP_VIEWS = ["week", "day", "month", "list"];
 const MOBILE_VIEWS = ["month", "day", "list"];
 
 export const AgendaPage = () => {
@@ -19,7 +19,7 @@ export const AgendaPage = () => {
 
     const data = useAgendaData({
         availableViews: isMobile ? MOBILE_VIEWS : DESKTOP_VIEWS,
-        defaultView: "month",
+        defaultView: isMobile ? "month" : "week",
     });
 
     return isMobile ? <AgendaPageMobile {...data} /> : <AgendaPageDesktop {...data} />;

@@ -78,10 +78,25 @@ export const useThirdPartyData = () => {
         set(`openSections.${key}`, !openSections?.[key]);
     };
 
+    // Inline single-field save (desktop cockpit click-to-edit). We send the
+    // FULL current item with one field changed: mapToBackend() fills defaults
+    // for missing schema keys, so a partial payload would wipe the other
+    // fields -- merging the loaded item avoids that. Throws on failure so the
+    // inline editor can surface the error and keep the field open.
+    const saveField = async (key, value) => {
+        const currentItem = states?.item;
+        if (!currentItem) {
+            throw new Error("Aucun tiers chargé");
+        }
+        const updated = await dbThirdParties.update(currentItem.id, { ...currentItem, [key]: value });
+        set("item", updated);
+        return updated;
+    };
+
     return {
         id,
         item, loading, error, deleting, openSections,
-        loadThirdParty, handleBack, handleEdit, handleDelete, toggleSection,
+        loadThirdParty, handleBack, handleEdit, handleDelete, toggleSection, saveField,
         dataSource: dbThirdParties,
     };
 };

@@ -31,6 +31,25 @@ export const useAgendaEventEditData = () => {
     const seededDatepMs = isNew && Number.isFinite(datepParam) && datepParam > 0
         ? datepParam * 1000
         : null;
+    const datefParam = Number(searchParams.get("datef"));
+    const seededDatefMs = isNew && Number.isFinite(datefParam) && datefParam > 0
+        ? datefParam * 1000
+        : null;
+
+    // "Nouvel événement" from a thirdparty fiche passes ?socid=<id> to
+    // pre-link the event to that thirdparty.
+    const socidParam = Number(searchParams.get("socid"));
+    const seededSocid = isNew && Number.isFinite(socidParam) && socidParam > 0
+        ? socidParam
+        : null;
+
+    // The quick-create modal's "Plus de détails" hands off its typed fields via
+    // the query string. Seed them so nothing the user entered is lost. AutoForm
+    // keys are camelCase (note_private -> notePrivate); dates are handled above.
+    const labelParam = isNew ? (searchParams.get("label") || "") : "";
+    const locationParam = isNew ? (searchParams.get("location") || "") : "";
+    const noteParam = isNew ? (searchParams.get("note_private") || "") : "";
+    const seededFullDay = isNew && searchParams.get("fulldayevent") === "1";
 
     const [event, setEvent] = useState(null);
     const [loading, setLoading] = useState(!isNew);
@@ -70,7 +89,17 @@ export const useAgendaEventEditData = () => {
     // Initial values to seed AutoForm with. For edit: use the loaded event.
     // For new: a minimal default that mirrors the mobile form (type AC_OTH).
     const initialValues = isNew
-        ? { typeCode: "AC_OTH", percentage: 0, ...(seededDatepMs ? { datep: seededDatepMs } : {}) }
+        ? {
+            typeCode: "AC_OTH",
+            percentage: 0,
+            ...(labelParam ? { label: labelParam } : {}),
+            ...(locationParam ? { location: locationParam } : {}),
+            ...(noteParam ? { notePrivate: noteParam } : {}),
+            ...(seededDatepMs ? { datep: seededDatepMs } : {}),
+            ...(seededDatefMs ? { datef: seededDatefMs } : {}),
+            ...(seededFullDay ? { fulldayevent: true } : {}),
+            ...(seededSocid ? { socid: seededSocid } : {}),
+        }
         : (event ?? {});
 
     const save = useCallback(async (values) => {

@@ -19,9 +19,11 @@ namespace Dolipocket\Api;
 dol_include_once('/societe/class/societe.class.php');
 dol_include_once('/dolipocket/smartmaker-api/dmThirdParty.php');
 dol_include_once('/dolipocket/smartmaker-api/Trait/PaginatedListTrait.php');
+dol_include_once('/dolipocket/smartmaker-api/Trait/SendEmailTrait.php');
 
 use Societe;
 use Dolipocket\Api\Trait\PaginatedListTrait;
+use Dolipocket\Api\Trait\SendEmailMailerRegistry;
 use SmartAuth\DolibarrMapping\MapperValidationException;
 
 /**
@@ -1006,6 +1008,463 @@ class ThirdPartyController
         $db->free($resql);
 
         return [['discounts' => $discounts], 200];
+    }
+
+    /**
+     * GET thirdparty/{id}/cockpit -- 360 synthesis of a thirdparty for the
+     * desktop "cockpit" view (cf .claude/CLAUDE.md "Fiche tiers = cockpit").
+     *
+     * Single round-trip aggregation: counts (proposals/orders/invoices/
+     * contacts/projects), turnover by year, recent + unpaid invoices, recent
+     * contacts and recent agenda events. Each block is permission-gated
+     * server-side ($user->hasRight on the natural Dolibarr right) AND resilient
+     * (a SQL failure on one block is logged and degrades to an empty block --
+     * never a 500 for the whole cockpit). The frontend mirrors the gating via
+     * useMenu().has() so a forbidden block is simply not rendered.
+     *
+     * Entity scoping uses getEntity('<element>') everywhere (never a hardcoded
+     * WHERE entity = N). Dates are returned as Unix epoch seconds (via jdate)
+     * to match how the mappers expose datec/tms.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function cockpit($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::cockpit forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::cockpit missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::cockpit thirdparty not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        // Cast to real booleans so the JSON permissions map is true/false
+        // (hasRight() returns an int) -- the frontend and the contract expect
+        // booleans, not 1/0.
+        $canProposal = (bool) $user->hasRight('propal', 'lire');
+        $canOrder    = (bool) $user->hasRight('commande', 'lire');
+        $canInvoice  = (bool) $user->hasRight('facture', 'lire');
+        $canContact  = (bool) $user->hasRight('societe', 'contact', 'lire');
+        $canProject  = (bool) $user->hasRight('projet', 'lire');
+        $canAgenda   = $user->hasRight('agenda', 'allactions', 'read')
+            || $user->hasRight('agenda', 'myactions', 'read');
+
+        $data = [
+            'currency'    => !empty($conf->currency) ? $conf->currency : 'EUR',
+            'permissions' => [
+                'proposal' => $canProposal,
+                'order'    => $canOrder,
+                'invoice'  => $canInvoice,
+                'contact'  => $canContact,
+                'agenda'   => $canAgenda,
+                'project'  => $canProject,
+            ],
+            'counts' => [
+                'proposals' => 0,
+                'orders'    => 0,
+                'invoices'  => 0,
+                'contacts'  => 0,
+                'projects'  => 0,
+            ],
+            'ca'             => [],
+            'caTotal'        => 0.0,
+            'invoicesRecent' => [],
+            'invoicesUnpaid' => [],
+            'unpaidTotal'    => 0.0,
+            'contactsRecent' => [],
+            'events'         => [],
+        ];
+
+        // ---- Counts (cheap, one row each) ----
+        if ($canProposal) {
+            $data['counts']['proposals'] = $this->cockpitCountBySoc('propal', 'propal', $id);
+        }
+        if ($canOrder) {
+            $data['counts']['orders'] = $this->cockpitCountBySoc('commande', 'commande', $id);
+        }
+        if ($canInvoice) {
+            $data['counts']['invoices'] = $this->cockpitCountBySoc('facture', 'facture', $id);
+        }
+        if ($canContact) {
+            $data['counts']['contacts'] = $this->cockpitCountBySoc('socpeople', 'contact', $id);
+        }
+        if ($canProject) {
+            $data['counts']['projects'] = $this->cockpitCountBySoc('projet', 'project', $id);
+        }
+
+        // ---- Invoices: turnover by year + recent + unpaid ----
+        if ($canInvoice) {
+            // Turnover (CA) by year: validated (1) and paid (2) invoices only,
+            // abandoned (3) and drafts (0) excluded. Year is extracted in PHP
+            // (jdate) to stay portable across MySQL and the SQLite test driver
+            // -- no MySQL-only YEAR() in the SQL.
+            $sql = "SELECT datef, total_ttc FROM " . MAIN_DB_PREFIX . "facture";
+            $sql .= " WHERE fk_soc = " . ((int) $id);
+            $sql .= " AND entity IN (" . getEntity('facture') . ")";
+            $sql .= " AND fk_statut IN (1, 2)";
+            $resql = $db->query($sql);
+            if ($resql) {
+                $byYear = [];
+                while ($obj = $db->fetch_object($resql)) {
+                    $ts = $obj->datef ? (int) $db->jdate($obj->datef) : 0;
+                    if ($ts <= 0) {
+                        continue;
+                    }
+                    $year = (int) dol_print_date($ts, '%Y');
+                    if (!isset($byYear[$year])) {
+                        $byYear[$year] = ['ttc' => 0.0, 'count' => 0];
+                    }
+                    $byYear[$year]['ttc'] += (float) $obj->total_ttc;
+                    $byYear[$year]['count']++;
+                }
+                $db->free($resql);
+
+                ksort($byYear);
+                $total = 0.0;
+                foreach ($byYear as $year => $agg) {
+                    $data['ca'][] = [
+                        'year'  => (int) $year,
+                        'ttc'   => round((float) $agg['ttc'], 2),
+                        'count' => (int) $agg['count'],
+                    ];
+                    $total += (float) $agg['ttc'];
+                }
+                $data['caTotal'] = round($total, 2);
+            } else {
+                dol_syslog("DPK ThirdPartyController::cockpit CA SQL error: " . $db->lasterror(), LOG_ERR);
+            }
+
+            // Recent invoices (any status), newest first.
+            $sql = "SELECT rowid, ref, datef, total_ht, total_ttc, fk_statut, paye";
+            $sql .= " FROM " . MAIN_DB_PREFIX . "facture";
+            $sql .= " WHERE fk_soc = " . ((int) $id);
+            $sql .= " AND entity IN (" . getEntity('facture') . ")";
+            $sql .= " ORDER BY datef DESC, rowid DESC";
+            $sql .= $db->plimit(6, 0);
+            $resql = $db->query($sql);
+            if ($resql) {
+                while ($obj = $db->fetch_object($resql)) {
+                    $data['invoicesRecent'][] = [
+                        'id'       => (int) $obj->rowid,
+                        'ref'      => (string) $obj->ref,
+                        'date'     => $obj->datef ? (int) $db->jdate($obj->datef) : 0,
+                        'totalHt'  => (float) $obj->total_ht,
+                        'totalTtc' => (float) $obj->total_ttc,
+                        'statut'   => (int) $obj->fk_statut,
+                        'paye'     => (int) $obj->paye,
+                    ];
+                }
+                $db->free($resql);
+            } else {
+                dol_syslog("DPK ThirdPartyController::cockpit recent invoices SQL error: " . $db->lasterror(), LOG_ERR);
+            }
+
+            // Unpaid invoices: validated (1) and not paid (paye=0). Total is
+            // summed over ALL unpaid; the returned list is capped to 10.
+            $sql = "SELECT rowid, ref, total_ttc, date_lim_reglement";
+            $sql .= " FROM " . MAIN_DB_PREFIX . "facture";
+            $sql .= " WHERE fk_soc = " . ((int) $id);
+            $sql .= " AND entity IN (" . getEntity('facture') . ")";
+            $sql .= " AND fk_statut = 1 AND paye = 0";
+            $sql .= " ORDER BY date_lim_reglement ASC, rowid ASC";
+            $resql = $db->query($sql);
+            if ($resql) {
+                $unpaidTotal = 0.0;
+                while ($obj = $db->fetch_object($resql)) {
+                    $unpaidTotal += (float) $obj->total_ttc;
+                    if (count($data['invoicesUnpaid']) < 10) {
+                        $data['invoicesUnpaid'][] = [
+                            'id'       => (int) $obj->rowid,
+                            'ref'      => (string) $obj->ref,
+                            'totalTtc' => (float) $obj->total_ttc,
+                            'dateLim'  => $obj->date_lim_reglement ? (int) $db->jdate($obj->date_lim_reglement) : 0,
+                        ];
+                    }
+                }
+                $db->free($resql);
+                $data['unpaidTotal'] = round($unpaidTotal, 2);
+            } else {
+                dol_syslog("DPK ThirdPartyController::cockpit unpaid invoices SQL error: " . $db->lasterror(), LOG_ERR);
+            }
+        }
+
+        // ---- Recent contacts ----
+        if ($canContact) {
+            $sql = "SELECT rowid, firstname, lastname, email, phone_pro, phone_mobile, statut";
+            $sql .= " FROM " . MAIN_DB_PREFIX . "socpeople";
+            $sql .= " WHERE fk_soc = " . ((int) $id);
+            $sql .= " AND entity IN (" . getEntity('contact') . ")";
+            $sql .= " ORDER BY lastname ASC, firstname ASC";
+            $sql .= $db->plimit(6, 0);
+            $resql = $db->query($sql);
+            if ($resql) {
+                while ($obj = $db->fetch_object($resql)) {
+                    $data['contactsRecent'][] = [
+                        'id'          => (int) $obj->rowid,
+                        'firstname'   => (string) $obj->firstname,
+                        'lastname'    => (string) $obj->lastname,
+                        'email'       => (string) $obj->email,
+                        'phonePro'    => (string) $obj->phone_pro,
+                        'phoneMobile' => (string) $obj->phone_mobile,
+                        'statut'      => (int) $obj->statut,
+                    ];
+                }
+                $db->free($resql);
+            } else {
+                dol_syslog("DPK ThirdPartyController::cockpit contacts SQL error: " . $db->lasterror(), LOG_ERR);
+            }
+        }
+
+        // ---- Recent agenda events ----
+        if ($canAgenda) {
+            $sql = "SELECT id, label, datep, code";
+            $sql .= " FROM " . MAIN_DB_PREFIX . "actioncomm";
+            $sql .= " WHERE fk_soc = " . ((int) $id);
+            $sql .= " AND entity IN (" . getEntity('agenda') . ")";
+            $sql .= " ORDER BY datep DESC, id DESC";
+            $sql .= $db->plimit(6, 0);
+            $resql = $db->query($sql);
+            if ($resql) {
+                while ($obj = $db->fetch_object($resql)) {
+                    $data['events'][] = [
+                        'id'    => (int) $obj->id,
+                        'label' => (string) $obj->label,
+                        'date'  => $obj->datep ? (int) $db->jdate($obj->datep) : 0,
+                        'code'  => (string) $obj->code,
+                    ];
+                }
+                $db->free($resql);
+            } else {
+                dol_syslog("DPK ThirdPartyController::cockpit events SQL error: " . $db->lasterror(), LOG_ERR);
+            }
+        }
+
+        return [$data, 200];
+    }
+
+    /**
+     * Count rows of a Dolibarr table linked to a thirdparty (fk_soc), scoped
+     * to the current tenant entity. Returns 0 on SQL error (logged) so a single
+     * failing block never breaks the whole cockpit.
+     *
+     * @param string $table      llx table name without the MAIN_DB_PREFIX (e.g. 'facture')
+     * @param string $entityKey  getEntity() element key (e.g. 'facture')
+     * @param int    $id         Thirdparty id
+     * @param string $extraWhere Optional extra " AND ..." clause
+     * @return int
+     */
+    private function cockpitCountBySoc($table, $entityKey, $id, $extraWhere = '')
+    {
+        global $db;
+
+        $sql = "SELECT COUNT(*) as nb FROM " . MAIN_DB_PREFIX . $table;
+        $sql .= " WHERE fk_soc = " . ((int) $id);
+        $sql .= " AND entity IN (" . getEntity($entityKey) . ")";
+        $sql .= $extraWhere;
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog("DPK ThirdPartyController::cockpit count error on " . $table . ": " . $db->lasterror(), LOG_ERR);
+            return 0;
+        }
+        $row = $db->fetch_object($resql);
+        $nb = $row ? (int) $row->nb : 0;
+        $db->free($resql);
+        return $nb;
+    }
+
+    /**
+     * POST thirdparty/{id}/email -- send a free email to the thirdparty
+     * (mirrors Dolibarr's "Envoyer email" on the company card). Unlike the
+     * document send (SendEmailTrait), there is NO PDF attachment: this is a
+     * plain message to the thirdparty (or an explicit recipient).
+     *
+     * On success the email is logged as an agenda event linked to the
+     * thirdparty (best-effort: a logging failure never fails the already-sent
+     * email), so it surfaces in the cockpit "Derniers événements" card.
+     *
+     * The mailer is resolved through SendEmailMailerRegistry::$cmailFileClass
+     * so integration tests can inject a mock and avoid opening a real SMTP
+     * socket.
+     *
+     * Body fields: to (optional, defaults to the thirdparty email), subject
+     * (required), body, cc, bcc (CSV), ishtml.
+     *
+     * @param array|null $arr
+     * @return array
+     */
+    public function sendEmail($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('societe', 'lire')) {
+            dol_syslog("DPK ThirdPartyController::sendEmail forbidden user=" . (int) $user->id, LOG_WARNING);
+            return [['error' => 'Forbidden'], 403];
+        }
+
+        $id = isset($arr['id']) ? (int) $arr['id'] : 0;
+        if ($id <= 0) {
+            dol_syslog("DPK ThirdPartyController::sendEmail missing id", LOG_WARNING);
+            return [['error' => 'Thirdparty id is required'], 400];
+        }
+
+        $tp = new Societe($db);
+        if ($tp->fetch($id) <= 0) {
+            dol_syslog("DPK ThirdPartyController::sendEmail not found id=" . $id, LOG_WARNING);
+            return [['error' => 'Thirdparty not found'], 404];
+        }
+
+        // Recipient: explicit 'to' wins, otherwise the thirdparty email.
+        $to = isset($arr['to']) ? trim((string) $arr['to']) : '';
+        if ($to === '') {
+            $to = trim((string) ($tp->email ?? ''));
+        }
+        if ($to === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            dol_syslog("DPK ThirdPartyController::sendEmail invalid recipient '" . $to . "'", LOG_WARNING);
+            return [['error' => "A valid 'to' email address is required"], 400];
+        }
+
+        // cc / bcc accept "a@b,c@d" CSV -- validate each, refuse the whole
+        // request on a bad address (same contract as SendEmailTrait).
+        $cc = isset($arr['cc']) ? trim((string) $arr['cc']) : '';
+        $bcc = isset($arr['bcc']) ? trim((string) $arr['bcc']) : '';
+        foreach (['cc' => $cc, 'bcc' => $bcc] as $kind => $list) {
+            if ($list === '') {
+                continue;
+            }
+            foreach (explode(',', $list) as $piece) {
+                $piece = trim($piece);
+                if ($piece !== '' && !filter_var($piece, FILTER_VALIDATE_EMAIL)) {
+                    dol_syslog("DPK ThirdPartyController::sendEmail invalid {$kind} '" . $piece . "'", LOG_WARNING);
+                    return [['error' => "Invalid email in {$kind}: " . $piece], 400];
+                }
+            }
+        }
+
+        $subject = isset($arr['subject']) ? trim((string) $arr['subject']) : '';
+        if ($subject === '') {
+            dol_syslog("DPK ThirdPartyController::sendEmail missing subject", LOG_WARNING);
+            return [['error' => "A 'subject' is required"], 400];
+        }
+        $body = isset($arr['body']) ? (string) $arr['body'] : '';
+        if (trim($body) === '') {
+            // CMailFile refuses an empty body with ErrorBodyIsRequired.
+            $body = $subject;
+        }
+        $msgIsHtml = isset($arr['ishtml']) ? (int) $arr['ishtml'] : 0;
+
+        // From resolution (same priority as SendEmailTrait).
+        $from = (string) (getDolGlobalString('MAIN_MAIL_EMAIL_FROM') ?: '');
+        if ($from === '' && !empty($user->email)) {
+            $from = (string) $user->email;
+        }
+        if ($from === '') {
+            $host = isset($_SERVER['HTTP_HOST']) ? (string) $_SERVER['HTTP_HOST'] : 'localhost';
+            $from = 'no-reply@' . $host;
+        }
+
+        $trackid = 'thirdparty-' . $id;
+
+        $mailerClass = SendEmailMailerRegistry::$cmailFileClass;
+        if (!class_exists($mailerClass)) {
+            require_once DOL_DOCUMENT_ROOT . '/core/class/CMailFile.class.php';
+        }
+
+        // No attachment: empty filename lists (free email, not a document send).
+        $mailer = new $mailerClass(
+            $subject,
+            $to,
+            $from,
+            $body,
+            array(),
+            array(),
+            array(),
+            $cc,
+            $bcc,
+            0,
+            $msgIsHtml,
+            '',
+            '',
+            $trackid,
+            '',
+            'standard'
+        );
+
+        $sent = $mailer->sendfile();
+        if ($sent !== true && $sent !== 1) {
+            $err = isset($mailer->error) ? (string) $mailer->error : 'sendfile returned ' . var_export($sent, true);
+            dol_syslog("DPK ThirdPartyController::sendEmail sendfile() failed: " . $err, LOG_ERR);
+            return [['error' => 'Failed to send email: ' . $err], 500];
+        }
+
+        $eventId = $this->logSentEmailEvent($id, $subject, $body);
+
+        dol_syslog("DPK ThirdPartyController::sendEmail ok id=" . $id . " to=" . $to, LOG_INFO);
+
+        return [[
+            'ok'      => true,
+            'to'      => $to,
+            'cc'      => $cc,
+            'bcc'     => $bcc,
+            'subject' => $subject,
+            'eventId' => $eventId,
+            'trackid' => $trackid,
+        ], 200];
+    }
+
+    /**
+     * Best-effort: record a sent email as an agenda event linked to the
+     * thirdparty (Dolibarr "AC_EMAIL"). Returns the event id, or 0 when the
+     * user lacks the agenda create right or the creation fails -- never throws,
+     * so a logging problem cannot fail an already-sent email.
+     *
+     * @param int    $socId
+     * @param string $subject
+     * @param string $body
+     * @return int
+     */
+    private function logSentEmailEvent($socId, $subject, $body)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('agenda', 'allactions', 'create')
+            && !$user->hasRight('agenda', 'myactions', 'create')) {
+            return 0;
+        }
+
+        try {
+            require_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
+            $event = new \ActionComm($db);
+            $event->type_code = 'AC_EMAIL';
+            $event->label = 'Email envoyé : ' . $subject;
+            $event->note_private = $body;
+            $event->datep = dol_now();
+            $event->datef = dol_now();
+            $event->percentage = -1;
+            $event->socid = (int) $socId;
+            $event->userownerid = (int) $user->id;
+            $res = $event->create($user);
+            if ($res <= 0) {
+                dol_syslog("DPK ThirdPartyController::sendEmail agenda log failed: " . $event->error, LOG_WARNING);
+                return 0;
+            }
+            return (int) $res;
+        } catch (\Throwable $e) {
+            dol_syslog("DPK ThirdPartyController::sendEmail agenda log exception: " . $e->getMessage(), LOG_WARNING);
+            return 0;
+        }
     }
 
     /**

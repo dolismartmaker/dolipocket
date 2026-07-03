@@ -31,6 +31,8 @@ import {
     // Lot 5 - Agenda + GED
     AgendaPage, AgendaEventPage, AgendaEventEditPage,
     DocumentsPage, DocumentsObjectPage,
+    // Lot B1 - Projects (projet)
+    ProjectsPage, ProjectPage, ProjectEditPage,
 } from "src/components";
 
 import { RequirePermission } from "src/lib/permissions";
@@ -155,6 +157,14 @@ export const Router = () => {
                                     <Route element={<RequirePermission perm="invoicerec.read" />}>
                                         <Route path="/invoice-templates" element={<InvoiceTemplatesPage />} />
                                         <Route path="/invoice-templates/:id" element={<InvoiceTemplatePage />} />
+                                    </Route>
+
+                                    {/* Lot B1 - Projets (projet) */}
+                                    <Route element={<RequirePermission perm="project.read" />}>
+                                        <Route path="/projects" element={<ProjectsPage />} />
+                                        <Route path="/projects/new" element={<ProjectEditPage />} />
+                                        <Route path="/projects/:id" element={<ProjectPage />} />
+                                        <Route path="/projects/:id/edit" element={<ProjectEditPage />} />
                                     </Route>
 
                                     {/* Lot 4 - Commandes fournisseur */}

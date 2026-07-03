@@ -44,6 +44,20 @@ class dmProposal extends dmBase
     protected $dolibarrClassName = 'Propal';
 
     /**
+     * Opt-in FK -> label companion fields resolved by dmTrait. Exposes the
+     * thirdparty name (+ email) alongside the raw socid, without nesting the
+     * whole Societe -- so lists and detail show a human name automatically.
+     * @var array
+     */
+    protected $listOfForeignKeyLabels = [
+        'fk_soc' => [
+            'class'  => 'Societe',
+            'path'   => 'societe/class/societe.class.php',
+            'labels' => ['socname' => 'name', 'socEmail' => 'email'],
+        ],
+    ];
+
+    /**
      * Dolibarr line class, required by dmTrait::_objectDesc() to expose lines metadata.
      * @var string
      */

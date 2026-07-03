@@ -33,6 +33,7 @@ i18n
       "receptions",
       "supplier-proposals",
       "invoice-templates",
+      "projects",
     ],
     interpolation: {
       escapeValue: false, // react already safes from xss

@@ -405,14 +405,11 @@ class SupplierOrderController
 
         $data = $this->mapper->exportMappedData($obj);
 
-        // Attach thirdparty summary for display (name + email for the summary
-        // band and the default send-by-email recipient).
+        // Attach thirdparty summary for display.
         if (!empty($obj->socid)) {
             $soc = new Societe($db);
             if ($soc->fetch($obj->socid) > 0) {
                 $data->thirdparty_name = $soc->name;
-                $data->socname = $soc->name;
-                $data->socEmail = !empty($soc->email) ? $soc->email : '';
             }
         }
 

@@ -1,53 +1,23 @@
 import { TabletEditScaffold } from "src/lib/tablet";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { ORDER_CONFIG } from "src/lib/document/documentConfig";
 
-// Tablet edit page for an Order: focused full-page touch form (AutoForm in
-// two columns) + the document lines editor (touch cards variant on tablet).
-// Reuses useOrderEditData() and mirrors the desktop excludeKeys.
-const EXCLUDE_KEYS = [
-    "ref",
-    "totalHt",
-    "totalTva",
-    "totalTtc",
-    "fkStatut",
-    "status",
-    "statut",
-    "datec",
-    "dateValid",
-    "datev",
-    "dateCloture",
-    "lastMainDoc",
-    "modelPdf",
-    "facturee",
-    "fkUserAuthor",
-    "fkUserValid",
-    "fkUserCloture",
-    "fkUserModif",
-];
-
-export const OrderEditPageTablet = ({
-    isNew,
-    order,
-    setOrder,
-    loading,
-    saving,
-    error,
-    initialValues,
-    describe,
-    save,
-    cancel,
-    dbOrders,
-}) => {
+// Tablet order edit page: touch AutoForm + lines editor. Curated header
+// whitelist from ORDER_CONFIG.editFields.
+export const OrderEditPageTablet = (props) => {
+    const { isNew, order, setOrder, loading, saving, error, initialValues, describe, save, cancel, dbOrders } = props;
+    const includeKeys = isNew ? ORDER_CONFIG.editFields.create : ORDER_CONFIG.editFields.update;
     return (
         <TabletEditScaffold
-            title={isNew ? "Nouvelle commande" : `Modifier ${order?.ref ?? ""}`}
+            title={isNew ? ORDER_CONFIG.newTitle : `Modifier ${order?.ref ?? ""}`}
             loading={loading}
             saving={saving}
             error={error}
             describe={describe}
             value={initialValues}
             mode={isNew ? "create" : "update"}
-            excludeKeys={EXCLUDE_KEYS}
+            includeKeys={includeKeys}
+            groupings={[{ id: "main", title: "En-tête", keys: includeKeys }]}
             onCancel={cancel}
             onSave={save}
             renderLines={() => (
@@ -55,9 +25,7 @@ export const OrderEditPageTablet = ({
                     docId={!isNew && order ? Number(order.id) : 0}
                     lines={order?.lines ?? []}
                     dataSource={dbOrders}
-                    onChange={(updatedDoc) => {
-                        if (typeof setOrder === "function" && updatedDoc) setOrder(updatedDoc);
-                    }}
+                    onChange={(u) => { if (typeof setOrder === "function" && u) setOrder(u); }}
                 />
             )}
         />

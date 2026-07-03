@@ -94,6 +94,7 @@ use Dolipocket\Api\DocumentController;
 
 // Lot 9 - Read-only FK lookups (powered by AutoForm <FkPicker>)
 use Dolipocket\Api\ProjectController;
+use Dolipocket\Api\TaskController;
 use Dolipocket\Api\UserController;
 
 
@@ -135,6 +136,10 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::delete('thirdparty/{id}/bankaccount/{accountId}', ThirdPartyController::class, 'bankAccountRemove', true);
     // Tier A - A5c - reusable discounts available for the thirdparty
     Route::get('thirdparty/{id}/discounts',               ThirdPartyController::class, 'discounts',          true);
+    // Cockpit - 360 synthesis of the thirdparty (desktop fiche)
+    Route::get('thirdparty/{id}/cockpit',                 ThirdPartyController::class, 'cockpit',            true);
+    // Send a free email to the thirdparty (no document attachment)
+    Route::post('thirdparty/{id}/email',                  ThirdPartyController::class, 'sendEmail',          true);
 
     // ********** Lot 1 - Contacts ********** //
     Route::get('contact',              ContactController::class, 'index',       true);
@@ -453,9 +458,60 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::get('document',              DocumentController::class, 'list',     true);
     Route::get('document/{id}/download', DocumentController::class, 'download', true);
 
-    // ********** Lot 9 - Read-only FK lookups (AutoForm <FkPicker>) ********** //
-    Route::get('project',      ProjectController::class, 'index', true);
-    Route::get('project/{id}', ProjectController::class, 'show',  true);
+    // ********** Lot B1 - Projects (projet) -- full desktop feature ********** //
+    // GET project ALSO powers the Lot 9 AutoForm <FkPicker> (fk_projet): index()
+    // returns the {items,total,page,limit} envelope with id/ref/title/label on
+    // every item, so both the DataTable and the picker are satisfied.
+    // Static sub-paths (columns/describe/count) MUST stay before the {id} route.
+    Route::get('project/columns',        ProjectController::class, 'columns',      true);
+    Route::get('project/describe',       ProjectController::class, 'describe',     true);
+    Route::get('project/count',          ProjectController::class, 'count',        true);
+    Route::get('project',                ProjectController::class, 'index',        true);
+    Route::get('project/{id}',           ProjectController::class, 'show',         true);
+    Route::post('project',               ProjectController::class, 'create',       true);
+    Route::put('project/{id}',           ProjectController::class, 'update',       true);
+    Route::delete('project',             ProjectController::class, 'deleteBulk',   true);
+    Route::delete('project/{id}',        ProjectController::class, 'destroy',      true);
+    Route::post('project/{id}/validate', ProjectController::class, 'validate',     true);
+    Route::post('project/{id}/close',    ProjectController::class, 'close',        true);
+    Route::post('project/{id}/reopen',   ProjectController::class, 'reopen',       true);
+    Route::post('project/{id}/setdraft', ProjectController::class, 'setDraft',     true);
+    Route::post('project/{id}/clone',    ProjectController::class, 'cloneProject', true);
+    // Lot B2 - project contacts (intervenants) + categories (tags)
+    Route::get('project/{id}/contacts',                 ProjectController::class, 'contacts',       true);
+    Route::post('project/{id}/contact',                 ProjectController::class, 'contactAdd',     true);
+    Route::delete('project/{id}/contact/{rowid}',       ProjectController::class, 'contactRemove',  true);
+    Route::get('project/{id}/categories',               ProjectController::class, 'categories',     true);
+    Route::post('project/{id}/category',                ProjectController::class, 'categoryAdd',    true);
+    Route::delete('project/{id}/category/{categoryId}', ProjectController::class, 'categoryRemove', true);
+    // Lot B2b - project referents (linked objects via fk_projet)
+    Route::get('project/{id}/elements',                    ProjectController::class, 'linkedObjects', true);
+    Route::delete('project/{id}/element/{type}/{elementId}', ProjectController::class, 'detachElement', true);
+    // Lot B5 - project PDF generation
+    Route::post('project/{id}/generatepdf',                ProjectController::class, 'generatePdf',   true);
+
+    // ********** Lot B3 - Tasks (projet_task) ********** //
+    // Static sub-paths before {id}. List accepts ?project=<id>.
+    Route::get('task/columns',                 TaskController::class, 'columns',       true);
+    Route::get('task/describe',                TaskController::class, 'describe',      true);
+    Route::get('task/count',                   TaskController::class, 'count',         true);
+    Route::get('task',                         TaskController::class, 'index',         true);
+    Route::get('task/{id}',                    TaskController::class, 'show',          true);
+    Route::post('task',                        TaskController::class, 'create',        true);
+    Route::put('task/{id}',                    TaskController::class, 'update',        true);
+    Route::delete('task/{id}',                 TaskController::class, 'destroy',       true);
+    Route::post('task/{id}/clone',             TaskController::class, 'cloneTask',     true);
+    // Lot B4 - time spent (timesheet). summary before {tsid}.
+    Route::get('task/{id}/timespent/summary',  TaskController::class, 'timeSummary',   true);
+    Route::get('task/{id}/timespent',          TaskController::class, 'timeList',      true);
+    Route::post('task/{id}/timespent',         TaskController::class, 'timeAdd',       true);
+    Route::put('task/{id}/timespent/{tsid}',   TaskController::class, 'timeUpdate',    true);
+    Route::delete('task/{id}/timespent/{tsid}', TaskController::class, 'timeDelete',   true);
+    Route::get('task/{id}/contacts',           TaskController::class, 'contacts',      true);
+    Route::post('task/{id}/contact',           TaskController::class, 'contactAdd',    true);
+    Route::delete('task/{id}/contact/{rowid}', TaskController::class, 'contactRemove', true);
+
+    // ********** Lot 9 - Read-only FK lookup: User (AutoForm <FkPicker>) ********** //
     Route::get('user',         UserController::class,    'index', true);
     Route::get('user/{id}',    UserController::class,    'show',  true);
 

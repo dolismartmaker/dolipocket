@@ -10,6 +10,7 @@ import { useConfirm } from "@cap-rel/smartcommon";
 import { useDbSupplierOrders } from "src/db/stores/supplierOrders/useDbSupplierOrders";
 import { useMenu } from "src/lib/permissions";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { noteToText } from "src/lib/utils/htmlText";
 import { DocumentHeaderFields } from "src/lib/datatable";
 import { DocumentsSection } from "src/lib/components/DocumentsSection";
 import { SendEmailModal } from "src/lib/components/SendEmailModal";
@@ -185,13 +186,13 @@ const SupplierOrderTabletDetail = ({ id, onDeleted }) => {
                             {order.notePublic && (
                                 <div>
                                     <div className="text-xs text-soft-text uppercase tracking-wider mb-1">Publique</div>
-                                    <div className="whitespace-pre-wrap text-strong-text">{order.notePublic}</div>
+                                    <div className="whitespace-pre-wrap text-strong-text">{noteToText(order.notePublic)}</div>
                                 </div>
                             )}
                             {order.notePrivate && (
                                 <div>
                                     <div className="text-xs text-soft-text uppercase tracking-wider mb-1">Privée</div>
-                                    <div className="whitespace-pre-wrap text-strong-text">{order.notePrivate}</div>
+                                    <div className="whitespace-pre-wrap text-strong-text">{noteToText(order.notePrivate)}</div>
                                 </div>
                             )}
                         </div>

@@ -120,6 +120,9 @@ if ($action == 'update') {
 $page_name = "Dolipocket SmartMaker";
 llxHeader('', $page_name);
 
+// Warn when the companion SmartAuth module is missing / too old.
+print dolipocket_check_smartauth_version();
+
 // Configuration of extrafields for SmartMaker
 // Customize the element name(s) below to match your module's objects
 

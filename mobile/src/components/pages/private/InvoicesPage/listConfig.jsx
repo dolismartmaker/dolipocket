@@ -56,7 +56,7 @@ export const invoicesListConfig = {
     columnsOverrides: {
         ref:              { defaultVisible: true,  defaultWidth: 160 },
         refClient:        { defaultVisible: false, defaultWidth: 140 },
-        socid:            { defaultVisible: true,  defaultWidth: 200 },
+        socid:            { defaultVisible: true,  defaultWidth: 200, formatter: (v, row) => row?.socname || (v ? `#${v}` : "-") },
         datef:            { defaultVisible: true,  defaultWidth: 110, formatter: fmtDate },
         dateLimReglement: { defaultVisible: false, defaultWidth: 110, formatter: fmtDate },
         totalHt:          { defaultVisible: false, defaultWidth: 120, formatter: fmtAmount },

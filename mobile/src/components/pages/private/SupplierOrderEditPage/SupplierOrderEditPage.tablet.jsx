@@ -1,58 +1,23 @@
 import { TabletEditScaffold } from "src/lib/tablet";
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { SUPPLIER_ORDER_CONFIG } from "src/lib/document/documentConfig";
 
-// Tablet edit page for a Supplier Order: focused full-page touch form (AutoForm
-// in two columns) + the document lines editor (touch cards variant on tablet).
-// Reuses useSupplierOrderEditData() and mirrors the desktop excludeKeys.
-const EXCLUDE_KEYS = [
-    "ref",
-    "totalHt",
-    "totalTva",
-    "totalTtc",
-    "fkStatut",
-    "status",
-    "statut",
-    "datec",
-    "dateValid",
-    "datev",
-    "dateApprove",
-    "dateApprove2",
-    "dateCloture",
-    "dateCommande",
-    "lastMainDoc",
-    "modelPdf",
-    "billed",
-    "fkUserAuthor",
-    "fkUserValid",
-    "fkUserApprove",
-    "fkUserApprove2",
-    "fkUserCloture",
-    "fkUserModif",
-];
-
-export const SupplierOrderEditPageTablet = ({
-    isNew,
-    order,
-    setOrder,
-    loading,
-    saving,
-    error,
-    initialValues,
-    describe,
-    save,
-    cancel,
-    dbSupplierOrders,
-}) => {
+// Tablet supplier order edit page: touch AutoForm + lines editor. Curated
+// header whitelist from SUPPLIER_ORDER_CONFIG.editFields.
+export const SupplierOrderEditPageTablet = (props) => {
+    const { isNew, order, setOrder, loading, saving, error, initialValues, describe, save, cancel, dbSupplierOrders } = props;
+    const includeKeys = isNew ? SUPPLIER_ORDER_CONFIG.editFields.create : SUPPLIER_ORDER_CONFIG.editFields.update;
     return (
         <TabletEditScaffold
-            title={isNew ? "Nouvelle commande fournisseur" : `Modifier ${order?.ref ?? ""}`}
+            title={isNew ? SUPPLIER_ORDER_CONFIG.newTitle : `Modifier ${order?.ref ?? ""}`}
             loading={loading}
             saving={saving}
             error={error}
             describe={describe}
             value={initialValues}
             mode={isNew ? "create" : "update"}
-            excludeKeys={EXCLUDE_KEYS}
+            includeKeys={includeKeys}
+            groupings={[{ id: "main", title: "En-tête", keys: includeKeys }]}
             onCancel={cancel}
             onSave={save}
             renderLines={() => (
@@ -60,9 +25,7 @@ export const SupplierOrderEditPageTablet = ({
                     docId={!isNew && order ? Number(order.id) : 0}
                     lines={order?.lines ?? []}
                     dataSource={dbSupplierOrders}
-                    onChange={(updatedDoc) => {
-                        if (typeof setOrder === "function" && updatedDoc) setOrder(updatedDoc);
-                    }}
+                    onChange={(u) => { if (typeof setOrder === "function" && u) setOrder(u); }}
                 />
             )}
         />

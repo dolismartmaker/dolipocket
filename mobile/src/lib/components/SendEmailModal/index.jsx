@@ -31,6 +31,8 @@ export const SendEmailModal = ({
     defaultBody = "",
     defaultAttachment = "",
     docLabel = "document",
+    showAttachment = true,
+    title,
 }) => {
     const [to, setTo] = useState(defaultTo);
     const [cc, setCc] = useState("");
@@ -146,7 +148,7 @@ export const SendEmailModal = ({
                             id="sendemail-modal-title"
                             className="text-sm font-semibold text-strong-text"
                         >
-                            Envoyer le {docLabel} par email
+                            {title || `Envoyer le ${docLabel} par email`}
                         </h2>
                     </div>
                     <button
@@ -243,23 +245,25 @@ export const SendEmailModal = ({
                         />
                     </div>
 
-                    <div className="space-y-1">
-                        <label className="block text-xs font-medium text-soft-text flex items-center gap-1">
-                            <FaPaperclip className="text-[11px]" />
-                            Pièce jointe (chemin du PDF)
-                        </label>
-                        <input
-                            type="text"
-                            value={attachment}
-                            onChange={(e) => setAttachment(e.target.value)}
-                            disabled={submitting}
-                            placeholder="Laisser vide pour utiliser le dernier PDF généré"
-                            className="w-full h-9 px-3 border border-soft-border rounded-md text-[12px] font-mono text-soft-text focus:border-primary focus:outline-hidden disabled:bg-medium-bg"
-                        />
-                        <p className="text-[11px] text-soft-text">
-                            Si laissé vide, le dernier PDF généré sera utilisé (ou un nouveau sera généré).
-                        </p>
-                    </div>
+                    {showAttachment && (
+                        <div className="space-y-1">
+                            <label className="block text-xs font-medium text-soft-text flex items-center gap-1">
+                                <FaPaperclip className="text-[11px]" />
+                                Pièce jointe (chemin du PDF)
+                            </label>
+                            <input
+                                type="text"
+                                value={attachment}
+                                onChange={(e) => setAttachment(e.target.value)}
+                                disabled={submitting}
+                                placeholder="Laisser vide pour utiliser le dernier PDF généré"
+                                className="w-full h-9 px-3 border border-soft-border rounded-md text-[12px] font-mono text-soft-text focus:border-primary focus:outline-hidden disabled:bg-medium-bg"
+                            />
+                            <p className="text-[11px] text-soft-text">
+                                Si laissé vide, le dernier PDF généré sera utilisé (ou un nouveau sera généré).
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Footer */}

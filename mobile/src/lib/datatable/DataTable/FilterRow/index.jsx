@@ -51,7 +51,12 @@ export const FilterRow = ({
 }) => {
     if (isConfigMode) return null;
 
+    // Wrapped in its own <tbody>: a bare <tr> as a direct child of <table>
+    // is invalid DOM nesting (React hydration warning). Multiple <tbody> in
+    // one table is valid HTML; the horizontal sticky lives on the <td>, so
+    // this wrapper changes nothing visually.
     return (
+        <tbody>
         <tr>
             <td
                 style={{
@@ -133,5 +138,6 @@ export const FilterRow = ({
                 </td>
             )}
         </tr>
+        </tbody>
     );
 };

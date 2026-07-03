@@ -1,6 +1,7 @@
 import { FaPlus, FaArrowLeft } from "react-icons/fa";
 
 import { Page, Block, Select } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 
 // Status labels for FactureFournisseur (Dolibarr STATUS_*).
 // 0 Draft, 1 Validated, 2 Closed/Paid, 3 Abandoned.
@@ -70,12 +71,14 @@ export const SupplierInvoicesPageMobile = (props) => {
                 <Block blockProps={{ className: "rounded-xl" }}>
                     <div className="grid grid-cols-2 gap-3 md:flex md:flex-row md:items-end">
                         <Select
+                            labels={labelsWithFallback("Select")}
                             label="Statut"
                             value={statusFilter}
                             options={STATUS_OPTIONS}
                             onChange={(value) => set("statusFilter", value)}
                         />
                         <Select
+                            labels={labelsWithFallback("Select")}
                             label="Paiement"
                             value={payeFilter}
                             options={PAYE_OPTIONS}

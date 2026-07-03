@@ -24,30 +24,6 @@ export const initialsOf = (name) => {
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
-// Dolibarr note_public / note_private fields are stored HTML-encoded (the
-// WYSIWYG editor, or generators like SmartInterventions, emit entities such as
-// "&eacute;" and tags such as "<br>"). Rendered as a raw React text node they
-// show literally ("G&eacute;n&eacute;r&eacute;"). This turns such a note into
-// clean readable plain text: block tags -> newlines, remaining well-formed tags
-// stripped, then entities decoded. The result is rendered as TEXT (no
-// dangerouslySetInnerHTML), so there is no XSS surface.
-//
-// The tag regex requires a letter right after "<" or "</", so a literal
-// comparison like "a < b" is preserved (it is not mistaken for a tag).
-export const noteToText = (raw) => {
-    if (typeof raw !== "string" || raw === "") return raw ?? "";
-    let s = raw
-        .replace(/<\s*br\s*\/?>/gi, "\n")
-        .replace(/<\s*\/\s*(p|div|li|tr|h[1-6])\s*>/gi, "\n")
-        .replace(/<\/?[a-zA-Z][^>]*>/g, "");
-    if (typeof document !== "undefined") {
-        const el = document.createElement("textarea");
-        el.innerHTML = s;
-        s = el.value;
-    }
-    return s.replace(/\n{3,}/g, "\n\n").trim();
-};
-
 // Standard Totaux rows (HT / TVA / TTC) consumed by config.sideRail.totalsRows.
 // Most documents reuse it verbatim; invoices keep payment rows in their own
 // Paiements tab so this stays a pure 3-line summary.

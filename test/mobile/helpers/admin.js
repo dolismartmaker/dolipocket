@@ -89,3 +89,219 @@ export function adminCreateThirdParty(entity, name) {
 export function adminDeleteProposal(entity, propId) {
     return runAdmin('delete-proposal', [String(entity), String(propId)]);
 }
+
+/**
+ * Seed a proposal (Propal) with one free-text line so the detail page renders
+ * and a PDF has content. Pass validate=true to mint a ref and move it to the
+ * validated status (required for the PDF flow).
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, error?: string}}
+ */
+export function adminCreateProposal(entity, socId, validate = false) {
+    return runAdmin('create-proposal', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Seed a customer order (Commande) with one free-text line. Pass validate=true
+ * to mint a ref and move it to the validated status.
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, error?: string}}
+ */
+export function adminCreateOrder(entity, socId, validate = false) {
+    return runAdmin('create-order', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a Commande row, used as teardown safety net for order specs.
+ *
+ * @param {number} entity
+ * @param {number} ordId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteOrder(entity, ordId) {
+    return runAdmin('delete-order', [String(entity), String(ordId)]);
+}
+
+/**
+ * Seed a supplier (fournisseur) thirdparty for supplier-side document specs.
+ *
+ * @param {number} entity
+ * @param {string} name
+ * @returns {{ok: boolean, id?: number, error?: string}}
+ */
+export function adminCreateSupplier(entity, name) {
+    return runAdmin('create-supplier', [String(entity), String(name)]);
+}
+
+/**
+ * Seed a supplier order (CommandeFournisseur) with one free-text line. Pass
+ * validate=true to mint a ref and move it to the validated status.
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, error?: string}}
+ */
+export function adminCreateSupplierOrder(entity, socId, validate = false) {
+    return runAdmin('create-supplierorder', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a CommandeFournisseur row, teardown safety net for supplier-order specs.
+ *
+ * @param {number} entity
+ * @param {number} ordId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteSupplierOrder(entity, ordId) {
+    return runAdmin('delete-supplierorder', [String(entity), String(ordId)]);
+}
+
+/**
+ * Seed a supplier invoice (FactureFournisseur) with one free-text line. Pass
+ * validate=true to mint a ref and move it to the validated status.
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, error?: string}}
+ */
+export function adminCreateSupplierInvoice(entity, socId, validate = false) {
+    return runAdmin('create-supplierinvoice', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a FactureFournisseur row, teardown safety net for supplier-invoice specs.
+ *
+ * @param {number} entity
+ * @param {number} invId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteSupplierInvoice(entity, invId) {
+    return runAdmin('delete-supplierinvoice', [String(entity), String(invId)]);
+}
+
+/**
+ * Seed a supplier price request (SupplierProposal) with one free-text line.
+ * Pass validate=true to mint a ref and move it to the validated status.
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, error?: string}}
+ */
+export function adminCreateSupplierProposal(entity, socId, validate = false) {
+    return runAdmin('create-supplierproposal', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a SupplierProposal row, teardown safety net for supplier-proposal specs.
+ *
+ * @param {number} entity
+ * @param {number} spId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteSupplierProposal(entity, spId) {
+    return runAdmin('delete-supplierproposal', [String(entity), String(spId)]);
+}
+
+/**
+ * Seed an agenda event (ActionComm). No lines/PDF/validate: create() finalizes
+ * the record in one call. socId is optional (attaches the event to a tiers).
+ *
+ * @param {number} entity
+ * @param {number} [socId=0]
+ * @returns {{ok: boolean, id?: number, label?: string, error?: string}}
+ */
+export function adminCreateAgendaEvent(entity, socId = 0) {
+    return runAdmin('create-agendaevent', [String(entity), String(socId)]);
+}
+
+/**
+ * Delete an ActionComm row, teardown safety net for agenda specs.
+ *
+ * @param {number} entity
+ * @param {number} evtId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteAgendaEvent(entity, evtId) {
+    return runAdmin('delete-agendaevent', [String(entity), String(evtId)]);
+}
+
+/**
+ * Seed a shipment (Expedition): creates a validated origin order with one line,
+ * then a shipment from it. Pass validate=true to validate the shipment too.
+ *
+ * @param {number} entity
+ * @param {number} socId
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, orderId?: number, error?: string}}
+ */
+export function adminCreateShipment(entity, socId, validate = false) {
+    return runAdmin('create-shipment', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete an Expedition row, teardown safety net for shipment specs.
+ *
+ * @param {number} entity
+ * @param {number} shipId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteShipment(entity, shipId) {
+    return runAdmin('delete-shipment', [String(entity), String(shipId)]);
+}
+
+/**
+ * Seed a reception (Reception): creates a product, a validated supplier order
+ * carrying that product, then a reception from it. Pass validate=true to
+ * validate the reception too.
+ *
+ * @param {number} entity
+ * @param {number} socId supplier thirdparty id
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, status?: number, orderId?: number, productId?: number, error?: string}}
+ */
+export function adminCreateReception(entity, socId, validate = false) {
+    return runAdmin('create-reception', [String(entity), String(socId), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a Reception row, teardown safety net for reception specs.
+ *
+ * @param {number} entity
+ * @param {number} recId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteReception(entity, recId) {
+    return runAdmin('delete-reception', [String(entity), String(recId)]);
+}
+
+/**
+ * Seed a project (Project). Header-only object. Pass validate=true to move it to
+ * the validated status.
+ *
+ * @param {number} entity
+ * @param {boolean} [validate=false]
+ * @returns {{ok: boolean, id?: number, ref?: string, title?: string, status?: number, error?: string}}
+ */
+export function adminCreateProject(entity, validate = false) {
+    return runAdmin('create-project', [String(entity), validate ? '1' : '0']);
+}
+
+/**
+ * Delete a Project row, teardown safety net for project specs.
+ *
+ * @param {number} entity
+ * @param {number} projId
+ * @returns {{ok: boolean, deleted: number}}
+ */
+export function adminDeleteProject(entity, projId) {
+    return runAdmin('delete-project', [String(entity), String(projId)]);
+}

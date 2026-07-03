@@ -438,6 +438,23 @@ class modDolipocket extends DolibarrModules
 	{
 		global $conf, $langs;
 
+		// Hard gate: refuse activation when the companion SmartAuth module is
+		// missing or older than the minimum version required by the auth bridge,
+		// the smartmaker validation-schema hook, the binary upload flow and the
+		// FK -> label resolution (thirdparty name). The admin banner catches
+		// post-activation downgrades; this check stops the install upfront.
+		dol_include_once('/dolipocket/lib/dolipocket.lib.php');
+		$minSmartauth = dolipocket_required_smartauth_version();
+		$installedSmartauth = dolipocket_get_installed_smartauth_version();
+		if ($installedSmartauth === null || version_compare($installedSmartauth, $minSmartauth, '<')) {
+			$installedLabel = $installedSmartauth !== null
+				? 'version installée : ' . $installedSmartauth
+				: 'module non détecté';
+			$this->error = 'Le module SmartAuth version ' . $minSmartauth . ' ou plus récent est requis pour activer Dolipocket (' . $installedLabel . ').';
+			dol_syslog("DPK modDolipocket::init refused: smartauth " . $installedLabel . ", required >= " . $minSmartauth, LOG_ERR);
+			return -1;
+		}
+
 		//$result = $this->_load_tables('/install/mysql/', 'dolipocket');
 		$result = $this->_load_tables('/dolipocket/sql/');
 		if ($result < 0) {

@@ -413,14 +413,7 @@ class OrderController
         }
         $cmd->fetch_lines();
 
-        $data = $this->mapper->exportMappedData($cmd);
-        // Hydrate thirdparty name + email for the detail summary band + default
-        // email recipient (the mapper only publishes the raw socid).
-        $cmd->fetch_thirdparty();
-        $data->socname = ($cmd->thirdparty && !empty($cmd->thirdparty->name)) ? $cmd->thirdparty->name : '';
-        $data->socEmail = ($cmd->thirdparty && !empty($cmd->thirdparty->email)) ? $cmd->thirdparty->email : '';
-
-        return [$data, 200];
+        return [$this->mapper->exportMappedData($cmd), 200];
     }
 
     /**

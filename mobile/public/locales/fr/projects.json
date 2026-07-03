@@ -1,0 +1,69 @@
+{
+    "title": "Projets",
+    "title-singular": "Projet",
+    "list": {
+        "search-placeholder": "Rechercher un projet...",
+        "empty": "Aucun projet",
+        "create": "Nouveau projet",
+        "filter-status": "Statut",
+        "filter-all": "Tous"
+    },
+    "fiche": {
+        "section-info": "Informations",
+        "section-notes": "Notes",
+        "ref": "Référence",
+        "label": "Libellé",
+        "thirdparty": "Tiers",
+        "visibility": "Visibilité",
+        "public": "Public",
+        "private": "Privé",
+        "date-start": "Date de début",
+        "date-end": "Date de fin",
+        "budget": "Budget",
+        "opportunity": "Opportunité",
+        "opp-amount": "Montant de l'opportunité",
+        "opp-percent": "Probabilité",
+        "date-creation": "Créé le",
+        "description": "Description"
+    },
+    "edit": {
+        "title-create": "Nouveau projet",
+        "title-edit": "Modifier le projet",
+        "label": "Libellé du projet",
+        "thirdparty": "Tiers",
+        "visibility": "Visibilité",
+        "date-start": "Date de début",
+        "date-end": "Date de fin",
+        "budget": "Budget",
+        "opp-amount": "Montant de l'opportunité",
+        "opp-percent": "Probabilité (%)",
+        "note-public": "Note publique",
+        "note-private": "Note privée",
+        "save": "Enregistrer"
+    },
+    "actions": {
+        "validate": "Valider",
+        "close": "Fermer",
+        "reopen": "Rouvrir",
+        "set-draft": "Repasser en brouillon",
+        "clone": "Dupliquer",
+        "delete": "Supprimer"
+    },
+    "status-code": {
+        "0": "Brouillon",
+        "1": "Ouvert",
+        "2": "Fermé"
+    },
+    "toasts": {
+        "create-success": "Projet créé",
+        "update-success": "Projet mis à jour",
+        "validate-success": "Projet validé",
+        "close-success": "Projet fermé",
+        "reopen-success": "Projet rouvert",
+        "set-draft-success": "Projet repassé en brouillon",
+        "clone-success": "Projet dupliqué",
+        "delete-success": "Projet supprimé",
+        "load-error": "Impossible de charger les projets",
+        "action-error": "L'action a échoué"
+    }
+}

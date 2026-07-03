@@ -123,6 +123,9 @@ $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/module
 
 print load_fiche_titre($langs->trans($page_name), $linkback, 'title_setup');
 
+// Warn when the companion SmartAuth module is missing / too old.
+print dolipocket_check_smartauth_version();
+
 // Configuration header
 $head = dolipocketAdminPrepareHead();
 print dol_get_fiche_head($head, 'about', $langs->trans($page_name), 0, 'dolipocket@dolipocket');

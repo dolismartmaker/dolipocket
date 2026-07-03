@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FaXmark } from "react-icons/fa6";
 
 import { Input, Textarea, Select } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 
 import { FkPicker } from "src/lib/forms/FkPicker";
 
@@ -143,6 +144,7 @@ const AddFreeSheet = ({ onSubmit, onClose, busy }) => {
                 <Input value={remise} onChange={setRemise} label="Remise %" type="int" />
             </div>
             <Select
+                labels={labelsWithFallback("Select")}
                 value={productType}
                 onChange={setProductType}
                 label="Type"

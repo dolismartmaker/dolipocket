@@ -15,3 +15,5 @@ export * from "./shipments";
 export * from "./receptions";
 export * from "./supplierProposals";
 export * from "./invoiceRecs";
+export * from "./projects";
+export * from "./tasks";

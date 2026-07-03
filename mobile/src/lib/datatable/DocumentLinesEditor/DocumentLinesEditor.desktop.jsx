@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { FaPlus, FaTrash, FaArrowUp, FaArrowDown, FaPenToSquare, FaHeading } from "react-icons/fa6";
 
 import { Input, Textarea, Select } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 
 import { FkPicker } from "src/lib/forms/FkPicker";
 
@@ -391,6 +392,7 @@ const AddFreeLineForm = ({ onSubmit, onCancel, busy }) => {
                 <Input value={tvaTx} onChange={setTvaTx} label="TVA %" type="int" />
                 <Input value={remise} onChange={setRemise} label="Remise %" type="int" />
                 <Select
+                    labels={labelsWithFallback("Select")}
                     value={productType}
                     onChange={setProductType}
                     label="Type"

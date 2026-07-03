@@ -34,7 +34,14 @@ export const contactsListConfig = {
         lastname:    { defaultVisible: true,  defaultWidth: 180 },
         firstname:   { defaultVisible: true,  defaultWidth: 160 },
         email:       { defaultVisible: true,  defaultWidth: 240 },
-        fkSoc:       { defaultVisible: true,  defaultWidth: 120 },
+        fkSoc: {
+            defaultVisible: true,
+            defaultWidth: 120,
+            formatter: (socId, row) => {
+                const name = row?.fkSocName || "";
+                return name ? `${name} (#${socId})` : socId ? `#${socId}` : "—";
+            },
+        },
         phonePro:    { defaultVisible: false, defaultWidth: 140 },
         town:        { defaultVisible: false, defaultWidth: 140 },
         countryCode: { defaultVisible: false, defaultWidth: 80 },

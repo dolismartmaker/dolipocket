@@ -1,10 +1,20 @@
 import { useMemo, useState } from "react";
-import { FaSliders } from "react-icons/fa6";
+import { FaSliders, FaPen } from "react-icons/fa6";
 
 import { useColumnCatalog } from "../DataTable/hooks/useColumnCatalog";
 import { LinesColumnPanel } from "../DocumentLinesTable/LinesColumnPanel";
 
 import { useDocumentHeaderPrefs } from "./useDocumentHeaderPrefs";
+import { InlineFieldEditor } from "./InlineFieldEditor";
+import { editorKindForType } from "./editorKind";
+
+// Keys that must never be edited inline: computed/system columns and the
+// status/relation flags that have their own workflow (better edited via the
+// full AutoForm or dedicated controls).
+const READONLY_KEYS = new Set([
+    "id", "rowid", "createdAt", "updatedAt", "datec", "tms",
+    "client", "fournisseur", "status",
+]);
 
 // <DocumentHeaderFields> renders the header information of a document
 // as a vertical list of "label : value" pairs, driven by the same backend
@@ -50,6 +60,8 @@ export const DocumentHeaderFields = ({
     storageKey,
     title = "Informations",
     overrides,
+    editable = false,
+    onSaveField,
 }) => {
     const { catalog, loading: catalogLoading, error: catalogError } = useColumnCatalog({
         dataSource,
@@ -66,6 +78,15 @@ export const DocumentHeaderFields = ({
     } = useDocumentHeaderPrefs({ storageKey, catalog, overrides });
 
     const [isPanelOpen, setIsPanelOpen] = useState(false);
+    const [editingKey, setEditingKey] = useState(null);
+
+    const canEdit = editable && typeof onSaveField === "function";
+
+    const handleFieldSave = async (field, value) => {
+        const updated = await onSaveField(field.key, value);
+        setEditingKey(null);
+        return updated;
+    };
 
     const visibleFields = useMemo(
         () => resolvedFields.filter((f) => f.visible !== false),
@@ -121,14 +142,46 @@ export const DocumentHeaderFields = ({
 
             {visibleFields.length > 0 && (
                 <div className="px-4 py-2 divide-y divide-soft-border/60">
-                    {visibleFields.map((field) => (
-                        <div key={field.key} className="flex justify-between gap-4 py-1.5 text-[13px]">
-                            <span className="text-soft-text shrink-0">{field.label}</span>
-                            <span className="text-strong-text font-medium text-right truncate">
-                                {renderValue(field, object)}
-                            </span>
-                        </div>
-                    ))}
+                    {visibleFields.map((field) => {
+                        const fieldEditable = canEdit
+                            && Object.prototype.hasOwnProperty.call(object ?? {}, field.key)
+                            && !READONLY_KEYS.has(field.key)
+                            && editorKindForType(field.type) !== null;
+                        const isEditing = editingKey === field.key;
+
+                        return (
+                            <div
+                                key={field.key}
+                                className="group flex justify-between items-start gap-4 py-1.5 text-[13px]"
+                            >
+                                <span className="text-soft-text shrink-0 pt-0.5">{field.label}</span>
+                                {isEditing ? (
+                                    <div className="flex-1 min-w-0 max-w-[75%]">
+                                        <InlineFieldEditor
+                                            kind={editorKindForType(field.type)}
+                                            initialValue={object?.[field.key]}
+                                            onSave={(val) => handleFieldSave(field, val)}
+                                            onCancel={() => setEditingKey(null)}
+                                        />
+                                    </div>
+                                ) : fieldEditable ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingKey(field.key)}
+                                        className="flex-1 min-w-0 flex items-center justify-end gap-1.5 text-strong-text font-medium text-right rounded px-1 -mx-1 hover:bg-medium-bg/60 transition-colors"
+                                        title="Modifier ce champ"
+                                    >
+                                        <FaPen className="text-[10px] text-soft-text opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                        <span className="truncate">{renderValue(field, object)}</span>
+                                    </button>
+                                ) : (
+                                    <span className="text-strong-text font-medium text-right truncate">
+                                        {renderValue(field, object)}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </section>

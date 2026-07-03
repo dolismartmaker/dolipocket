@@ -59,6 +59,7 @@ DolipocketMenuSupplierInvoices = Supplier invoices
 DolipocketMenuProducts = Products
 DolipocketMenuWarehouses = Warehouses
 DolipocketMenuStock = Stock
+DolipocketMenuProjects = Projects
 DolipocketMenuAgenda = Agenda
 DolipocketMenuDocuments = Documents
 

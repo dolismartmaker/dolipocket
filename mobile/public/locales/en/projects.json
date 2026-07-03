@@ -1,0 +1,69 @@
+{
+    "title": "Projects",
+    "title-singular": "Project",
+    "list": {
+        "search-placeholder": "Search a project...",
+        "empty": "No project",
+        "create": "New project",
+        "filter-status": "Status",
+        "filter-all": "All"
+    },
+    "fiche": {
+        "section-info": "Information",
+        "section-notes": "Notes",
+        "ref": "Reference",
+        "label": "Label",
+        "thirdparty": "Third party",
+        "visibility": "Visibility",
+        "public": "Public",
+        "private": "Private",
+        "date-start": "Start date",
+        "date-end": "End date",
+        "budget": "Budget",
+        "opportunity": "Opportunity",
+        "opp-amount": "Opportunity amount",
+        "opp-percent": "Probability",
+        "date-creation": "Created on",
+        "description": "Description"
+    },
+    "edit": {
+        "title-create": "New project",
+        "title-edit": "Edit project",
+        "label": "Project label",
+        "thirdparty": "Third party",
+        "visibility": "Visibility",
+        "date-start": "Start date",
+        "date-end": "End date",
+        "budget": "Budget",
+        "opp-amount": "Opportunity amount",
+        "opp-percent": "Probability (%)",
+        "note-public": "Public note",
+        "note-private": "Private note",
+        "save": "Save"
+    },
+    "actions": {
+        "validate": "Validate",
+        "close": "Close",
+        "reopen": "Reopen",
+        "set-draft": "Set to draft",
+        "clone": "Clone",
+        "delete": "Delete"
+    },
+    "status-code": {
+        "0": "Draft",
+        "1": "Open",
+        "2": "Closed"
+    },
+    "toasts": {
+        "create-success": "Project created",
+        "update-success": "Project updated",
+        "validate-success": "Project validated",
+        "close-success": "Project closed",
+        "reopen-success": "Project reopened",
+        "set-draft-success": "Project set to draft",
+        "clone-success": "Project cloned",
+        "delete-success": "Project deleted",
+        "load-error": "Unable to load projects",
+        "action-error": "The action failed"
+    }
+}

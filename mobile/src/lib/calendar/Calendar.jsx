@@ -32,6 +32,7 @@ export const Calendar = ({
     onSelectEvent,
     onSelectDay,
     onSelectSlot,
+    onCreateEvent,
     compact = false,
 }) => {
     const { t } = useTranslation("agenda");
@@ -63,6 +64,7 @@ export const Calendar = ({
                     locale={locale}
                     onSelectEvent={onSelectEvent}
                     onSelectSlot={onSelectSlot}
+                    onCreateEvent={onCreateEvent}
                 />
             );
         }

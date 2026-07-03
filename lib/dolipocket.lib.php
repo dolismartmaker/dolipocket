@@ -156,3 +156,85 @@ function dpk_findUserByLogin($login)
 		'statut'       => (int) $obj->statut,
 	];
 }
+
+/**
+ * Minimum SmartAuth version required by Dolipocket.
+ *
+ * Single source of truth used by both the activation-time check in
+ * modDolipocket::init() and the backoffice banner. Dolipocket leans on
+ * SmartAuth for the auth bridge (generateTokenForAuthenticatedUser), the
+ * smartmaker validation-schema hook, the binary upload flow AND the generic
+ * FK -> label resolution (thirdparty name in lists/detail, dmTrait
+ * $listOfForeignKeyLabels) shipped in 2.0.31.
+ *
+ * @return string Semver string (e.g. '2.0.31')
+ */
+function dolipocket_required_smartauth_version()
+{
+	return '2.0.31';
+}
+
+/**
+ * Read the installed SmartAuth module version from its descriptor.
+ *
+ * @return string|null Installed version, or null when the smartauth descriptor
+ *                     is missing / unreadable / fails to instantiate.
+ */
+function dolipocket_get_installed_smartauth_version()
+{
+	$descriptorPath = function_exists('dol_buildpath')
+		? dol_buildpath('/smartauth/core/modules/modSmartauth.class.php')
+		: '';
+	if ($descriptorPath === '' || !@is_readable($descriptorPath)) {
+		return null;
+	}
+	require_once $descriptorPath;
+	if (!class_exists('modSmartauth')) {
+		return null;
+	}
+	global $db;
+	try {
+		$mod = new \modSmartauth($db);
+		if (isset($mod->version) && is_string($mod->version)) {
+			return $mod->version;
+		}
+	} catch (\Throwable $e) {
+		dol_syslog("DPK dolipocket_get_installed_smartauth_version: " . $e->getMessage(), LOG_WARNING);
+	}
+	return null;
+}
+
+/**
+ * Render a top-of-page banner when the installed SmartAuth module is missing
+ * or older than the minimum version required by Dolipocket.
+ *
+ * Returns the HTML banner string when an upgrade is needed, or an empty string
+ * when SmartAuth is OK. Designed to be inlined verbatim by every admin page:
+ *
+ *   print dolipocket_check_smartauth_version();
+ *
+ * @return string HTML or empty string
+ */
+function dolipocket_check_smartauth_version()
+{
+	$minVersion = dolipocket_required_smartauth_version();
+	$dolistoreUrl = 'https://www.dolistore.com/product.php?id=2509';
+
+	$installedVersion = dolipocket_get_installed_smartauth_version();
+
+	if ($installedVersion !== null && version_compare($installedVersion, $minVersion, '>=')) {
+		return '';
+	}
+
+	$installedLabel = $installedVersion !== null
+		? 'version installée : ' . htmlspecialchars($installedVersion, ENT_QUOTES, 'UTF-8')
+		: 'module non détecté';
+
+	$linkLabel = 'Télécharger sur Dolistore';
+
+	return '<div class="warning" style="margin:0 0 1em 0;padding:0.6em 0.8em;border:1px solid #cc9;background:#ffc;">'
+		. 'Le module <strong>SmartAuth</strong> version <strong>' . htmlspecialchars($minVersion, ENT_QUOTES, 'UTF-8') . '</strong> ou plus récent est requis pour Dolipocket ('
+		. $installedLabel . '). '
+		. '<a href="' . htmlspecialchars($dolistoreUrl, ENT_QUOTES, 'UTF-8') . '" target="_blank" rel="noopener noreferrer">' . $linkLabel . '</a>'
+		. '</div>';
+}

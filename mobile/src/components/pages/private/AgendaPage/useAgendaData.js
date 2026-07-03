@@ -24,6 +24,7 @@ export const useAgendaData = ({ availableViews, defaultView = "month" } = {}) =>
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [revalidateKey, setRevalidateKey] = useState(0);
 
     const hasClient = !!dbAgenda.list;
     const cursorTime = cursor.getTime();
@@ -64,7 +65,7 @@ export const useAgendaData = ({ availableViews, defaultView = "month" } = {}) =>
             cancelled = true;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [hasClient, range]);
+    }, [hasClient, range, revalidateKey]);
 
     const step = useCallback(
         (dir) => {
@@ -104,6 +105,24 @@ export const useAgendaData = ({ availableViews, defaultView = "month" } = {}) =>
     const onSelectSlot = useCallback((date) => createAt(date), [createAt]);
     const onCreate = useCallback(() => createAt(null), [createAt]);
 
+    // Quick create via modal: create event and return {id}.
+    // Trigger list revalidation after creation so the new event appears.
+    const onCreateEvent = useCallback(
+        async (payload) => {
+            try {
+                const result = await dbAgenda.create(payload);
+                if (result?.id) {
+                    setRevalidateKey((prev) => prev + 1);
+                }
+                return result;
+            } catch (err) {
+                console.error("[useAgendaData] onCreateEvent error", err);
+                throw err;
+            }
+        },
+        [dbAgenda],
+    );
+
     return {
         view,
         availableViews,
@@ -122,5 +141,6 @@ export const useAgendaData = ({ availableViews, defaultView = "month" } = {}) =>
         onSelectEvent,
         onSelectDay,
         onSelectSlot,
+        onCreateEvent,
     };
 };

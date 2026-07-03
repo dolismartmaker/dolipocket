@@ -4,7 +4,7 @@ import toast from "react-hot-toast";
 
 import { Input, isEmpty, Button, useApi, useStates, Page, Checker } from "@cap-rel/smartcommon";
 
-import { API_ABORT_TIMEOUT } from "src/utils";
+import { API_ABORT_TIMEOUT, labelsWithFallback } from "src/utils";
 import { updateUser } from "src/global-state";
 import { useTranslation } from "react-i18next";
 
@@ -100,6 +100,7 @@ export const DeviceIdentificationPage = () => {
                     </div>
                     <Checker
                         id="devices-checker"
+                        labels={labelsWithFallback("Checker")}
                         label={t("devices-checker.label")}
                         readOnly={isValidatingDevice}
                         required={!isEmpty(deviceOptions)}

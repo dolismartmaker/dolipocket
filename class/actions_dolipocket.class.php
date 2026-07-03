@@ -155,14 +155,178 @@ class ActionsDolipocket
 			'GET:home' => array(),
 
 			// =====================================================================
-			// Lot 9 - Read-only FK lookups (powered by AutoForm <FkPicker>).
-			// Project + User both expose ?search=&page=&limit= and a /{id}.
+			// Lot B1 - Projects (projet). GET:project uses the full $listSchema so
+			// it serves BOTH the DataTable (sort/filter/include) AND the AutoForm
+			// <FkPicker> (search/page/limit). 'note_*'/'description' are RAW to
+			// escape the 255-char sanitize truncation; 'options_*' passes
+			// extrafields through. Statuses/clone take only the id (+ flags).
 			// =====================================================================
-			'GET:project' => array(
-				'search' => array('type' => $TYPE_STRING, 'maxLen' => 255),
-				'page'   => array('type' => $TYPE_INT, 'min' => 1),
-				'limit'  => array('type' => $TYPE_INT, 'min' => 1, 'max' => 200),
+			'GET:project'          => $listSchema,
+			'GET:project/columns'  => $columnsSchema,
+			'GET:project/describe' => $columnsSchema,
+			'GET:project/count'    => $countSchema,
+			'DELETE:project'       => $bulkDeleteSchema,
+			'POST:project' => array(
+				'title'             => array('type' => $TYPE_STRING, 'maxLen' => 255),
+				'socid'             => array('type' => $TYPE_INT, 'min' => 0),
+				'fk_soc'            => array('type' => $TYPE_INT, 'min' => 0),
+				'description'       => $rawEntry,
+				'public'            => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'date_start'        => $rawEntry,
+				'date_end'          => $rawEntry,
+				'fk_opp_status'     => array('type' => $TYPE_INT, 'min' => 0),
+				'opp_status'        => array('type' => $TYPE_INT, 'min' => 0),
+				'opp_percent'       => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'opp_amount'        => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'budget_amount'     => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'usage_opportunity' => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'usage_task'        => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'usage_bill_time'   => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'note_public'       => $rawEntry,
+				'note_private'      => $rawEntry,
+				'options_*'         => $rawEntry,
 			),
+			'PUT:project/{id}' => array(
+				'id'                => array('type' => $TYPE_INT, 'min' => 1),
+				'title'             => array('type' => $TYPE_STRING, 'maxLen' => 255),
+				'socid'             => array('type' => $TYPE_INT, 'min' => 0),
+				'fk_soc'            => array('type' => $TYPE_INT, 'min' => 0),
+				'description'       => $rawEntry,
+				'public'            => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'date_start'        => $rawEntry,
+				'date_end'          => $rawEntry,
+				'fk_opp_status'     => array('type' => $TYPE_INT, 'min' => 0),
+				'opp_status'        => array('type' => $TYPE_INT, 'min' => 0),
+				'opp_percent'       => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'opp_amount'        => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'budget_amount'     => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'usage_opportunity' => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'usage_task'        => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'usage_bill_time'   => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'note_public'       => $rawEntry,
+				'note_private'      => $rawEntry,
+				'options_*'         => $rawEntry,
+			),
+			'POST:project/{id}/validate' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/close'    => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/reopen'   => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/setdraft' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/clone' => array(
+				'id'             => array('type' => $TYPE_INT, 'min' => 1),
+				'socid'          => array('type' => $TYPE_INT, 'min' => 0),
+				'clone_contacts' => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'clone_tasks'    => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'clone_notes'    => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+				'move_date'      => array('type' => $TYPE_INT, 'min' => 0, 'max' => 1),
+			),
+			// Lot B2 - project contacts + categories
+			'GET:project/{id}/contacts' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/contact' => array(
+				'id'         => array('type' => $TYPE_INT, 'min' => 1),
+				'contact_id' => array('type' => $TYPE_INT, 'min' => 1),
+				'type_id'    => array('type' => $TYPE_INT, 'min' => 1),
+				'source'     => array('type' => $TYPE_STRING, 'maxLen' => 20),
+			),
+			'DELETE:project/{id}/contact/{rowid}' => array(
+				'id'    => array('type' => $TYPE_INT, 'min' => 1),
+				'rowid' => array('type' => $TYPE_INT, 'min' => 1),
+			),
+			'GET:project/{id}/categories' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:project/{id}/category' => array(
+				'id'          => array('type' => $TYPE_INT, 'min' => 1),
+				'category_id' => array('type' => $TYPE_INT, 'min' => 1),
+				'type'        => array('type' => $TYPE_STRING, 'maxLen' => 20),
+			),
+			'DELETE:project/{id}/category/{categoryId}' => array(
+				'id'         => array('type' => $TYPE_INT, 'min' => 1),
+				'categoryId' => array('type' => $TYPE_INT, 'min' => 1),
+			),
+			// Lot B2b - project referents (linked objects)
+			'GET:project/{id}/elements' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'DELETE:project/{id}/element/{type}/{elementId}' => array(
+				'id'        => array('type' => $TYPE_INT, 'min' => 1),
+				'type'      => array('type' => $TYPE_STRING, 'maxLen' => 40),
+				'elementId' => array('type' => $TYPE_INT, 'min' => 1),
+			),
+			// Lot B5 - project PDF generation
+			'POST:project/{id}/generatepdf' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+
+			// =====================================================================
+			// Lot B3 - Tasks (projet_task). List accepts ?project. note_*/
+			// description RAW to escape the 255-char truncation.
+			// =====================================================================
+			'GET:task'          => $listSchema,
+			'GET:task/columns'  => $columnsSchema,
+			'GET:task/describe' => $columnsSchema,
+			'GET:task/count'    => $countSchema,
+			'POST:task' => array(
+				'fk_project'       => array('type' => $TYPE_INT, 'min' => 1),
+				'label'            => array('type' => $TYPE_STRING, 'maxLen' => 255),
+				'description'      => $rawEntry,
+				'fk_task_parent'   => array('type' => $TYPE_INT, 'min' => 0),
+				'date_start'       => $rawEntry,
+				'date_end'         => $rawEntry,
+				'planned_workload' => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'progress'         => array('type' => $TYPE_INT, 'min' => 0, 'max' => 100),
+				'priority'         => array('type' => $TYPE_INT, 'min' => 0),
+				'budget_amount'    => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'note_public'      => $rawEntry,
+				'note_private'     => $rawEntry,
+				'options_*'        => $rawEntry,
+			),
+			'PUT:task/{id}' => array(
+				'id'               => array('type' => $TYPE_INT, 'min' => 1),
+				'label'            => array('type' => $TYPE_STRING, 'maxLen' => 255),
+				'description'      => $rawEntry,
+				'fk_task_parent'   => array('type' => $TYPE_INT, 'min' => 0),
+				'date_start'       => $rawEntry,
+				'date_end'         => $rawEntry,
+				'planned_workload' => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'progress'         => array('type' => $TYPE_INT, 'min' => 0, 'max' => 100),
+				'priority'         => array('type' => $TYPE_INT, 'min' => 0),
+				'budget_amount'    => array('type' => $TYPE_FLOAT, 'min' => 0),
+				'note_public'      => $rawEntry,
+				'note_private'     => $rawEntry,
+				'options_*'        => $rawEntry,
+			),
+			'POST:task/{id}/clone' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			// Lot B4 - time spent
+			'GET:task/{id}/timespent' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'GET:task/{id}/timespent/summary' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:task/{id}/timespent' => array(
+				'id'       => array('type' => $TYPE_INT, 'min' => 1),
+				'date'     => $rawEntry,
+				'duration' => array('type' => $TYPE_INT, 'min' => 0),
+				'fk_user'  => array('type' => $TYPE_INT, 'min' => 0),
+				'note'     => $rawEntry,
+			),
+			'PUT:task/{id}/timespent/{tsid}' => array(
+				'id'       => array('type' => $TYPE_INT, 'min' => 1),
+				'tsid'     => array('type' => $TYPE_INT, 'min' => 1),
+				'date'     => $rawEntry,
+				'duration' => array('type' => $TYPE_INT, 'min' => 0),
+				'fk_user'  => array('type' => $TYPE_INT, 'min' => 0),
+				'note'     => $rawEntry,
+			),
+			'DELETE:task/{id}/timespent/{tsid}' => array(
+				'id'   => array('type' => $TYPE_INT, 'min' => 1),
+				'tsid' => array('type' => $TYPE_INT, 'min' => 1),
+			),
+			'GET:task/{id}/contacts' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			'POST:task/{id}/contact' => array(
+				'id'         => array('type' => $TYPE_INT, 'min' => 1),
+				'contact_id' => array('type' => $TYPE_INT, 'min' => 1),
+				'type_id'    => array('type' => $TYPE_INT, 'min' => 1),
+				'source'     => array('type' => $TYPE_STRING, 'maxLen' => 20),
+			),
+			'DELETE:task/{id}/contact/{rowid}' => array(
+				'id'    => array('type' => $TYPE_INT, 'min' => 1),
+				'rowid' => array('type' => $TYPE_INT, 'min' => 1),
+			),
+
+			// =====================================================================
+			// Lot 9 - Read-only FK lookup: User (powered by AutoForm <FkPicker>).
+			// =====================================================================
 			'GET:user' => array(
 				'search' => array('type' => $TYPE_STRING, 'maxLen' => 255),
 				'page'   => array('type' => $TYPE_INT, 'min' => 1),
@@ -187,6 +351,10 @@ class ActionsDolipocket
 			'DELETE:thirdparty/{id}/bankaccount/{accountId}' => array('id' => array('type' => $TYPE_INT, 'min' => 1), 'accountId' => array('type' => $TYPE_INT, 'min' => 1)),
 			// Tier A - A5c - reusable discounts available for the thirdparty.
 			'GET:thirdparty/{id}/discounts' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			// Cockpit - 360 synthesis of the thirdparty (desktop fiche).
+			'GET:thirdparty/{id}/cockpit' => array('id' => array('type' => $TYPE_INT, 'min' => 1)),
+			// Send a free email to the thirdparty. body is raw (no 255 truncation).
+			'POST:thirdparty/{id}/email' => array('id' => array('type' => $TYPE_INT, 'min' => 1), 'to' => array('type' => $TYPE_STRING, 'maxLen' => 255), 'subject' => array('type' => $TYPE_STRING, 'maxLen' => 255), 'body' => array('type' => $TYPE_RAW), 'cc' => array('type' => $TYPE_STRING, 'maxLen' => 255), 'bcc' => array('type' => $TYPE_STRING, 'maxLen' => 255), 'ishtml' => array('type' => $TYPE_INT)),
 			'GET:contact'             => $listSchema,
 			'GET:contact/columns'     => $columnsSchema,
 			'GET:contact/describe'    => $columnsSchema,

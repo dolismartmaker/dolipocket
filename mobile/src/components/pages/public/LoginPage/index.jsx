@@ -9,7 +9,7 @@ import { LuLogIn } from "react-icons/lu";
 
 import { Input, Boolean, Button, useStates, Page, useApi, Select, isEmpty } from "@cap-rel/smartcommon";
 
-import { API_ABORT_TIMEOUT, APP_VERSION } from "src/utils";
+import { API_ABORT_TIMEOUT, APP_VERSION, labelsWithFallback } from "src/utils";
 import { defaultSettings, setLastSettings, updateUser } from "src/global-state";
 import { AnimationLayout } from "src/components/layouts";
 import { Waves } from "./Waves";
@@ -223,6 +223,7 @@ export const LoginPage = () => {
                     {!isEmpty(entities) &&
                         <Select
                             id="login-entity-select"
+                            labels={labelsWithFallback("Select")}
                             required={!isEmpty(entities)}
                             readOnly={isLoading}
                             onChange={value => set("loginData.entity", value)}
@@ -236,6 +237,7 @@ export const LoginPage = () => {
                     }
                     <Boolean
                         id="login-remember-me-boolean"
+                        labels={labelsWithFallback("Boolean")}
                         label={t("remember-me-boolean.label")}
                         readOnly={isLoading}
                         type={`checkbox`}

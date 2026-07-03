@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { FaArrowLeft, FaSave } from "react-icons/fa";
 
 import { Page, Input, Select, useStates, useConfirm } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 
 import { useDbThirdParties } from "src/db/stores/thirdparties/useDbThirdParties";
 
@@ -211,12 +212,14 @@ export const ThirdPartyEditPage = () => {
                                 onChange={(value) => setField("codeFournisseur", value)}
                             />
                             <Select
+                                labels={labelsWithFallback("Select")}
                                 label="Type client"
                                 value={form?.client ?? 0}
                                 options={CLIENT_OPTIONS}
                                 onChange={(value) => setField("client", Number(value))}
                             />
                             <Select
+                                labels={labelsWithFallback("Select")}
                                 label="Fournisseur"
                                 value={form?.fournisseur ?? 0}
                                 options={FOURNISSEUR_OPTIONS}

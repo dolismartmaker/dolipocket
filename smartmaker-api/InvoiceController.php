@@ -423,18 +423,6 @@ class InvoiceController
 
         $data = $this->mapper->exportMappedData($invoice);
 
-        // Hydrate the thirdparty name + email for the detail header (summary
-        // band). The mapper only publishes socid/fk_soc (the raw id); the
-        // desktop "qui / pour quoi" band needs the human name, and the email
-        // is reused as the default recipient of the send-by-email modal.
-        $invoice->fetch_thirdparty();
-        $data->socname = ($invoice->thirdparty && !empty($invoice->thirdparty->name))
-            ? $invoice->thirdparty->name
-            : '';
-        $data->socEmail = ($invoice->thirdparty && !empty($invoice->thirdparty->email))
-            ? $invoice->thirdparty->email
-            : '';
-
         // Append payment summary (list + total) for the recap section
         $payments = $invoice->getListOfPayments();
         $sum = 0.0;

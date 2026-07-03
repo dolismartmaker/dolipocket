@@ -15,6 +15,8 @@ import { SendEmailModal } from "src/lib/components/SendEmailModal";
 import { StatusPill, getStatusInfo } from "src/lib/components/StatusPill";
 import { MasterDetailLayout, EmptyDetail, TouchList, TouchListItem } from "src/lib/tablet";
 
+import { noteToText } from "src/lib/utils/htmlText";
+
 import { useProposalData, fmtAmount, fmtDate } from "../ProposalPage/useProposalData";
 
 // Tablet master-detail workspace for Proposals (devis). Document feature:
@@ -181,13 +183,13 @@ const ProposalTabletDetail = ({ id, onDeleted }) => {
                             {proposal.notePublic && (
                                 <div>
                                     <div className="text-xs text-soft-text uppercase tracking-wider mb-1">Publique</div>
-                                    <div className="whitespace-pre-wrap text-strong-text">{proposal.notePublic}</div>
+                                    <div className="whitespace-pre-wrap text-strong-text">{noteToText(proposal.notePublic)}</div>
                                 </div>
                             )}
                             {proposal.notePrivate && (
                                 <div>
                                     <div className="text-xs text-soft-text uppercase tracking-wider mb-1">Privée</div>
-                                    <div className="whitespace-pre-wrap text-strong-text">{proposal.notePrivate}</div>
+                                    <div className="whitespace-pre-wrap text-strong-text">{noteToText(proposal.notePrivate)}</div>
                                 </div>
                             )}
                         </div>

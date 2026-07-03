@@ -3,6 +3,7 @@ import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaCheckCircle, FaBan, FaC
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { noteToText } from "src/lib/utils/htmlText";
 
 import { STATUS_LABELS, fmtAmount, fmtDate } from "./useInvoiceData";
 
@@ -108,13 +109,13 @@ export const InvoicePageMobile = (props) => {
                             {invoice.notePublic && (
                                 <div className="mb-2">
                                     <div className="text-xs text-gray-500">Publique</div>
-                                    <div className="whitespace-pre-wrap">{invoice.notePublic}</div>
+                                    <div className="whitespace-pre-wrap">{noteToText(invoice.notePublic)}</div>
                                 </div>
                             )}
                             {invoice.notePrivate && (
                                 <div>
                                     <div className="text-xs text-gray-500">Privée</div>
-                                    <div className="whitespace-pre-wrap">{invoice.notePrivate}</div>
+                                    <div className="whitespace-pre-wrap">{noteToText(invoice.notePrivate)}</div>
                                 </div>
                             )}
                         </Block>

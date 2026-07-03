@@ -25,6 +25,19 @@ if (!is_dir($sqliteVendorPath)) {
 }
 $sqliteVendorPath = realpath($sqliteVendorPath);
 
+// Remove the htdocs/custom/dolipocket symlink left behind by the Playwright E2E
+// harness (test/mobile/backend/init.php symlinks the module there for php -S and
+// never cleans it up). It points back at the project root, whose vendored
+// dolibarr-integration-sqlite/htdocs/custom/dolipocket points back again -> an
+// infinite symlink loop. Integration tests register the module via
+// $conf->file->dol_document_root['alt0'] (below), not via custom/, so any
+// recursive dol_dir_list over dol_document_root would otherwise follow that loop
+// and hang the suite. This is a no-op when the E2E harness has not run.
+$e2eLeftoverSymlink = $sqliteVendorPath . '/htdocs/custom/dolipocket';
+if (is_link($e2eLeftoverSymlink)) {
+    @unlink($e2eLeftoverSymlink);
+}
+
 // Restore conf.php from template (in case a previous test crashed)
 $confPath = $sqliteVendorPath . '/htdocs/conf/conf.php';
 $confTemplate = $sqliteVendorPath . '/htdocs/conf/conf.php_sqlite';

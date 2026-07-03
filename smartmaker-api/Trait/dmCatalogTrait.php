@@ -637,6 +637,19 @@ trait dmCatalogTrait
 
         // Always preserve structural keys that the caller did not strip explicitly.
         $structuralKeys = ['lines', 'categories', 'nb_linked_files', 'linked_files'];
+        // Preserve FK-label companion fields (socname, socEmail, ...) regardless
+        // of ?include=: they are derived from a FK and the catalog never lists
+        // them as standalone columns, but the UI needs them whenever the source
+        // FK column (socid) is shown.
+        if (!empty($this->listOfForeignKeyLabels) && is_array($this->listOfForeignKeyLabels)) {
+            foreach ($this->listOfForeignKeyLabels as $spec) {
+                if (is_array($spec) && !empty($spec['labels']) && is_array($spec['labels'])) {
+                    foreach (array_keys($spec['labels']) as $companion) {
+                        $structuralKeys[] = $companion;
+                    }
+                }
+            }
+        }
         $allowedSet = array_fill_keys($includeKeys, true);
         // 'id' is always carried (otherwise the row is unusable client-side).
         $allowedSet['id'] = true;

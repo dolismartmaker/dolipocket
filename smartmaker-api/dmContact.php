@@ -40,6 +40,21 @@ class dmContact extends dmBase
     protected $dolibarrClassName = 'Contact';
 
     /**
+     * Opt-in FK -> label companion field resolved by dmTrait. Exposes the
+     * parent thirdparty name as fkSocName alongside the raw fk_soc id, using
+     * the per-process fetch cache in dmTrait::_resolveForeignKeyLabels() (one
+     * Societe fetch per list, no N+1). Consumed by the ContactsPage DataTable.
+     * @var array
+     */
+    protected $listOfForeignKeyLabels = [
+        'fk_soc' => [
+            'class'  => 'Societe',
+            'path'   => 'societe/class/societe.class.php',
+            'labels' => ['fkSocName' => 'name'],
+        ],
+    ];
+
+    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */

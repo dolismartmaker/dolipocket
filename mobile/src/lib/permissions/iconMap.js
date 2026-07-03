@@ -8,6 +8,7 @@ import {
     FaTruck, FaTruckFast, FaTruckRampBox, FaFileInvoiceDollar,
     FaCalendarDays, FaFolderOpen,
     FaEnvelope, FaCommentsDollar, FaRepeat,
+    FaDiagramProject,
     FaCircle,
 } from "react-icons/fa6";
 
@@ -30,6 +31,7 @@ export const ICON_MAP = {
     "envelope":            FaEnvelope,
     "comments-dollar":     FaCommentsDollar,
     "repeat":              FaRepeat,
+    "diagram-project":     FaDiagramProject,
 };
 
 // Fallback to a neutral circle icon if the backend ships an unknown name.

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { FaArrowLeft, FaSave, FaPlus, FaTrash } from "react-icons/fa";
 
 import { useStates, useConfirm, Page, Block, Input, Select, Button } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 import { SearchPicker } from "../../../common/SearchPicker";
 
 import { useDbSupplierInvoices } from "src/db/stores/supplierInvoices/useDbSupplierInvoices";
@@ -240,6 +241,7 @@ export const SupplierInvoiceEditPage = () => {
                             onChange={(value) => set("refSupplier", value)}
                         />
                         <Select
+                            labels={labelsWithFallback("Select")}
                             label="Type"
                             value={type}
                             options={TYPE_OPTIONS}

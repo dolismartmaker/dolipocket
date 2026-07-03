@@ -3,6 +3,7 @@ import { FaArrowLeft, FaTrash, FaPen, FaCheck, FaUndo, FaCheckCircle, FaCopy } f
 import { Page, Block, Button } from "@cap-rel/smartcommon";
 
 import { DocumentLinesEditor } from "src/lib/datatable/DocumentLinesEditor";
+import { noteToText } from "src/lib/utils/htmlText";
 
 // Mobile rendering of the supplier invoice detail page. The lines block is
 // now rendered through the shared <DocumentLinesEditor> (mobile variant:
@@ -171,13 +172,13 @@ export const SupplierInvoicePageMobile = (props) => {
                         {invoice.notePublic && (
                             <div className="mb-2">
                                 <div className="text-xs text-gray-500 uppercase">Publique</div>
-                                <div className="text-sm text-gray-800 whitespace-pre-wrap">{invoice.notePublic}</div>
+                                <div className="text-sm text-gray-800 whitespace-pre-wrap">{noteToText(invoice.notePublic)}</div>
                             </div>
                         )}
                         {invoice.notePrivate && (
                             <div>
                                 <div className="text-xs text-gray-500 uppercase">Privée</div>
-                                <div className="text-sm text-gray-800 whitespace-pre-wrap">{invoice.notePrivate}</div>
+                                <div className="text-sm text-gray-800 whitespace-pre-wrap">{noteToText(invoice.notePrivate)}</div>
                             </div>
                         )}
                     </Block>

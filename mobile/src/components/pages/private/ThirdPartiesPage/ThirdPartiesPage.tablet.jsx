@@ -10,7 +10,7 @@ import {
     TouchListItem,
     DocumentDetailPane,
 } from "src/lib/tablet";
-import { HEADER_OVERRIDES } from "../ThirdPartyPage/ThirdPartyPage.desktop";
+import { HEADER_OVERRIDES } from "src/lib/cockpit/headerOverrides";
 
 // Tablet master-detail workspace for ThirdParties. Used by BOTH:
 //   - /thirdparties        (list route, no preselection)

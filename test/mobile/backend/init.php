@@ -142,6 +142,19 @@ $db->query(
     . " VALUES('MAIN_VERSION_LAST_UPGRADE', '" . $db->escape(DOL_VERSION) . "', 'chaine', 0, '', 0)"
 );
 
+// Force the default backend language to French. master.inc.php initialises the
+// per-request $langs from MAIN_LANG_DEFAULT of the default entity BEFORE the
+// SmartAuth layer switches to the tenant entity, so without this the API
+// translates field labels / menus in en_US (the SQLite base install default),
+// while the PWA chrome is French. Pinning fr_FR here makes the whole app render
+// French, matching production intent for a fr_FR tenant. (Test harness only.)
+foreach ([0, 1] as $langEntity) {
+    $db->query(
+        "REPLACE INTO " . MAIN_DB_PREFIX . "const(name, value, type, visible, note, entity)"
+        . " VALUES('MAIN_LANG_DEFAULT', 'fr_FR', 'chaine', 0, '', " . $langEntity . ")"
+    );
+}
+
 // Symlink the dolipocket module into htdocs/custom/ so php -S can serve
 // /custom/dolipocket/pwa/api.php and /custom/dolipocket/public/index.php.
 $customDir = $dolibarrPath . '/custom';
@@ -292,6 +305,12 @@ $db->query(
     . " '" . $db->idate(dol_now()) . "')"
 );
 fwrite(STDERR, "e2e: provisioned test tenant entity=$testEntity userid=$testUserId\n");
+
+// NB: module rights for the tenant admin are now granted by
+// EntityProvisioner::grantAdminRights() (production code), so the harness no
+// longer needs to activate modules / addrights itself. The only harness-only
+// tweak left below is pinning the backend language (the SQLite base install
+// defaults to en_US, whereas production tenants are fr_FR).
 
 // Configure DOLIPOCKET_PWA_URL so the Blade login redirects to the Vite
 // preview server (host + port). The PWA port lives in the env (default 5195

@@ -31,16 +31,32 @@ class EntityProvisioner
 	/** @var DoliDB */
 	private $db;
 
-	/** @var array Modules activated by default for each new tenant */
-	private const DEFAULT_MODULES = [
-		'MAIN_MODULE_SOCIETE',
-		'MAIN_MODULE_FACTURE',
-		'MAIN_MODULE_PROPAL',
-		'MAIN_MODULE_COMMANDE',
-		'MAIN_MODULE_PRODUCT',
-		'MAIN_MODULE_SERVICE',
-		'MAIN_MODULE_BANQUE',
-		'MAIN_MODULE_TAX',
+	/**
+	 * Dolibarr core module descriptor classes enabled for each new tenant.
+	 *
+	 * Declared by class name (not MAIN_MODULE_* constant) so the enabling
+	 * constant is derived from the class -- MAIN_MODULE_<UPPER(name)> -- and
+	 * cannot drift (the historical list carried a MAIN_MODULE_PROPAL typo
+	 * instead of MAIN_MODULE_PROPALE). Covers the whole documented feature set
+	 * (12 CRUD entities + the shipment/reception/supplier-proposal documents).
+	 */
+	private const MODULE_CLASSES = [
+		'modSociete',
+		'modProduct',
+		'modService',
+		'modPropale',
+		'modCommande',
+		'modFacture',
+		'modFournisseur',
+		'modBanque',
+		'modTax',
+		'modCategorie',
+		'modAgenda',
+		'modStock',
+		'modExpedition',
+		'modReception',
+		'modSupplierProposal',
+		'modProjet',
 	];
 
 	public function __construct(DoliDB $db)
@@ -78,6 +94,7 @@ class EntityProvisioner
 			$this->insertBaselineConstants($entity, $company, $email);
 			$this->activateDefaultModules($entity);
 			$userId = $this->createAdminUser($entity, $email, $pass);
+			$this->grantAdminRights($entity, $userId);
 			$this->createDocumentDirectory($entity);
 
 			$this->db->commit();
@@ -138,6 +155,8 @@ class EntityProvisioner
 			['COMMANDE_ADDON',          'mod_commande_marbre'],
 			['PROPALE_ADDON',           'mod_propale_marbre'],
 			['PRODUCT_CODEPRODUCT_ADDON', 'mod_codeproduct_leopard'],
+			['PROJECT_ADDON',           'mod_project_simple'],
+			['PROJECT_TASK_ADDON',      'mod_task_simple'],
 		];
 
 		foreach ($rows as [$name, $value]) {
@@ -153,7 +172,8 @@ class EntityProvisioner
 	 */
 	private function activateDefaultModules(int $entity): void
 	{
-		foreach (self::DEFAULT_MODULES as $constName) {
+		foreach (self::MODULE_CLASSES as $modClass) {
+			$constName = 'MAIN_MODULE_' . strtoupper(substr($modClass, 3));
 			$this->upsertConst($constName, '1', $entity);
 		}
 	}
@@ -213,16 +233,70 @@ class EntityProvisioner
 			throw new RuntimeException('user insert returned no id');
 		}
 
-		// Grant the user every Dolipocket-relevant permission via a Dolibarr User object.
-		// Loading the user re-reads from DB and respects entity scoping internally.
-		require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
-		$user = new User($this->db);
-		if ($user->fetch($userId) <= 0) {
-			throw new RuntimeException('user fetch failed after insert');
-		}
-		// admin=1 grants all rights at runtime, no per-permission row needed.
-
+		// NB: admin=1 is NOT enough to use the feature APIs -- rights are granted
+		// explicitly in grantAdminRights() (see there for the full rationale).
 		return $userId;
+	}
+
+	/**
+	 * Populate the module permission definitions for the tenant entity and grant
+	 * every one of them to the tenant admin user.
+	 *
+	 * Why this is mandatory: the admin is created with admin=1, but in this
+	 * Dolibarr version User::hasRight() has no admin short-circuit for a non
+	 * entity-1 admin, and User::getrights() only loads permissions that exist in
+	 * llx_rights_def / llx_user_rights for the user's entity. Enabling a module
+	 * through its MAIN_MODULE_* constant does NOT create those rows. Without this
+	 * step the freshly provisioned admin gets HTTP 403 on every feature endpoint.
+	 *
+	 * Each module descriptor's insert_permissions() writes the llx_rights_def
+	 * rows for the entity (lightweight -- no menus/dictionaries). We pass
+	 * reinitadminperms=0 so it only writes the definitions and NEVER grants other
+	 * admin users (reinitadminperms=1 would grant every admin of every tenant --
+	 * a cross-tenant leak). The admin is then granted for this entity only via
+	 * addrights('allmodules').
+	 *
+	 * @param   int  $entity  Target entity
+	 * @param   int  $userId  Admin user id created by createAdminUser()
+	 * @return  void
+	 */
+	private function grantAdminRights(int $entity, int $userId): void
+	{
+		global $conf;
+
+		$prevEntity = isset($conf->entity) ? $conf->entity : null;
+		$conf->entity = $entity;
+
+		foreach (self::MODULE_CLASSES as $modClass) {
+			$file = DOL_DOCUMENT_ROOT . '/core/modules/' . $modClass . '.class.php';
+			if (!is_file($file)) {
+				dol_syslog('DPK provisioning: module class file missing: ' . $modClass, LOG_WARNING);
+				continue;
+			}
+			require_once $file;
+			if (!class_exists($modClass)) {
+				dol_syslog('DPK provisioning: module class not found: ' . $modClass, LOG_WARNING);
+				continue;
+			}
+			$mod = new $modClass($this->db);
+			// reinitadminperms=0: only populate llx_rights_def for $entity, do NOT
+			// touch other admin users (multi-tenant isolation).
+			$mod->insert_permissions(0, $entity);
+		}
+
+		require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
+		$admin = new User($this->db);
+		if ($admin->fetch($userId) > 0) {
+			$admin->entity = $entity;
+			// notrigger=1: no permission-change triggers during provisioning.
+			$admin->addrights(0, 'allmodules', '', $entity, 1);
+		} else {
+			dol_syslog('DPK provisioning: could not fetch admin userid=' . $userId . ' to grant rights', LOG_ERR);
+		}
+
+		if ($prevEntity !== null) {
+			$conf->entity = $prevEntity;
+		}
 	}
 
 	/**

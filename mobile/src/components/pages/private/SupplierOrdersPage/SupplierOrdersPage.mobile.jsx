@@ -1,6 +1,7 @@
 import { FaPlus, FaArrowLeft } from "react-icons/fa";
 
 import { Page, Block, Select, Button } from "@cap-rel/smartcommon";
+import { labelsWithFallback } from "src/utils";
 
 // Status labels for CommandeFournisseur (Dolibarr STATUS_* constants).
 // 0 Draft, 1 Validated, 2 Approved, 3 Order sent, 4 Received partially,
@@ -77,6 +78,7 @@ export const SupplierOrdersPageMobile = (props) => {
                 <Block blockProps={{ className: "rounded-xl" }}>
                     <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row md:items-end">
                         <Select
+                            labels={labelsWithFallback("Select")}
                             label="Statut"
                             value={statusFilter}
                             options={STATUS_OPTIONS}

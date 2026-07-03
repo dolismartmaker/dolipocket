@@ -415,14 +415,7 @@ class ProposalController
         }
         $propal->fetch_lines();
 
-        $data = $this->mapper->exportMappedData($propal);
-        // Hydrate thirdparty name + email for the detail summary band + default
-        // email recipient (the mapper only publishes the raw socid).
-        $propal->fetch_thirdparty();
-        $data->socname = ($propal->thirdparty && !empty($propal->thirdparty->name)) ? $propal->thirdparty->name : '';
-        $data->socEmail = ($propal->thirdparty && !empty($propal->thirdparty->email)) ? $propal->thirdparty->email : '';
-
-        return [$data, 200];
+        return [$this->mapper->exportMappedData($propal), 200];
     }
 
     /**

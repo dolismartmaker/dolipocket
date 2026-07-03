@@ -302,6 +302,15 @@ class HomeController
                 'title' => $langs->transnoentities('DolipocketMenuTransverse'),
                 'items' => array(
                     array(
+                        'id'      => 'projects',
+                        'label'   => $langs->transnoentities('DolipocketMenuProjects'),
+                        'icon'    => 'diagram-project',
+                        'route'   => '/projects',
+                        'visible' => function ($u) {
+                            return (bool) $u->hasRight('projet', 'lire');
+                        },
+                    ),
+                    array(
                         'id'      => 'agenda',
                         'label'   => $langs->transnoentities('DolipocketMenuAgenda'),
                         'icon'    => 'calendar-days',
@@ -476,6 +485,14 @@ class HomeController
             'agenda.create'          => $agendaCan('create'),
             'agenda.write'           => $agendaCan('create'),
             'agenda.delete'          => $agendaCan('delete'),
+
+            // Projects (projet). Lot B1. 'write' maps to creer (no separate
+            // update right). The finer public/private per-project access is
+            // enforced server-side by ProjectController::restrictedProjectArea.
+            'project.read'           => $can('projet', 'lire'),
+            'project.create'         => $can('projet', 'creer'),
+            'project.write'          => $can('projet', 'creer'),
+            'project.delete'         => $can('projet', 'supprimer'),
 
             // Reflects the real admin flag (NOT bypassed): the PWA may want
             // to show or hide a "settings" tile based on this value.

@@ -18,6 +18,8 @@ import {
   receptionsIndexes,
   supplierProposalsIndexes,
   invoiceRecsIndexes,
+  projectsIndexes,
+  tasksIndexes,
 } from "./stores";
 
 // Single Db instance used by every useDb<Feature> hook.
@@ -30,7 +32,9 @@ const db = new Db({
   // v5 (Tier A lot A5b): adds the `invoiceRecs` store. Additive again -- Dexie
   // creates the new table on upgrade for existing clients; fresh installs get
   // it directly. No data migration needed (existing stores are untouched).
-  version: 5,
+  // v6 (lot B1): adds the `projects` store. Additive, same rationale.
+  // v7 (lot B3): adds the `tasks` store. Additive again.
+  version: 7,
   stores: {
     users: usersIndexes,
     thirdparties: thirdpartiesIndexes,
@@ -49,6 +53,8 @@ const db = new Db({
     receptions: receptionsIndexes,
     supplierProposals: supplierProposalsIndexes,
     invoiceRecs: invoiceRecsIndexes,
+    projects: projectsIndexes,
+    tasks: tasksIndexes,
   },
 });
 

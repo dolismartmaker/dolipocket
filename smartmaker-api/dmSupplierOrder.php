@@ -36,6 +36,20 @@ class dmSupplierOrder extends dmBase
     protected $dolibarrClassName = 'CommandeFournisseur';
 
     /**
+     * Opt-in FK -> label companion fields resolved by dmTrait. Exposes the
+     * supplier name (+ email) alongside the raw socid, without nesting the
+     * whole Societe -- so lists and detail show a human name automatically.
+     * @var array
+     */
+    protected $listOfForeignKeyLabels = [
+        'fk_soc' => [
+            'class'  => 'Societe',
+            'path'   => 'societe/class/societe.class.php',
+            'labels' => ['socname' => 'name', 'socEmail' => 'email'],
+        ],
+    ];
+
+    /**
      * Element name for extrafields (must match llx_extrafields.elementtype)
      * @var string
      */

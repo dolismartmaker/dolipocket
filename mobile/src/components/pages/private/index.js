@@ -63,3 +63,8 @@ export * from "./AgendaEventPage";
 export * from "./AgendaEventEditPage";
 export * from "./DocumentsPage";
 export * from "./DocumentsObjectPage";
+
+// Lot B1 - Projects (projet)
+export * from "./ProjectsPage";
+export * from "./ProjectPage";
+export * from "./ProjectEditPage";
