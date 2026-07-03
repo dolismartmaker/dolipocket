@@ -13,6 +13,7 @@ import {
     FaEnvelope,
     FaListCheck,
     FaRegCalendar,
+    FaCakeCandles,
 } from "react-icons/fa6";
 
 // Each colour family ships the class strings used across the three renderers:
@@ -60,6 +61,14 @@ const FAMILIES = {
         chip: "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200",
         block: "bg-slate-100/90 border-l-4 border-slate-400 text-slate-800",
     },
+    birthday: {
+        key: "birthday",
+        labelKey: "types.birthday",
+        Icon: FaCakeCandles,
+        dot: "bg-pink-500",
+        chip: "bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100",
+        block: "bg-pink-100/90 border-l-4 border-pink-500 text-pink-900",
+    },
 };
 
 // Explicit type_code -> family. Unknown codes fall back via prefix heuristics.
@@ -70,6 +79,7 @@ const CODE_MAP = {
     AC_FAX: "other",
     AC_OTH: "other",
     AC_OTH_AUTO: "other",
+    BIRTHDAY: "birthday",
 };
 
 // Resolve a type_code to its visual family meta.
@@ -80,6 +90,7 @@ export const getTypeMeta = (typeCode) => {
     if (code.includes("TEL") || code.includes("PHONE") || code.includes("CALL")) return FAMILIES.phone;
     if (code.includes("MAIL")) return FAMILIES.email;
     if (code.includes("TASK") || code.includes("TODO")) return FAMILIES.task;
+    if (code.includes("BIRTH")) return FAMILIES.birthday;
     return FAMILIES.other;
 };
 

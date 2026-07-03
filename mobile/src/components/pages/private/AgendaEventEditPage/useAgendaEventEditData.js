@@ -94,15 +94,24 @@ export const useAgendaEventEditData = () => {
             percentage: 0,
             ...(labelParam ? { label: labelParam } : {}),
             ...(locationParam ? { location: locationParam } : {}),
-            ...(noteParam ? { notePrivate: noteParam } : {}),
+            ...(noteParam ? { note: noteParam } : {}),
             ...(seededDatepMs ? { datep: seededDatepMs } : {}),
             ...(seededDatefMs ? { datef: seededDatefMs } : {}),
             ...(seededFullDay ? { fulldayevent: true } : {}),
-            ...(seededSocid ? { socid: seededSocid } : {}),
+            ...(seededSocid ? { fkSoc: seededSocid } : {}),
         }
         : (event ?? {});
 
     const save = useCallback(async (values) => {
+        // Required-field validation (mirrors the mobile form). The label is
+        // mandatory: without this guard the desktop "Enregistrer" button -- which
+        // calls save() directly, bypassing the form's onSubmit -- silently sent
+        // an empty label (create -> backend 400, update -> blank saved), leaving
+        // the user with no hint that the field is required.
+        if (!values?.label || String(values.label).trim() === "") {
+            setError("Le libellé est obligatoire");
+            return null;
+        }
         setSaving(true);
         setError(null);
         try {
@@ -134,6 +143,9 @@ export const useAgendaEventEditData = () => {
             }
             const data = await dbAgenda.update(id, payload);
             setEvent(data);
+            // Success feedback: return to the detail page (mirrors create), so
+            // the user sees the saved event instead of a form that "did nothing".
+            navigate(`/agenda/${id}`);
             return data;
         } catch (err) {
             console.error("[useAgendaEventEditData] save error", err);

@@ -96,6 +96,7 @@ use Dolipocket\Api\DocumentController;
 use Dolipocket\Api\ProjectController;
 use Dolipocket\Api\TaskController;
 use Dolipocket\Api\UserController;
+use Dolipocket\Api\ResourceController;
 
 
 // Initialize route cache for this module.
@@ -376,6 +377,8 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     Route::get('event',            AgendaController::class, 'index',    true);
     Route::get('event/columns',    AgendaController::class, 'columns',  true);
     Route::get('event/describe',   AgendaController::class, 'describe', true);
+    Route::get('event/filter-options', AgendaController::class, 'filterOptions', true);
+    Route::get('event/counts',     AgendaController::class, 'counts',   true);
     Route::get('event/{id}',       AgendaController::class, 'show',     true);
     Route::post('event',           AgendaController::class, 'create',   true);
     Route::put('event/{id}',       AgendaController::class, 'update',   true);
@@ -514,6 +517,10 @@ if (RouteCache::isCacheValid() && RouteCache::loadCache()) {
     // ********** Lot 9 - Read-only FK lookup: User (AutoForm <FkPicker>) ********** //
     Route::get('user',         UserController::class,    'index', true);
     Route::get('user/{id}',    UserController::class,    'show',  true);
+
+    // ********** Agenda filters - Read-only FK lookup: Resource ********** //
+    Route::get('resource',      ResourceController::class, 'index', true);
+    Route::get('resource/{id}', ResourceController::class, 'show',  true);
 
     // ========== End Route Registration ========== //
 

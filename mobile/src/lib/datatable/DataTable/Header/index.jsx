@@ -19,6 +19,8 @@ export const Header = ({
     actionsWidth,
     stickyLeftOffsets,
     rowsForAutoFit,
+    reorder,
+    onOpenMenu,
 }) => {
     return (
         <thead>
@@ -68,6 +70,8 @@ export const Header = ({
                             isConfigMode={isConfigMode}
                             isFirstSticky={typeof stickyLeft === "number"}
                             stickyLeft={stickyLeft}
+                            reorder={reorder}
+                            onOpenMenu={onOpenMenu}
                         />
                     );
                 })}

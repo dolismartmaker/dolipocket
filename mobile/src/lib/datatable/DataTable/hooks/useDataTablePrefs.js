@@ -329,6 +329,28 @@ export const useDataTablePrefs = (config, { catalog = null } = {}) => {
         });
     }, [setPrefs]);
 
+    // Exact insert-before semantics for the pointer-based header drag.
+    // Moves `fromKey` so that it lands immediately BEFORE `beforeKey`.
+    // `beforeKey === null` appends it at the very end.
+    const insertColumnBefore = useCallback((fromKey, beforeKey) => {
+        if (fromKey === beforeKey) return;
+        setPrefs((p) => {
+            const cols = p.columns.slice();
+            const fromIdx = cols.findIndex((c) => c.key === fromKey);
+            if (fromIdx < 0) return p;
+            const [moved] = cols.splice(fromIdx, 1);
+            let insertAt;
+            if (beforeKey == null) {
+                insertAt = cols.length;
+            } else {
+                insertAt = cols.findIndex((c) => c.key === beforeKey);
+                if (insertAt < 0) insertAt = cols.length;
+            }
+            cols.splice(insertAt, 0, moved);
+            return { ...p, columns: cols };
+        });
+    }, [setPrefs]);
+
     const setSort = useCallback((sort) => {
         setPrefs((p) => ({ ...p, sort }));
     }, [setPrefs]);
@@ -390,6 +412,7 @@ export const useDataTablePrefs = (config, { catalog = null } = {}) => {
         setColumnVisibility,
         setColumnWidth,
         moveColumn,
+        insertColumnBefore,
         setSort,
         setPageSize,
         setSearch,

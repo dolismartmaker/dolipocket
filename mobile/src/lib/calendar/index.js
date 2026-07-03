@@ -10,6 +10,7 @@ export { MonthView } from "./MonthView";
 export { TimeGridView } from "./TimeGridView";
 export { AgendaListView } from "./AgendaListView";
 export { CalendarToolbar } from "./CalendarToolbar";
+export { CalendarFilterBar } from "./CalendarFilterBar";
 export { MiniMonth } from "./MiniMonth";
 export { AgendaHomeWidget } from "./AgendaHomeWidget";
 export { getTypeMeta, TYPE_LEGEND } from "./eventTypes";

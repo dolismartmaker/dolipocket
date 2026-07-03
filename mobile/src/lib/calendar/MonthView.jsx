@@ -22,11 +22,28 @@ const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const dayIndex = (date, weekStart) =>
     Math.round((startOfDay(date).getTime() - weekStart.getTime()) / DAY_MS);
 
+// Density heatmap (desktop month view): count events per START day and expose
+// the busiest day so each cell can be tinted proportionally. Subtle by design
+// (cf .claude/CLAUDE.md UI épuré) -- a light primary wash, never a loud colour.
+const HEAT_MAX_ALPHA = 0.16;
+const buildDensity = (events) => {
+    const map = {};
+    let max = 0;
+    for (const ev of events || []) {
+        const s = tsToDate(ev.datep);
+        if (!s) continue;
+        const k = dayKey(startOfDay(s));
+        map[k] = (map[k] || 0) + 1;
+        if (map[k] > max) max = map[k];
+    }
+    return { map, max };
+};
+
 // One week row. Events are laid out as continuous bars spanning the columns
 // they cover (Google-Calendar style), packed into lanes. Single-day events are
 // 1-column bars. This is what stops multi-day events from being repeated in
 // every cell.
-const WeekRow = ({ weekDays, cursor, events, onSelectEvent, onSelectDay }) => {
+const WeekRow = ({ weekDays, cursor, events, density, onSelectEvent, onSelectDay }) => {
     const weekStart = startOfDay(weekDays[0]);
     const weekEndDay = startOfDay(weekDays[6]);
 
@@ -86,6 +103,11 @@ const WeekRow = ({ weekDays, cursor, events, onSelectEvent, onSelectDay }) => {
                     const out = !isSameMonth(day, cursor);
                     const today = isToday(day);
                     const weekend = isWeekend(day);
+                    const heatCount = density?.map[dayKey(day)] || 0;
+                    const heatAlpha =
+                        density && density.max > 0 && heatCount > 0
+                            ? (heatCount / density.max) * HEAT_MAX_ALPHA
+                            : 0;
                     return (
                         <button
                             type="button"
@@ -95,6 +117,14 @@ const WeekRow = ({ weekDays, cursor, events, onSelectEvent, onSelectDay }) => {
                                 out ? "bg-medium-bg/40" : weekend ? "bg-medium-bg/20" : "bg-white"
                             } hover:bg-primary/5 transition-colors`}
                         >
+                            {/* Density heatmap wash (desktop). Behind the number + bars. */}
+                            {heatAlpha > 0 && (
+                                <span
+                                    aria-hidden="true"
+                                    className="absolute inset-0 bg-primary pointer-events-none"
+                                    style={{ opacity: heatAlpha }}
+                                />
+                            )}
                             <span
                                 className={`absolute top-0.5 left-0.5 grid place-items-center text-[12px] font-medium h-6 min-w-6 px-1 rounded-full ${
                                     today ? "bg-primary text-white" : out ? "text-soft-text" : "text-strong-text"
@@ -172,6 +202,8 @@ export const MonthView = ({ cursor, events, locale, onSelectEvent, onSelectDay, 
         [cells],
     );
     const byStartDay = useMemo(() => (compact ? startDayIndex(events) : {}), [events, compact]);
+    // Density heatmap for the desktop month grid only (mobile stays épuré).
+    const density = useMemo(() => (compact ? null : buildDensity(events)), [events, compact]);
 
     return (
         <div className="flex flex-col h-full min-h-0">
@@ -229,13 +261,14 @@ export const MonthView = ({ cursor, events, locale, onSelectEvent, onSelectDay, 
                     })}
                 </div>
             ) : (
-                <div className="flex flex-col flex-1 min-h-0">
+                <div className="flex flex-col flex-1 min-h-0" data-testid="calendar-month-grid">
                     {weeks.map((wd, i) => (
                         <WeekRow
                             key={i}
                             weekDays={wd}
                             cursor={cursor}
                             events={events || []}
+                            density={density}
                             onSelectEvent={onSelectEvent}
                             onSelectDay={onSelectDay}
                         />

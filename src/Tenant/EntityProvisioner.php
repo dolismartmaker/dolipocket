@@ -57,6 +57,7 @@ class EntityProvisioner
 		'modReception',
 		'modSupplierProposal',
 		'modProjet',
+		'modResource',
 	];
 
 	public function __construct(DoliDB $db)

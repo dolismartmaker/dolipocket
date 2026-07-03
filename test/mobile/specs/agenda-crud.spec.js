@@ -48,11 +48,11 @@ test.describe('Agenda event CRUD from the desktop detail page', () => {
         }
     });
 
-    // The desktop edit page uses the generic <AutoForm>. Its save round-trip has
-    // a known camelCase/snake_case key mismatch (see the FIXME in invoice.spec.js
-    // for the same AutoForm), so we only assert the edit page opens *populated*
-    // with the event's data -- which is the meaningful "modify entry point" check
-    // -- and leave the save-persist path to the shared AutoForm fix.
+    // The desktop edit page uses the generic <AutoForm>. This test asserts it
+    // opens *populated* (guards a blank-form regression); the save-persist path
+    // is verified separately by the "PERSISTS" test below -- which proves the
+    // agenda AutoForm round-trip actually works (the old "known key mismatch"
+    // caveat was stale for this form).
     test('modify: the edit page opens populated with the event', async ({
         authenticatedPage: page,
         backendInfo,
@@ -73,6 +73,68 @@ test.describe('Agenda event CRUD from the desktop detail page', () => {
             // the header renders "Modifier <label>" and the Save button is ready.
             await expect(page.getByText(new RegExp(`Modifier ${SEED_LABEL}`)).first()).toBeVisible({ timeout: 15_000 });
             await expect(page.getByRole('button', { name: /^Enregistrer$/ }).first()).toBeVisible({ timeout: 10_000 });
+        } finally {
+            try { adminDeleteAgendaEvent(entity, evtId); } catch { /* swallow */ }
+            try { adminDeleteThirdParty(entity, socId); } catch { /* swallow */ }
+        }
+    });
+
+    test('modify: clearing the label shows a required-field error (no silent save)', async ({
+        authenticatedPage: page,
+        backendInfo,
+    }) => {
+        const entity = backendInfo.testUser.entity;
+        const tiers = adminCreateThirdParty(entity, `Agenda ReqLabel ${Date.now()}`);
+        expect(tiers.ok).toBe(true);
+        const socId = Number(tiers.id);
+        const seed = adminCreateAgendaEvent(entity, socId);
+        expect(seed.ok).toBe(true);
+        const evtId = Number(seed.id);
+
+        try {
+            await page.goto(`/#/agenda/${evtId}/edit`);
+            await page.waitForURL(new RegExp(`/agenda/${evtId}/edit$`), { timeout: 15_000 });
+            await expect(page.getByText(new RegExp(`Modifier ${SEED_LABEL}`)).first()).toBeVisible({ timeout: 15_000 });
+
+            // Clear the label and save: must surface a clear required-field error
+            // (not a silent no-op) and stay on the edit page.
+            await page.locator(`input[value="${SEED_LABEL}"]`).first().fill('');
+            await page.getByRole('button', { name: /^Enregistrer$/ }).first().click();
+
+            await expect(page.getByText('Le libellé est obligatoire')).toBeVisible({ timeout: 5_000 });
+            await expect(page).toHaveURL(new RegExp(`/agenda/${evtId}/edit$`));
+        } finally {
+            try { adminDeleteAgendaEvent(entity, evtId); } catch { /* swallow */ }
+            try { adminDeleteThirdParty(entity, socId); } catch { /* swallow */ }
+        }
+    });
+
+    test('modify: editing the label on the full edit page PERSISTS', async ({
+        authenticatedPage: page,
+        backendInfo,
+    }) => {
+        const entity = backendInfo.testUser.entity;
+        const tiers = adminCreateThirdParty(entity, `Agenda Persist ${Date.now()}`);
+        expect(tiers.ok).toBe(true);
+        const socId = Number(tiers.id);
+        const seed = adminCreateAgendaEvent(entity, socId);
+        expect(seed.ok).toBe(true);
+        const evtId = Number(seed.id);
+        const newLabel = `RDV Modifie ${Date.now()}`;
+
+        try {
+            await page.goto(`/#/agenda/${evtId}/edit`);
+            await page.waitForURL(new RegExp(`/agenda/${evtId}/edit$`), { timeout: 15_000 });
+            await expect(page.getByText(new RegExp(`Modifier ${SEED_LABEL}`)).first()).toBeVisible({ timeout: 15_000 });
+
+            await page.locator(`input[value="${SEED_LABEL}"]`).first().fill(newLabel);
+            await page.getByRole('button', { name: /^Enregistrer$/ }).first().click();
+
+            // Save must land on the detail page AND the new label must persist
+            // (reload from the backend to defeat any client cache).
+            await page.waitForURL(new RegExp(`/agenda/${evtId}$`), { timeout: 15_000 });
+            await page.goto(`/#/agenda/${evtId}`);
+            await expect(page.getByText(newLabel).first()).toBeVisible({ timeout: 15_000 });
         } finally {
             try { adminDeleteAgendaEvent(entity, evtId); } catch { /* swallow */ }
             try { adminDeleteThirdParty(entity, socId); } catch { /* swallow */ }

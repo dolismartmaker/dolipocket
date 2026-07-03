@@ -47,19 +47,53 @@
         "user-assigned": "Assigned to",
         "thirdparty": "Linked thirdparty",
         "contact": "Linked contact",
-        "note": "Note"
+        "note": "Note",
+        "label-required": "The label is required"
     },
     "status": {
         "todo": "To do",
         "in-progress": "In progress",
         "done": "Done"
     },
+    "filters": {
+        "type": "Type",
+        "types-empty": "No type available",
+        "hide-auto": "Hide auto",
+        "birthday": "Birthdays",
+        "clear": "Clear",
+        "remove": "Remove",
+        "status-all": "Status",
+        "thirdparty": "Third party",
+        "project": "Project",
+        "resource": "Resource",
+        "group": "Group",
+        "group-all": "Group",
+        "views": "Views",
+        "views-empty": "No saved view",
+        "view-name": "View name",
+        "save": "Save",
+        "status": {
+            "todo": "To do",
+            "0": "Not started",
+            "50": "In progress",
+            "done": "Done",
+            "na": "Not applicable"
+        },
+        "presets": {
+            "all": "All",
+            "mine": "My actions",
+            "todo": "To do",
+            "overdue": "Overdue",
+            "done": "Done"
+        }
+    },
     "types": {
         "meeting": "Meeting",
         "phone": "Phone call",
         "email": "Email",
         "task": "Task",
-        "other": "Other"
+        "other": "Other",
+        "birthday": "Birthday"
     },
     "view-modes": {
         "list": "List",

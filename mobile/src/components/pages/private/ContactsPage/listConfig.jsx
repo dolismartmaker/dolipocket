@@ -55,7 +55,12 @@ export const contactsListConfig = {
     rowActions: [
         {
             key: "view", icon: FaEye, label: "Voir",
-            onClick: (row, ctx) => ctx.navigate(`/contacts/${row.id}`),
+            // Desktop provides ctx.openDetail (in-page modal); mobile/tablet
+            // fall back to full-page navigation.
+            onClick: (row, ctx) =>
+                ctx.openDetail
+                    ? ctx.openDetail(row, ctx)
+                    : ctx.navigate(`/contacts/${row.id}`),
         },
         {
             key: "edit", icon: FaPen, label: "Modifier", permission: "contact.write",

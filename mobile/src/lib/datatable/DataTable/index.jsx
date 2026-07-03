@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FaSliders, FaPlus } from "react-icons/fa6";
@@ -10,11 +10,14 @@ import { useMenu } from "src/lib/permissions";
 import { useDataTablePrefs } from "./hooks/useDataTablePrefs";
 import { useDataPipeline } from "./hooks/useDataPipeline";
 import { useColumnResize } from "./hooks/useColumnResize";
+import { useColumnReorder } from "./hooks/useColumnReorder";
 import { useRowSelection } from "./hooks/useRowSelection";
 import { useColumnCatalog } from "./hooks/useColumnCatalog";
 import { exportRows as runExport } from "./utils/exportRows";
 
 import { Header } from "./Header";
+import { ColumnHeaderMenu } from "./Header/ColumnHeaderMenu";
+import { ExportButton } from "./ExportButton";
 import { FilterRow } from "./FilterRow";
 import { Body } from "./Body";
 import { Footer } from "./Footer";
@@ -29,8 +32,12 @@ import { ColumnConfigurator } from "./ColumnConfigurator";
 //   feature        -- short identifier for export filenames ("contacts", "thirdparties"...)
 //   onTotalChange  -- optional callback, invoked with the current `total` count
 //                     so the parent page can render "Tiers (24)" in the title.
+//   onOpenDetail   -- optional (row, ctx) callback. When provided it is exposed
+//                     as ctx.openDetail so a listConfig "view" action (and the
+//                     row click) can open an in-page modal instead of navigating.
+//                     Used by desktop pages that render a detail popup.
 
-export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
+export const DataTable = ({ config, dataSource, feature, onTotalChange, onOpenDetail }) => {
     const navigate = useNavigate();
     const api = useApi();
     const { confirm } = useConfirm() ?? {};
@@ -52,6 +59,7 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
         setColumnVisibility,
         setColumnWidth,
         moveColumn,
+        insertColumnBefore,
         setSort: persistSort,
         setPageSize: persistPageSize,
         setSearch: persistSearch,
@@ -117,6 +125,22 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
 
     // Resize.
     const resize = useColumnResize({ onCommit: setColumnWidth });
+
+    // Ref on the scrollable table container: the reorder hook reads the live
+    // header cell rects from it to compute the drop position.
+    const scrollRef = useRef(null);
+
+    // Pointer-based column reorder from the table headers (press-and-move /
+    // long-press). Persists via insertColumnBefore -> localStorage.
+    const reorder = useColumnReorder({
+        containerRef: scrollRef,
+        onReorder: insertColumnBefore,
+    });
+
+    // Right-click column menu: { colKey, x, y } or null.
+    const [menu, setMenu] = useState(null);
+    const openColumnMenu = useCallback((colKey, x, y) => setMenu({ colKey, x, y }), []);
+    const closeColumnMenu = useCallback(() => setMenu(null), []);
 
     // List of column keys to request from the server (via ?include=). We
     // ship only the visible ones so the backend can skip mapping the rest.
@@ -199,7 +223,8 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
         toast,
         confirm,
         exportRows,
-    }), [navigate, api.private, refresh, confirm, exportRows]);
+        openDetail: onOpenDetail,
+    }), [navigate, api.private, refresh, confirm, exportRows, onOpenDetail]);
 
     // Cap the page if total shrinks (e.g. after a delete).
     useEffect(() => {
@@ -239,6 +264,53 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
             if (view?.onClick) view.onClick(row, ctx);
         };
 
+    // Fully-wired props for the right-click column menu (or null when closed).
+    const columnMenuProps = useMemo(() => {
+        if (!menu) return null;
+        const column = resolvedColumns.find((c) => c.key === menu.colKey);
+        if (!column) return null;
+
+        const orderable = resolvedColumns.filter((c) => c.visible !== false && c.key !== "_rownum");
+        const idx = orderable.findIndex((c) => c.key === column.key);
+        const isRownum = column.key === "_rownum";
+        const isSortable = column.sortable !== false && !isRownum;
+        const sortActive = prefs.sort?.col === column.key;
+
+        const curWidth = column.width ?? 150;
+        const defWidth = available.find((c) => c.key === column.key)?.defaultWidth ?? curWidth;
+
+        const applySort = (order) => { persistSort({ col: column.key, order }); setPage(1); };
+        const clearSort = () => {
+            persistSort(config.defaultSort
+                ? { col: config.defaultSort.col, order: config.defaultSort.order ?? "asc" }
+                : null);
+            setPage(1);
+        };
+
+        return {
+            column,
+            x: menu.x,
+            y: menu.y,
+            isSortable,
+            sortActive,
+            sortOrder: prefs.sort?.order,
+            canMoveLeft: idx > 0,
+            canMoveRight: idx >= 0 && idx < orderable.length - 1,
+            canHide: !isRownum,
+            onSortAsc: () => applySort("asc"),
+            onSortDesc: () => applySort("desc"),
+            onSortClear: clearSort,
+            onMoveLeft: () => { if (idx > 0) moveColumn(column.key, orderable[idx - 1].key); },
+            onMoveRight: () => { if (idx >= 0 && idx < orderable.length - 1) moveColumn(column.key, orderable[idx + 1].key); },
+            onAutoFit: () => resize.autoFit(column.key, column.label, pipeline.rows),
+            onWiden: () => setColumnWidth(column.key, curWidth + 40),
+            onNarrow: () => setColumnWidth(column.key, curWidth - 40),
+            onResetWidth: () => setColumnWidth(column.key, defWidth),
+            onHide: () => { if (!isRownum) setColumnVisibility(column.key, false); },
+            onConfigure: () => setIsConfigMode(true),
+        };
+    }, [menu, resolvedColumns, prefs.sort, available, pipeline.rows, persistSort, moveColumn, resize, setColumnWidth, setColumnVisibility, config.defaultSort]);
+
     return (
         <div className="flex flex-col h-full bg-white overflow-hidden">
             {/* Toolbar: optional global search input, headerActions (e.g. "Nouveau tiers"),
@@ -272,6 +344,9 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
                         </button>
                     );
                 })}
+                {config.export !== false && (
+                    <ExportButton onExport={(fmt) => exportRows(fmt)} />
+                )}
                 <button
                     type="button"
                     onClick={() => setIsConfigMode((v) => !v)}
@@ -303,7 +378,7 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
 
             {/* Scrollable container: horizontal AND vertical scroll inside
                 this box. The toolbar above and footer below stay pinned. */}
-            <div className="flex-1 min-h-0 overflow-auto">
+            <div ref={scrollRef} className="flex-1 min-h-0 overflow-auto">
                 <table
                     className="border-collapse"
                     style={{
@@ -323,6 +398,8 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
                         actionsWidth={actionsWidth}
                         stickyLeftOffsets={stickyLeftOffsets}
                         rowsForAutoFit={pipeline.rows}
+                        reorder={reorder}
+                        onOpenMenu={openColumnMenu}
                     />
                     <FilterRow
                         columns={resolvedColumns}
@@ -354,6 +431,33 @@ export const DataTable = ({ config, dataSource, feature, onTotalChange }) => {
                     />
                 </table>
             </div>
+
+            {/* Drag overlay: a vertical insertion line where the column would
+                land + a chip following the cursor with the column label. */}
+            {reorder.dragging && (
+                <>
+                    {scrollRef.current && (
+                        <div
+                            className="fixed z-40 w-[2px] bg-primary pointer-events-none"
+                            style={{
+                                left: reorder.dragging.indicatorX,
+                                top: scrollRef.current.getBoundingClientRect().top,
+                                height: scrollRef.current.getBoundingClientRect().height,
+                            }}
+                        />
+                    )}
+                    <div
+                        className="fixed z-50 px-2 py-1 bg-white border border-gray-200 rounded shadow-lg text-[12px] font-medium text-gray-700 pointer-events-none"
+                        style={{ left: reorder.dragging.pointerX + 12, top: reorder.dragging.pointerY + 8 }}
+                    >
+                        {reorder.dragging.label}
+                    </div>
+                </>
+            )}
+
+            {columnMenuProps && (
+                <ColumnHeaderMenu {...columnMenuProps} onClose={closeColumnMenu} />
+            )}
 
             <Footer
                 page={page}

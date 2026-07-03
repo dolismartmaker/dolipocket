@@ -56,6 +56,20 @@ class dmAgenda extends dmBase
     protected $parentTableElementToUseForExtraFields = 'actioncomm';
 
     /**
+     * Field-level overrides applied by dmTrait::propertiesFilter() at boot.
+     *
+     * ActionComm exposes the event type as a free `type_code` string (AC_RDV,
+     * AC_TEL, ...). Left as-is the describe()/AutoForm renders a raw text input.
+     * Declaring it as a sellist onto the c_actioncomm dictionary turns it into a
+     * translated <select> (Rendez-vous, Appel telephonique, Email...) sourced
+     * from the tenant's active action types -- no hardcoded list front-side.
+     * @var array
+     */
+    protected $parentFieldsOverride = [
+        'type_code' => ['type' => 'sellist:c_actioncomm:libelle:code'],
+    ];
+
+    /**
      * Mapping: Dolibarr field name => API field name
      * @var array
      */

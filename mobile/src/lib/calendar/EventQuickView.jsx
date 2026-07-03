@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import toast from "react-hot-toast";
 import { FaXmark, FaArrowRight, FaCircleCheck, FaClock, FaMapPin } from "react-icons/fa6";
 import { fmtTime, tsToDate } from "./dateUtils";
 import { getTypeMeta } from "./eventTypes";
 
 // Quick event popup: show details + quick edit + link to full details page.
 // Triggered by click (not hover, to avoid mobile touch issues).
+//
+// The component is kept MOUNTED by the parent (only `isOpen`/`event` toggle),
+// so the local edit state MUST be re-synced whenever the event changes --
+// otherwise a title typed for event A leaks into event B's popup (and the
+// popup stays stuck in edit mode). The effect below does exactly that.
 export const EventQuickView = ({
     event,
     isOpen,
@@ -15,13 +21,48 @@ export const EventQuickView = ({
 }) => {
     const { t } = useTranslation("agenda");
     const [isEditing, setIsEditing] = useState(false);
+    const [saving, setSaving] = useState(false);
     const [label, setLabel] = useState(event?.label || "");
-    const [notePublic, setNotePublic] = useState(event?.note_public || "");
+    const [note, setNote] = useState(event?.note || "");
+    const [formError, setFormError] = useState("");
+
+    // Re-sync edit state on event change (and reset the edit mode). Keyed on the
+    // event id so switching events never carries over the previous draft.
+    useEffect(() => {
+        setLabel(event?.label || "");
+        setNote(event?.note || "");
+        setIsEditing(false);
+        setFormError("");
+    }, [event?.id]);
 
     const handleSave = async () => {
-        if (onUpdate && event?.id) {
-            await onUpdate(event.id, { label, note_public: notePublic });
-            setIsEditing(false);
+        if (!event?.id) return;
+        // Label is mandatory (mirrors the full edit form + backend).
+        if (!label || label.trim() === "") {
+            setFormError(t("edit.label-required", "Le libellé est obligatoire"));
+            return;
+        }
+        if (typeof onUpdate !== "function") {
+            console.error("[EventQuickView] onUpdate not wired");
+            toast.error(t("toasts.save-error", "Impossible d'enregistrer l'événement"));
+            return;
+        }
+        setSaving(true);
+        setFormError("");
+        try {
+            const result = await onUpdate(event.id, { label: label.trim(), note });
+            if (result) {
+                toast.success(t("toasts.update-success", "Événement mis à jour"));
+                setIsEditing(false);
+                onClose();
+            } else {
+                toast.error(t("toasts.save-error", "Impossible d'enregistrer l'événement"));
+            }
+        } catch (err) {
+            console.error("[EventQuickView] save error", err);
+            toast.error(t("toasts.save-error", "Impossible d'enregistrer l'événement"));
+        } finally {
+            setSaving(false);
         }
     };
 
@@ -125,17 +166,25 @@ export const EventQuickView = ({
                                     <input
                                         type="text"
                                         value={label}
-                                        onChange={(e) => setLabel(e.target.value)}
-                                        className="mt-1 w-full px-3 py-2 border border-soft-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        onChange={(e) => {
+                                            setLabel(e.target.value);
+                                            if (formError) setFormError("");
+                                        }}
+                                        className={`mt-1 w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent ${
+                                            formError ? "border-red-400" : "border-soft-border"
+                                        }`}
                                     />
+                                    {formError && (
+                                        <p className="mt-1 text-xs text-red-600">{formError}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <label className="text-xs font-semibold text-soft-text uppercase tracking-wider">
                                         Notes
                                     </label>
                                     <textarea
-                                        value={notePublic}
-                                        onChange={(e) => setNotePublic(e.target.value)}
+                                        value={note}
+                                        onChange={(e) => setNote(e.target.value)}
                                         rows={3}
                                         className="mt-1 w-full px-3 py-2 border border-soft-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent resize-none"
                                     />
@@ -143,13 +192,13 @@ export const EventQuickView = ({
                             </>
                         ) : (
                             <>
-                                {notePublic && (
+                                {note && (
                                     <div>
                                         <p className="text-xs font-semibold text-soft-text uppercase tracking-wider mb-2">
                                             Notes
                                         </p>
-                                        <p className="text-sm text-strong-text bg-medium-bg/50 rounded-lg p-3 leading-relaxed">
-                                            {notePublic}
+                                        <p className="text-sm text-strong-text bg-medium-bg/50 rounded-lg p-3 leading-relaxed whitespace-pre-wrap">
+                                            {note}
                                         </p>
                                     </div>
                                 )}
@@ -164,17 +213,24 @@ export const EventQuickView = ({
                         <>
                             <button
                                 type="button"
-                                onClick={() => setIsEditing(false)}
-                                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-soft-border bg-white text-strong-text hover:bg-medium-bg transition-colors"
+                                onClick={() => {
+                                    setLabel(event?.label || "");
+                                    setNote(event?.note || "");
+                                    setFormError("");
+                                    setIsEditing(false);
+                                }}
+                                disabled={saving}
+                                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg border border-soft-border bg-white text-strong-text hover:bg-medium-bg transition-colors disabled:opacity-60"
                             >
                                 Annuler
                             </button>
                             <button
                                 type="button"
                                 onClick={handleSave}
-                                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:brightness-110 transition-[filter]"
+                                disabled={saving}
+                                className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-primary text-white hover:brightness-110 transition-[filter] disabled:opacity-60"
                             >
-                                Enregistrer
+                                {saving ? "Enregistrement..." : "Enregistrer"}
                             </button>
                         </>
                     ) : (

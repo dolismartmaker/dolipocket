@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { FaRegCalendarXmark, FaPlus } from "react-icons/fa6";
 
 import { CalendarToolbar } from "./CalendarToolbar";
+import { CalendarFilterBar } from "./CalendarFilterBar";
 import { MonthView } from "./MonthView";
 import { TimeGridView } from "./TimeGridView";
 import { AgendaListView } from "./AgendaListView";
@@ -33,6 +34,9 @@ export const Calendar = ({
     onSelectDay,
     onSelectSlot,
     onCreateEvent,
+    onMoveEvent,
+    onUpdateEvent,
+    filters,
     compact = false,
 }) => {
     const { t } = useTranslation("agenda");
@@ -65,6 +69,8 @@ export const Calendar = ({
                     onSelectEvent={onSelectEvent}
                     onSelectSlot={onSelectSlot}
                     onCreateEvent={onCreateEvent}
+                    onMoveEvent={onMoveEvent}
+                    onUpdateEvent={onUpdateEvent}
                 />
             );
         }
@@ -94,6 +100,9 @@ export const Calendar = ({
                 onCreate={onCreate}
                 compact={compact}
             />
+
+            {/* Filter bar: desktop only (mobile stays épuré). */}
+            {!compact && filters && <CalendarFilterBar {...filters} />}
 
             {error && (
                 <div className="shrink-0 mx-3 mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -125,14 +134,21 @@ export const Calendar = ({
                         </div>
                     </div>
                 ) : (
-                    <AnimatePresence mode="wait" initial={false}>
+                    // NB: mode="sync" (default), NOT "wait". With "wait" the new
+                    // view waits for the old one's exit to complete, but the load
+                    // effect (setLoading/setEvents) fired by the view change
+                    // re-renders mid-exit and framer drops the pending enter --
+                    // the very first view switch after mount was swallowed. In
+                    // sync mode both children coexist briefly; absolute insets
+                    // overlap them for a clean crossfade with no layout jump.
+                    <AnimatePresence initial={false}>
                         <motion.div
                             key={`${view}-${cursor.getTime()}`}
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -6 }}
                             transition={{ duration: 0.18, ease: "easeOut" }}
-                            className="h-full min-h-0"
+                            className="absolute inset-0"
                         >
                             {renderView()}
                         </motion.div>

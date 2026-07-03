@@ -101,6 +101,12 @@ return array(
 		array('name' => 'Emballages Pro Services',   'email' => 'ventes@emballages-pro.demo.local',    'town' => 'Roissy',     'zip' => '95700'),
 	),
 
+	'warehouses' => array(
+		array('label' => 'Entrepôt principal',  'town' => 'Lyon',  'zip' => '69003'),
+		array('label' => 'Réserve froide',      'town' => 'Lyon',  'zip' => '69003'),
+		array('label' => 'Dépôt secondaire',    'town' => 'Corbas', 'zip' => '69960'),
+	),
+
 	'contacts' => array(
 		array('customer' => 0, 'firstname' => 'Claire',   'lastname' => 'Dubois',   'poste' => 'Gérante',              'phone' => '0472000001'),
 		array('customer' => 1, 'firstname' => 'Marc',     'lastname' => 'Lefèvre',  'poste' => 'Chef de cuisine',     'phone' => '0143000002'),

@@ -28,7 +28,7 @@ class DemoDataTest extends DolibarrRealTestCase
         if (!isset($conf->modules) || !is_array($conf->modules)) {
             $conf->modules = [];
         }
-        foreach (['fournisseur', 'expedition', 'reception', 'supplier_proposal', 'projet'] as $m) {
+        foreach (['fournisseur', 'expedition', 'reception', 'supplier_proposal', 'projet', 'stock'] as $m) {
             $conf->modules[$m] = $m;
         }
 
@@ -124,6 +124,19 @@ class DemoDataTest extends DolibarrRealTestCase
         $u->rights->projet->all->creer = 1;
         $u->rights->projet->all->supprimer = 1;
 
+        // Stock: Entrepot / MouvementStock create + delete for the demo
+        // warehouses and initial stock movements.
+        if (!isset($u->rights->stock) || !is_object($u->rights->stock)) {
+            $u->rights->stock = new \stdClass();
+        }
+        $u->rights->stock->lire = 1;
+        $u->rights->stock->creer = 1;
+        $u->rights->stock->supprimer = 1;
+        if (!isset($u->rights->stock->mouvement) || !is_object($u->rights->stock->mouvement)) {
+            $u->rights->stock->mouvement = new \stdClass();
+        }
+        $u->rights->stock->mouvement->creer = 1;
+
         // Ensure a clean slate (previous test data or a leftover install).
         $this->demo->purge($this->testUser);
     }
@@ -171,6 +184,9 @@ class DemoDataTest extends DolibarrRealTestCase
         $this->assertSame(4, $out['counts']['shipments']);
         $this->assertSame(3, $out['counts']['receptions']);
         $this->assertSame(6, $out['counts']['projects']);
+        $this->assertSame(3, $out['counts']['warehouses']);
+        $this->assertSame(12, $out['counts']['stock_movements']);
+        $this->assertSame(6, $out['counts']['documents']);
 
         $rootId = $out['rootId'];
 
@@ -272,6 +288,15 @@ class DemoDataTest extends DolibarrRealTestCase
         // Projects: 6 tagged demo projets (header-only, no lines).
         $this->assertSame(6, $this->countRows('projet', "note_private LIKE '%DEMO-DPKD%'"));
 
+        // Warehouses: 3 tagged demo entrepots (marker in the description).
+        $this->assertSame(3, $this->countRows('entrepot', "description LIKE '%DEMO-DPKD%'"));
+
+        // Stock movements: one "add" per demo product (marker in the label).
+        $this->assertSame(12, $this->countRows('stock_mouvement', "label LIKE '%DEMO-DPKD%'"));
+
+        // GED documents: indexed in llx_ecm_files with the demo marker.
+        $this->assertSame(6, $this->countRows('ecm_files', "description LIKE '%DEMO-DPKD%'"));
+
         // Install marker set.
         $this->assertTrue($this->demo->isInstalled());
     }
@@ -320,6 +345,9 @@ class DemoDataTest extends DolibarrRealTestCase
         $this->assertSame(0, $this->countRows('reception', "note_private LIKE '%DEMO-DPKD%'"));
         $this->assertSame(0, $this->countRows('projet', "note_private LIKE '%DEMO-DPKD%'"));
         $this->assertSame(0, $this->countRows('facture_fourn', "note_private LIKE '%DEMO-DPKD%'"));
+        $this->assertSame(0, $this->countRows('entrepot', "description LIKE '%DEMO-DPKD%'"));
+        $this->assertSame(0, $this->countRows('stock_mouvement', "label LIKE '%DEMO-DPKD%'"));
+        $this->assertSame(0, $this->countRows('ecm_files', "description LIKE '%DEMO-DPKD%'"));
         $this->assertSame(0, $this->countRows('product', "ref LIKE 'DPKD-%'"));
         $this->assertSame(0, $this->countRows('categorie', "fk_parent = " . (int) $rootId));
         $this->assertSame(0, $this->countRows('categorie', "rowid = " . (int) $rootId));

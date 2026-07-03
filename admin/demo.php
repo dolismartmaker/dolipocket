@@ -86,7 +86,7 @@ if ($action == 'generate' && $user->admin) {
 		setEventMessages($out['error'].' erreur(s) critique(s) - données annulées', null, 'errors');
 	} else {
 		$c = $out['counts'];
-		setEventMessages('Jeu de démonstration généré : '.$c['rayons'].' rayons, '.$c['products'].' produits, '.$c['customers'].' clients, '.$c['suppliers'].' fournisseurs, '.$c['contacts'].' contacts, '.$c['proposals'].' devis, '.$c['orders'].' commandes, '.$c['invoices'].' factures, '.$c['supplier_orders'].' commandes fournisseur, '.$c['supplier_invoices'].' factures fournisseur, '.$c['supplier_proposals'].' demandes de prix, '.$c['agenda'].' évènements agenda, '.$c['shipments'].' expéditions, '.$c['receptions'].' réceptions, '.$c['projects'].' projets, '.$c['images'].' images.'.($out['warnings'] ? ' ('.$out['warnings'].' avertissement(s))' : ''), null, 'mesgs');
+		setEventMessages('Jeu de démonstration généré : '.$c['rayons'].' rayons, '.$c['products'].' produits, '.$c['warehouses'].' entrepôts, '.$c['stock_movements'].' mouvements de stock, '.$c['customers'].' clients, '.$c['suppliers'].' fournisseurs, '.$c['contacts'].' contacts, '.$c['proposals'].' devis, '.$c['orders'].' commandes, '.$c['invoices'].' factures, '.$c['supplier_orders'].' commandes fournisseur, '.$c['supplier_invoices'].' factures fournisseur, '.$c['supplier_proposals'].' demandes de prix, '.$c['agenda'].' évènements agenda, '.$c['shipments'].' expéditions, '.$c['receptions'].' réceptions, '.$c['projects'].' projets, '.$c['documents'].' documents, '.$c['images'].' images.'.($out['warnings'] ? ' ('.$out['warnings'].' avertissement(s))' : ''), null, 'mesgs');
 	}
 }
 
@@ -96,7 +96,7 @@ if ($action == 'purge' && $user->admin) {
 	}
 	$out = $demo->purge($user);
 	$results = $out['results'];
-	setEventMessages('Purge effectuée : '.$out['nbProd'].' produits, '.$out['nbCat'].' catégories, '.$out['nbSoc'].' tiers et '.$out['nbContact'].' contacts supprimés.', null, 'mesgs');
+	setEventMessages('Purge effectuée : '.$out['nbProd'].' produits, '.$out['nbWarehouse'].' entrepôts, '.$out['nbStockMove'].' mouvements de stock, '.$out['nbDoc'].' documents, '.$out['nbCat'].' catégories, '.$out['nbSoc'].' tiers et '.$out['nbContact'].' contacts supprimés.', null, 'mesgs');
 }
 
 
@@ -127,7 +127,7 @@ print '<div class="opacitymedium justify">';
 print 'Page cachée réservée à l\'administrateur (non liée aux menus). Elle installe un jeu';
 print ' de démonstration (thème épicerie / supérette) dans le tenant courant pour tester';
 print ' rapidement Dolipocket : <strong>'.$nbRayons.' rayons</strong>,';
-print ' <strong>'.$nbArticles.' articles</strong> avec photos, <strong>'.$nbCustomers.' clients</strong>,';
+print ' <strong>'.$nbArticles.' articles</strong> avec photos et stock initial, <strong>'.count($catalog['warehouses'] ?? array()).' entrepôts</strong>, <strong>'.$nbCustomers.' clients</strong>,';
 print ' <strong>'.$nbSuppliers.' fournisseurs</strong>, <strong>'.$nbContacts.' contacts</strong>,';
 print ' <strong>'.DolipocketDemoData::PROPOSAL_COUNT.' devis</strong>,';
 print ' <strong>'.DolipocketDemoData::ORDER_COUNT.' commandes</strong>,';
@@ -138,7 +138,7 @@ print ' <strong>'.DolipocketDemoData::ORDER_COUNT.' commandes</strong>,';
 	print ' <strong>'.DolipocketDemoData::AGENDA_COUNT.' évènements agenda</strong> et';
 	print ' <strong>'.DolipocketDemoData::SHIPMENT_COUNT.' expéditions</strong> et';
 	print ' <strong>'.DolipocketDemoData::RECEPTION_COUNT.' réceptions</strong> et';
-	print ' <strong>'.DolipocketDemoData::PROJECT_COUNT.' projets</strong>.';
+	print ' <strong>'.DolipocketDemoData::PROJECT_COUNT.' projets</strong> et des <strong>documents (GED)</strong> attachés à quelques tiers et factures.';
 print '</div>';
 print '<br>';
 

@@ -31,6 +31,8 @@ export const ColumnHeader = ({
     isConfigMode,
     isFirstSticky,
     stickyLeft,
+    reorder,
+    onOpenMenu,
 }) => {
     const stickyStyles = isFirstSticky
         ? {
@@ -41,9 +43,27 @@ export const ColumnHeader = ({
         }
         : {};
 
+    // Pointer-based reorder (press-and-move / long-press): active outside
+    // config mode, never on the system rownum column. The label area is the
+    // drag source; a quick click still toggles the sort (the hook suppresses
+    // only the click that immediately follows a drag). The resize handle is a
+    // sibling and stays independent.
+    const dndEnabled = !isConfigMode && column.key !== "_rownum" && !!reorder;
+    const isDragging = dndEnabled && reorder.draggingKey === column.key;
+
+    // Right-click opens the column context menu (desktop). Available on the
+    // whole header cell, even the rownum column (sort/hide are just disabled).
+    const menuEnabled = !isConfigMode && typeof onOpenMenu === "function";
+
+    const handleSortClick = () => {
+        if (dndEnabled && reorder.shouldSuppressClick(column.key)) return;
+        onSortClick();
+    };
+
     return (
         <th
             scope="col"
+            data-dt-col={column.key}
             className="relative text-left text-[12px] font-semibold text-gray-700 select-none"
             style={{
                 width,
@@ -55,13 +75,18 @@ export const ColumnHeader = ({
                 background: "#f8fafc",
                 ...stickyStyles,
             }}
+            onContextMenu={menuEnabled ? (e) => { e.preventDefault(); onOpenMenu(column.key, e.clientX, e.clientY); } : undefined}
         >
-            <div className="flex items-center gap-1 h-full">
+            <div
+                className={`flex items-center gap-1 h-full ${dndEnabled ? "cursor-grab active:cursor-grabbing" : ""} ${isDragging ? "opacity-40" : ""}`}
+                onPointerDown={dndEnabled ? reorder.beginPress(column.key, column.label) : undefined}
+                title={dndEnabled ? "Glisser pour déplacer - clic droit pour plus d'options" : undefined}
+            >
                 <button
                     type="button"
-                    onClick={isSortable && !isConfigMode ? onSortClick : undefined}
+                    onClick={isSortable && !isConfigMode ? handleSortClick : undefined}
                     className={`flex-1 flex items-center gap-1 truncate text-left ${isSortable && !isConfigMode ? "cursor-pointer hover:text-primary" : "cursor-default"}`}
-                    disabled={!isSortable || isConfigMode}
+                    aria-disabled={!isSortable || isConfigMode}
                     title={column.label}
                 >
                     {isSortable && !isConfigMode && (

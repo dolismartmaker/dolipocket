@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { DataTable } from "src/lib/datatable";
 import { contactsListConfig } from "./listConfig";
+import { ContactDetailModal } from "./ContactDetailModal";
 
 // PagesLayout is now viewport-aware (min-h-screen on desktop, cf
 // inspiration from dsd/mobile), and AnimationLayout no longer forces
@@ -11,6 +12,11 @@ import { contactsListConfig } from "./listConfig";
 export const ContactsPageDesktop = (props) => {
     const { dataSource, socidFilter } = props;
     const [total, setTotal] = useState(null);
+
+    // Detail popup: instead of navigating to /contacts/:id on desktop, open an
+    // in-page modal. We capture ctx.refresh from the DataTable so the list can
+    // reload after an inline edit or delete without remounting the table.
+    const [detail, setDetail] = useState(null); // { id, refresh } | null
 
     return (
         <div className="flex flex-col h-full w-full bg-white overflow-hidden">
@@ -33,8 +39,17 @@ export const ContactsPageDesktop = (props) => {
                     dataSource={dataSource}
                     feature="contacts"
                     onTotalChange={setTotal}
+                    onOpenDetail={(row, ctx) => setDetail({ id: row.id, refresh: ctx.refresh })}
                 />
             </div>
+
+            {detail && (
+                <ContactDetailModal
+                    id={detail.id}
+                    onClose={() => setDetail(null)}
+                    onChanged={detail.refresh}
+                />
+            )}
         </div>
     );
 };

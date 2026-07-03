@@ -31,8 +31,11 @@
 
 require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/security2.lib.php';
 require_once DOL_DOCUMENT_ROOT.'/categories/class/categorie.class.php';
 require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+require_once DOL_DOCUMENT_ROOT.'/product/stock/class/entrepot.class.php';
+require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php';
 require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT.'/contact/class/contact.class.php';
 require_once DOL_DOCUMENT_ROOT.'/comm/propal/class/propal.class.php';
@@ -84,6 +87,15 @@ class DolipocketDemoData
 
 	/** @var int Number of demo projects (projets) to generate. */
 	const PROJECT_COUNT = 6;
+
+	/** @var int Number of demo customers that get a GED document attached. */
+	const DOC_CUSTOMER_COUNT = 3;
+
+	/** @var int Number of demo (validated) invoices that get a GED document attached. */
+	const DOC_INVOICE_COUNT = 3;
+
+	/** @var string Marker stored in demo objects (note / stock movement label / warehouse description). */
+	const DEMO_MARKER = '[DEMO-DPKD]';
 
 	/** @var string Product reference prefix (purge marker). */
 	const PROD_REF_PREFIX = 'DPKD-';
@@ -196,6 +208,64 @@ class DolipocketDemoData
 	}
 
 	/**
+	 * Attach a demo document to a Dolibarr object (GED).
+	 *
+	 * Copies $srcFile under the object's per-entity directory
+	 * (DOL_DATA_ROOT/<entity>/<dirKey>/<sub>/) and indexes it in
+	 * llx_ecm_files, mirroring DocumentController::attach so the file shows
+	 * up on the object's "Documents" tab in the PWA.
+	 *
+	 * @param  User   $user         User performing the action
+	 * @param  object $object       Fetched target object (needs ->id)
+	 * @param  string $tableElement llx_ecm_files.src_object_type (e.g. 'societe')
+	 * @param  string $dirKey       Data sub-directory key (e.g. 'societe', 'facture')
+	 * @param  string $sub          Per-object sub-directory (id or sanitized ref)
+	 * @param  string $srcFile      Absolute path to the source file to copy
+	 * @return bool
+	 */
+	private function attachDemoDocument($user, $object, $tableElement, $dirKey, $sub, $srcFile)
+	{
+		global $conf;
+
+		if (!is_file($srcFile) || empty($object->id) || $sub === '') {
+			return false;
+		}
+		$relDir = $conf->entity.'/'.$dirKey.'/'.$sub;
+		$absDir = rtrim(DOL_DATA_ROOT, '/').'/'.$relDir;
+		if (!dol_is_dir($absDir)) {
+			dol_mkdir($absDir);
+		}
+		$filename = basename($srcFile);
+		$absFile  = $absDir.'/'.$filename;
+		if (!@copy($srcFile, $absFile)) {
+			dol_syslog('DPK demo: GED copy failed to '.$absFile, LOG_WARNING);
+			return false;
+		}
+
+		$ecm = new EcmFiles($this->db);
+		$ecm->filename        = $filename;
+		$ecm->filepath        = $relDir;
+		$ecm->fullpath_orig   = $filename;
+		$ecm->entity          = (int) $conf->entity;
+		$ecm->src_object_type = (string) $tableElement;
+		$ecm->src_object_id   = (int) $object->id;
+		$ecm->gen_or_uploaded = 'uploaded';
+		$ecm->description     = self::DEMO_MARKER.' Document de démonstration';
+		$ecm->share           = getRandomPassword(true);
+		$ecm->date_c          = dol_now();
+		$encoded = function_exists('dol_osencode') ? dol_osencode($absFile) : $absFile;
+		if (file_exists($encoded)) {
+			$ecm->label = md5_file($encoded);
+		}
+		$created = $ecm->create($user);
+		if ($created <= 0) {
+			dol_syslog('DPK demo: GED ecm index failed ('.$tableElement.' '.$object->id.'): '.$this->collectErrors($ecm), LOG_WARNING);
+			return false;
+		}
+		return true;
+	}
+
+	/**
 	 * Generate the whole demo dataset.
 	 *
 	 * @param  User $user       User performing the action
@@ -207,7 +277,7 @@ class DolipocketDemoData
 		global $conf;
 
 		$this->results = array();
-		$counts = array('rayons' => 0, 'products' => 0, 'customers' => 0, 'suppliers' => 0, 'contacts' => 0, 'proposals' => 0, 'orders' => 0, 'invoices' => 0, 'supplier_orders' => 0, 'supplier_invoices' => 0, 'supplier_proposals' => 0, 'agenda' => 0, 'shipments' => 0, 'receptions' => 0, 'projects' => 0, 'images' => 0);
+		$counts = array('rayons' => 0, 'products' => 0, 'warehouses' => 0, 'stock_movements' => 0, 'customers' => 0, 'suppliers' => 0, 'contacts' => 0, 'proposals' => 0, 'orders' => 0, 'invoices' => 0, 'supplier_orders' => 0, 'supplier_invoices' => 0, 'supplier_proposals' => 0, 'agenda' => 0, 'shipments' => 0, 'receptions' => 0, 'projects' => 0, 'documents' => 0, 'images' => 0);
 
 		if ($this->isInstalled()) {
 			$this->results[] = '[WARN] Jeu de démonstration déjà installé - purger d\'abord';
@@ -234,6 +304,8 @@ class DolipocketDemoData
 		$supplierIds = array();
 		$validatedOrderIds = array();
 		$validatedSupplierOrderIds = array();
+		$validatedInvoiceIds = array();
+		$warehouseIds = array();
 		$createdProducts = array();
 
 		// 1. Root category (FATAL) ---------------------------------------
@@ -338,6 +410,77 @@ class DolipocketDemoData
 					}
 				}
 				$this->results[] = '[OK] '.$counts['rayons'].' rayons et '.$counts['products'].' produits créés';
+
+				// 2b. Warehouses (entrepots) -----------------------------
+				// Entrepot::create() writes $this->label into the `ref`
+				// column (there is no separate ref); the demo purge marker
+				// therefore lives in the `description` field. entity is taken
+				// from $conf->entity by create() (the property is ignored).
+				$warehouses = isset($catalog['warehouses']) ? $catalog['warehouses'] : array();
+				foreach ($warehouses as $wh) {
+					$ent = new Entrepot($this->db);
+					$ent->label       = $wh['label'];
+					$ent->description = self::DEMO_MARKER.' Entrepôt de démonstration';
+					$ent->statut      = 1;
+					if (!empty($wh['town'])) {
+						$ent->town = $wh['town'];
+					}
+					if (!empty($wh['zip'])) {
+						$ent->zip = $wh['zip'];
+					}
+					$whRes = $ent->create($user);
+					if ($whRes > 0 && $ent->id > 0) {
+						$warehouseIds[] = (int) $ent->id;
+						$counts['warehouses']++;
+					} else {
+						$warnings++;
+						$this->results[] = '[WARN] Entrepôt '.$wh['label'].' : '.$this->collectErrors($ent);
+						dol_syslog('DPK demo: warehouse creation failed ('.$wh['label'].')', LOG_WARNING);
+					}
+				}
+				$this->results[] = '[OK] '.$counts['warehouses'].' entrepôts créés';
+
+				// 2c. Initial stock movements ----------------------------
+				// One "add" movement per demo product into the first demo
+				// warehouse, so the Stock page and each product's stock tab
+				// are populated. correct_stock($user, $warehouse, $qty,
+				// $movement=0 add, $label, $price). The label carries the
+				// demo marker for a reliable purge of llx_stock_mouvement.
+				if (!empty($warehouseIds) && !empty($createdProducts)) {
+					$firstWh = $warehouseIds[0];
+					$k = 0;
+					foreach ($createdProducts as $cp) {
+						$k++;
+						// Deterministic quantity spread 10..200.
+						$qty = 10 + (($k * 17) % 191);
+						$vp = new Product($this->db);
+						if ($vp->fetch((int) $cp['id']) <= 0) {
+							$warnings++;
+							$this->results[] = '[WARN] Stock : produit '.$cp['id'].' introuvable';
+							dol_syslog('DPK demo: stock product fetch failed (id '.$cp['id'].')', LOG_WARNING);
+							continue;
+						}
+						$mvRes = $vp->correct_stock(
+							$user,
+							$firstWh,
+							$qty,
+							0,
+							self::DEMO_MARKER.' Stock initial',
+							(float) $cp['price']
+						);
+						if ($mvRes > 0) {
+							$counts['stock_movements']++;
+						} else {
+							$warnings++;
+							$this->results[] = '[WARN] Mouvement de stock ('.$cp['label'].') : '.$this->collectErrors($vp);
+							dol_syslog('DPK demo: stock movement failed (product id '.$cp['id'].')', LOG_WARNING);
+						}
+					}
+					$this->results[] = '[OK] '.$counts['stock_movements'].' mouvements de stock créés';
+				} else {
+					$this->results[] = '[WARN] Stock non généré : entrepôts ou produits indisponibles';
+					dol_syslog('DPK demo: stock skipped (no warehouses or products)', LOG_WARNING);
+				}
 
 				// 3. Customers -------------------------------------------
 				$customers = isset($catalog['customers']) ? $catalog['customers'] : array();
@@ -694,6 +837,8 @@ class DolipocketDemoData
 								$warnings++;
 								$this->results[] = '[WARN] Validation facture #'.($i + 1).' : '.$this->collectErrors($fac);
 								dol_syslog('DPK demo: invoice validation failed (#'.($i + 1).')', LOG_WARNING);
+							} else {
+								$validatedInvoiceIds[] = (int) $fac->id;
 							}
 						}
 						$counts['invoices']++;
@@ -1052,6 +1197,17 @@ class DolipocketDemoData
 						$conf->global->EXPEDITION_ADDON_NUMBER = 'mod_expedition_safor';
 					}
 					$conf->global->STOCK_WAREHOUSE_NOT_REQUIRED_FOR_SHIPMENTS = 1;
+					// With the stock module enabled (the real tenant case, and now
+					// that the demo seeds warehouses), Expedition::create()/valid()
+					// dereference STOCK_CALCULATE_ON_SHIPMENT[_CLOSE]. Define them
+					// (empty = no stock decrement) so the demo does not move stock
+					// and avoids an undefined-property notice under strict mode.
+					if (!isset($conf->global->STOCK_CALCULATE_ON_SHIPMENT)) {
+						$conf->global->STOCK_CALCULATE_ON_SHIPMENT = '';
+					}
+					if (!isset($conf->global->STOCK_CALCULATE_ON_SHIPMENT_CLOSE)) {
+						$conf->global->STOCK_CALCULATE_ON_SHIPMENT_CLOSE = '';
+					}
 					if (!isset($conf->expedition) || !is_object($conf->expedition)) {
 						$conf->expedition = new stdClass();
 					}
@@ -1272,6 +1428,44 @@ class DolipocketDemoData
 					$this->results[] = '[WARN] Projets non générés : clients indisponibles';
 					dol_syslog('DPK demo: projects skipped (no customers)', LOG_WARNING);
 				}
+
+				// 15. GED documents (attach a demo file) ----------------
+				// Attach a catalog image to a few customers and validated
+				// invoices so the "Documents" tab is not empty. Mirrors
+				// DocumentController::attach: copy the file under the object's
+				// per-entity directory and index it in llx_ecm_files.
+				$gedSrc = $this->imgBase.'/products/baguette.jpg';
+				if (is_file($gedSrc)) {
+					$nbDoc = 0;
+					foreach (array_slice($validCustomers, 0, self::DOC_CUSTOMER_COUNT) as $cid) {
+						$soc = new Societe($this->db);
+						if ($soc->fetch($cid) <= 0) {
+							continue;
+						}
+						if ($this->attachDemoDocument($user, $soc, 'societe', 'societe', (string) $soc->id, $gedSrc)) {
+							$nbDoc++;
+						} else {
+							$warnings++;
+						}
+					}
+					foreach (array_slice($validatedInvoiceIds, 0, self::DOC_INVOICE_COUNT) as $iid) {
+						$fac = new Facture($this->db);
+						if ($fac->fetch($iid) <= 0) {
+							continue;
+						}
+						$sub = dol_sanitizeFileName($fac->ref);
+						if ($this->attachDemoDocument($user, $fac, 'facture', 'facture', $sub, $gedSrc)) {
+							$nbDoc++;
+						} else {
+							$warnings++;
+						}
+					}
+					$counts['documents'] = $nbDoc;
+					$this->results[] = '[OK] '.$nbDoc.' documents (GED) attachés';
+				} else {
+					$this->results[] = '[WARN] GED non générée : image source introuvable ('.$gedSrc.')';
+					dol_syslog('DPK demo: GED skipped (source image missing)', LOG_WARNING);
+				}
 			}
 		}
 
@@ -1333,6 +1527,9 @@ class DolipocketDemoData
 		$nbShipment = 0;
 		$nbReception = 0;
 		$nbProject = 0;
+		$nbWarehouse = 0;
+		$nbStockMove = 0;
+		$nbDoc = 0;
 
 		// Resolve demo third-party ids (client + supplier prefixes).
 		$socIds = array();
@@ -1345,6 +1542,50 @@ class DolipocketDemoData
 			while ($objS = $this->db->fetch_object($resS)) {
 				$socIds[] = (int) $objS->rowid;
 			}
+		}
+
+		// Resolve demo warehouse ids (marker stored in the description field,
+		// since Entrepot::create() writes the label into the `ref` column).
+		$whIds = array();
+		$sqlWh = "SELECT rowid FROM ".MAIN_DB_PREFIX."entrepot";
+		$sqlWh .= " WHERE description LIKE '%DEMO-DPKD%' AND entity IN (".getEntity('stock').")";
+		$resWh = $this->db->query($sqlWh);
+		if ($resWh) {
+			while ($objWh = $this->db->fetch_object($resWh)) {
+				$whIds[] = (int) $objWh->rowid;
+			}
+		}
+
+		// 0y. GED documents (llx_ecm_files) of demo third parties and their
+		// invoices. Drop the index rows before the objects go away (the
+		// physical files are removed with the object directory on delete()).
+		if (!empty($socIds)) {
+			$inSocEcm = implode(',', array_map('intval', $socIds));
+			$sqlDocCount = "SELECT COUNT(*) AS nb FROM ".MAIN_DB_PREFIX."ecm_files";
+			$sqlDocCount .= " WHERE description LIKE '%DEMO-DPKD%'";
+			$sqlDocCount .= " AND ((src_object_type = 'societe' AND src_object_id IN (".$inSocEcm."))";
+			$sqlDocCount .= " OR (src_object_type = 'facture' AND src_object_id IN (SELECT rowid FROM ".MAIN_DB_PREFIX."facture WHERE fk_soc IN (".$inSocEcm."))))";
+			$resDocCount = $this->db->query($sqlDocCount);
+			if ($resDocCount) {
+				$oDoc = $this->db->fetch_object($resDocCount);
+				$nbDoc = (int) ($oDoc->nb ?? 0);
+			}
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ecm_files WHERE description LIKE '%DEMO-DPKD%' AND src_object_type = 'societe' AND src_object_id IN (".$inSocEcm.")");
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."ecm_files WHERE description LIKE '%DEMO-DPKD%' AND src_object_type = 'facture' AND src_object_id IN (SELECT rowid FROM ".MAIN_DB_PREFIX."facture WHERE fk_soc IN (".$inSocEcm."))");
+		}
+
+		// 0z. Stock movements tagged as demo (append-only table). Count then
+		// delete by the demo warehouse(s); Product::delete() would also drop
+		// them, but purge them explicitly so warehouse deletion is unblocked.
+		if (!empty($whIds)) {
+			$inWh = implode(',', array_map('intval', $whIds));
+			$sqlMvCount = "SELECT COUNT(*) AS nb FROM ".MAIN_DB_PREFIX."stock_mouvement WHERE fk_entrepot IN (".$inWh.")";
+			$resMvCount = $this->db->query($sqlMvCount);
+			if ($resMvCount) {
+				$oMv = $this->db->fetch_object($resMvCount);
+				$nbStockMove = (int) ($oMv->nb ?? 0);
+			}
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."stock_mouvement WHERE fk_entrepot IN (".$inWh.")");
 		}
 
 		// 0. Proposals (devis) of demo third parties. Must go before products:
@@ -1559,6 +1800,21 @@ class DolipocketDemoData
 			}
 		}
 
+		// 2b. Warehouses (entrepots). Clear any residual product_stock first
+		// (demo products deleted above already removed theirs) so
+		// Entrepot::delete() -- which refuses a warehouse holding stock --
+		// succeeds.
+		if (!empty($whIds)) {
+			$inWhDel = implode(',', array_map('intval', $whIds));
+			$this->db->query("DELETE FROM ".MAIN_DB_PREFIX."product_stock WHERE fk_entrepot IN (".$inWhDel.")");
+			foreach ($whIds as $wid) {
+				$ent = new Entrepot($this->db);
+				if ($ent->fetch($wid) > 0 && $ent->delete($user) > 0) {
+					$nbWarehouse++;
+				}
+			}
+		}
+
 		// 3. Categories (subtree of the stored root: rayons first, then root).
 		$rootId = (int) getDolGlobalString(self::ROOT_CONST, 0);
 		if ($rootId > 0) {
@@ -1589,8 +1845,8 @@ class DolipocketDemoData
 		dolibarr_del_const($this->db, self::ROOT_CONST, $conf->entity);
 		$this->db->commit();
 
-		$this->results[] = '[OK] Purge : '.$nbProp.' devis, '.$nbOrder.' commandes, '.$nbInvoice.' factures, '.$nbSupplierOrder.' commandes fournisseur, '.$nbSupplierInvoice.' factures fournisseur, '.$nbSupplierProposal.' demandes de prix, '.$nbAgenda.' évènements agenda, '.$nbShipment.' expéditions, '.$nbReception.' réceptions, '.$nbProject.' projets, '.$nbProd.' produits, '.$nbCat.' catégories, '.$nbSoc.' tiers, '.$nbContact.' contacts supprimés';
+		$this->results[] = '[OK] Purge : '.$nbProp.' devis, '.$nbOrder.' commandes, '.$nbInvoice.' factures, '.$nbSupplierOrder.' commandes fournisseur, '.$nbSupplierInvoice.' factures fournisseur, '.$nbSupplierProposal.' demandes de prix, '.$nbAgenda.' évènements agenda, '.$nbShipment.' expéditions, '.$nbReception.' réceptions, '.$nbProject.' projets, '.$nbWarehouse.' entrepôts, '.$nbStockMove.' mouvements de stock, '.$nbDoc.' documents, '.$nbProd.' produits, '.$nbCat.' catégories, '.$nbSoc.' tiers, '.$nbContact.' contacts supprimés';
 
-		return array('results' => $this->results, 'nbProd' => $nbProd, 'nbCat' => $nbCat, 'nbSoc' => $nbSoc, 'nbContact' => $nbContact, 'nbProp' => $nbProp, 'nbOrder' => $nbOrder, 'nbInvoice' => $nbInvoice, 'nbSupplierOrder' => $nbSupplierOrder, 'nbSupplierInvoice' => $nbSupplierInvoice, 'nbSupplierProposal' => $nbSupplierProposal, 'nbAgenda' => $nbAgenda, 'nbShipment' => $nbShipment, 'nbReception' => $nbReception, 'nbProject' => $nbProject);
+		return array('results' => $this->results, 'nbProd' => $nbProd, 'nbCat' => $nbCat, 'nbSoc' => $nbSoc, 'nbContact' => $nbContact, 'nbProp' => $nbProp, 'nbOrder' => $nbOrder, 'nbInvoice' => $nbInvoice, 'nbSupplierOrder' => $nbSupplierOrder, 'nbSupplierInvoice' => $nbSupplierInvoice, 'nbSupplierProposal' => $nbSupplierProposal, 'nbAgenda' => $nbAgenda, 'nbShipment' => $nbShipment, 'nbReception' => $nbReception, 'nbProject' => $nbProject, 'nbWarehouse' => $nbWarehouse, 'nbStockMove' => $nbStockMove, 'nbDoc' => $nbDoc);
 	}
 }

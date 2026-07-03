@@ -333,6 +333,13 @@ class ActionsDolipocket
 				'limit'  => array('type' => $TYPE_INT, 'min' => 1, 'max' => 200),
 			),
 
+			// Read-only FK lookup: Resource (agenda filter <FkPicker>).
+			'GET:resource' => array(
+				'search' => array('type' => $TYPE_STRING, 'maxLen' => 255),
+				'page'   => array('type' => $TYPE_INT, 'min' => 1),
+				'limit'  => array('type' => $TYPE_INT, 'min' => 1, 'max' => 200),
+			),
+
 			// =====================================================================
 			// Lot 1 - Tiers + Contacts
 			// =====================================================================
@@ -1154,6 +1161,8 @@ class ActionsDolipocket
 			// Catalog endpoints (Lot 6 v2 + Lot 9 generalisation to AgendaEvent).
 			'GET:event/columns'  => $columnsSchema,
 			'GET:event/describe' => $columnsSchema,
+			'GET:event/filter-options' => $columnsSchema,
+			'GET:event/counts' => $columnsSchema,
 
 			'POST:event' => array(
 				'label'            => array('type' => $TYPE_STRING, 'maxLen' => 200),

@@ -47,19 +47,53 @@
         "user-assigned": "Affecté à",
         "thirdparty": "Tiers lié",
         "contact": "Contact lié",
-        "note": "Note"
+        "note": "Note",
+        "label-required": "Le libellé est obligatoire"
     },
     "status": {
         "todo": "À faire",
         "in-progress": "En cours",
         "done": "Terminé"
     },
+    "filters": {
+        "type": "Type",
+        "types-empty": "Aucun type disponible",
+        "hide-auto": "Masquer les auto",
+        "birthday": "Anniversaires",
+        "clear": "Effacer",
+        "remove": "Retirer",
+        "status-all": "Statut",
+        "thirdparty": "Tiers",
+        "project": "Projet",
+        "resource": "Ressource",
+        "group": "Groupe",
+        "group-all": "Groupe",
+        "views": "Vues",
+        "views-empty": "Aucune vue enregistrée",
+        "view-name": "Nom de la vue",
+        "save": "Enregistrer",
+        "status": {
+            "todo": "À faire",
+            "0": "Non démarré",
+            "50": "En cours",
+            "done": "Terminé",
+            "na": "Non applicable"
+        },
+        "presets": {
+            "all": "Tout",
+            "mine": "Mes actions",
+            "todo": "À faire",
+            "overdue": "En retard",
+            "done": "Terminées"
+        }
+    },
     "types": {
         "meeting": "Rendez-vous",
         "phone": "Téléphone",
         "email": "Email",
         "task": "Tâche",
-        "other": "Autre"
+        "other": "Autre",
+        "birthday": "Anniversaire"
     },
     "view-modes": {
         "list": "Liste",

@@ -3,6 +3,53 @@ import { FaArrowLeft, FaFloppyDisk, FaXmark } from "react-icons/fa6";
 
 import { AutoForm } from "src/lib/forms/AutoForm";
 
+// Curated field set for the agenda event form. Keys are the AutoForm ids
+// (camelCase of the mapper appside names). Everything else in the ActionComm
+// describe() (fk_element, elementtype, priority, status, ref, system fields)
+// is hidden -- the user only sees what actually makes sense to edit.
+const AGENDA_INCLUDE_KEYS = [
+    "label",
+    "typeCode",
+    "datep",
+    "datef",
+    "fulldayevent",
+    "location",
+    "percentage",
+    "note",
+    "fkSoc",
+    "fkContact",
+    "fkProject",
+    "fkUserAction",
+];
+
+// Per-field presentation overrides: human French labels + the right widgets.
+// `typeCode` is already a populated <select> (backend sellist on c_actioncomm).
+// `fulldayevent` is an integer in Dolibarr -> force a switch.
+const AGENDA_OVERRIDES = {
+    label: { label: "Libellé" },
+    typeCode: { label: "Type" },
+    datep: { label: "Début" },
+    datef: { label: "Fin" },
+    fulldayevent: { type: "boolean", label: "Journée entière" },
+    location: { label: "Lieu" },
+    percentage: { label: "Avancement (%)" },
+    note: { label: "Description" },
+    fkSoc: { label: "Tiers" },
+    fkContact: { label: "Contact" },
+    fkProject: { label: "Projet" },
+    fkUserAction: { label: "Assigné à" },
+};
+
+const AGENDA_GROUPINGS = [
+    {
+        id: "infos",
+        title: "Informations",
+        keys: ["label", "typeCode", "datep", "datef", "fulldayevent", "location", "percentage"],
+    },
+    { id: "links", title: "Rattachements", keys: ["fkSoc", "fkContact", "fkProject", "fkUserAction"] },
+    { id: "desc", title: "Description", keys: ["note"] },
+];
+
 // Desktop edit page for an Agenda event (ActionComm). Renders a single
 // AutoForm generated from the backend describe() catalog. No JSX is hardcoded
 // per field. Conventions UI épurées strictes (cf .claude/CLAUDE.md): pas de
@@ -81,22 +128,9 @@ export const AgendaEventEditPageDesktop = ({
                             mode={isNew ? "create" : "update"}
                             onChange={(v) => { valuesRef.current = v; }}
                             onSubmit={(v) => { valuesRef.current = v; handleSave(); }}
-                            excludeKeys={[
-                                // Computed / system-managed (auto-resolved by Dolibarr)
-                                "ref",
-                                "datec",
-                                "tms",
-                                "fkUserAuthor",
-                                "fkUserModif",
-                                "fkUserAction",
-                                // Code reference is resolved server-side from typeCode
-                                "typeId",
-                                "type_id",
-                                // Last main doc / model PDF are not user-editable
-                                "lastMainDoc",
-                                "modelPdf",
-                                "importKey",
-                            ]}
+                            includeKeys={AGENDA_INCLUDE_KEYS}
+                            overrides={AGENDA_OVERRIDES}
+                            groupings={AGENDA_GROUPINGS}
                         />
                     )}
                 </div>

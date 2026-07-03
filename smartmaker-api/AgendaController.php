@@ -72,71 +72,428 @@ class AgendaController
 
         $start = isset($arr['start']) ? $this->parseDate($arr['start']) : null;
         $end = isset($arr['end']) ? $this->parseDate($arr['end']) : null;
+        // Delta-sync watermark: when provided, only events modified after this
+        // instant are returned (cf OPTI-DATA-ACCESS.md anti-pattern D). The
+        // client keeps its cache and merges the delta by id.
+        $since = isset($arr['since']) ? $this->parseDate($arr['since']) : null;
         $fkUserAssigned = !empty($arr['fk_user_assigned']) ? (int) $arr['fk_user_assigned'] : 0;
         $socid = !empty($arr['socid']) ? (int) $arr['socid'] : 0;
         $q = !empty($arr['q']) ? trim((string) $arr['q']) : '';
-        $page = isset($arr['page']) ? max(1, (int) $arr['page']) : 1;
-        $limit = isset($arr['limit']) ? min(200, max(1, (int) $arr['limit'])) : 100;
-        $offset = ($page - 1) * $limit;
+        // Safety cap only -- NOT pagination. A calendar window is already bounded
+        // by start/end; a hard LIMIT would silently truncate events past the cap
+        // and make them vanish from the grid (this is the exact bug documented in
+        // OPTI-DATA-ACCESS.md anti-pattern B). Any hit is logged, never silent.
+        $limit = isset($arr['limit']) ? min(5000, max(1, (int) $arr['limit'])) : 2000;
+
+        // Parity filters (cf docs/AGENDA_FILTERS_SPEC.md). All numeric ones are
+        // int-cast; actioncode codes are pattern-checked + escaped below.
+        $type = !empty($arr['type']) ? (int) $arr['type'] : 0;
+        $status = isset($arr['status']) ? (string) $arr['status'] : '';
+        $usergroup = !empty($arr['usergroup']) ? (int) $arr['usergroup'] : 0;
+        $projectid = !empty($arr['projectid']) ? (int) $arr['projectid'] : 0;
+        $resourceid = !empty($arr['resourceid']) ? (int) $arr['resourceid'] : 0;
+        $actioncode = isset($arr['actioncode']) ? trim((string) $arr['actioncode']) : '';
+        $hideAuto = isset($arr['hideAuto'])
+            && !in_array((string) $arr['hideAuto'], ['', '0', 'false'], true);
+        $showBirthday = isset($arr['showbirthday'])
+            && !in_array((string) $arr['showbirthday'], ['', '0', 'false'], true);
 
         $canSeeAll = $user->hasRight('agenda', 'allactions', 'read');
 
-        $sql = "SELECT DISTINCT t.id";
-        $sql .= " FROM ".MAIN_DB_PREFIX."actioncomm AS t";
-        // Join resources only when filtering by assigned user
-        if ($fkUserAssigned > 0 || !$canSeeAll) {
-            $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."actioncomm_resources AS ar";
-            $sql .= " ON (ar.fk_actioncomm = t.id AND ar.element_type = 'user')";
-        }
-        $sql .= " WHERE t.entity IN (".getEntity('agenda').")";
+        // Single query, no N+1: read exactly the columns the calendar renders
+        // instead of instantiating one ActionComm per row (which triggered
+        // fetch + fetch_optionals + resources + COUNT(files) per event, i.e.
+        // ~4 queries x N). Assigned-user resolution is not needed for the list
+        // (the non-detailed shape derives fk_user_assigned from fk_user_action).
+        $sql = "SELECT a.id, a.ref, a.label, c.code as type_code,";
+        $sql .= " a.datep, a.datep2, a.percent, a.location, a.fulldayevent,";
+        $sql .= " a.note as note_private, a.fk_user_action, a.fk_soc, a.fk_contact,";
+        $sql .= " a.fk_element, a.elementtype, a.status, a.tms";
+        $sql .= " FROM ".MAIN_DB_PREFIX."actioncomm AS a";
+        $sql .= " LEFT JOIN ".MAIN_DB_PREFIX."c_actioncomm AS c ON a.fk_action = c.id";
+        $sql .= " WHERE a.entity IN (".getEntity('agenda').")";
 
-        // Limit visibility to owned/assigned events when allactions.read is missing
+        // Limit visibility to owned/assigned events when allactions.read is
+        // missing. EXISTS (not a JOIN) so rows are never duplicated.
         if (!$canSeeAll) {
-            $sql .= " AND (t.fk_user_action = ".((int) $user->id);
-            $sql .= " OR ar.fk_element = ".((int) $user->id).")";
+            $sql .= " AND (a.fk_user_action = ".((int) $user->id);
+            $sql .= " OR EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."actioncomm_resources ar";
+            $sql .= " WHERE ar.fk_actioncomm = a.id AND ar.element_type = 'user'";
+            $sql .= " AND ar.fk_element = ".((int) $user->id)."))";
         }
 
         if ($fkUserAssigned > 0) {
-            $sql .= " AND ar.fk_element = ".((int) $fkUserAssigned);
+            $sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."actioncomm_resources ar2";
+            $sql .= " WHERE ar2.fk_actioncomm = a.id AND ar2.element_type = 'user'";
+            $sql .= " AND ar2.fk_element = ".((int) $fkUserAssigned).")";
         }
 
         if ($socid > 0) {
-            $sql .= " AND t.fk_soc = ".((int) $socid);
+            $sql .= " AND a.fk_soc = ".((int) $socid);
+        }
+
+        // Event type by dictionary id.
+        if ($type > 0) {
+            $sql .= " AND a.fk_action = ".((int) $type);
+        }
+
+        // Event type by code, or an auto/non-auto bucket (cf c_actioncomm.type).
+        if ($actioncode === 'AC_NON_AUTO') {
+            $sql .= " AND (c.type IS NULL OR c.type <> 'systemauto')";
+        } elseif ($actioncode === 'AC_ALL_AUTO') {
+            $sql .= " AND c.type = 'systemauto'";
+        } elseif ($actioncode !== '') {
+            $codes = [];
+            foreach (explode(',', $actioncode) as $code) {
+                $code = trim($code);
+                if ($code !== '' && preg_match('/^[A-Za-z0-9_]+$/', $code)) {
+                    $codes[] = "'".$db->escape($code)."'";
+                }
+            }
+            if (!empty($codes)) {
+                $sql .= " AND c.code IN (".implode(',', $codes).")";
+            }
+        }
+
+        // Hide system-generated (journal) events -- the AC_*_AUTO noise.
+        if ($hideAuto) {
+            $sql .= " AND (c.type IS NULL OR c.type <> 'systemauto')";
+        }
+
+        // Advancement/status bucket (percent). Semantics mirror Dolibarr's
+        // comm/action/index.php exactly.
+        switch ($status) {
+            case '0':
+                $sql .= " AND a.percent = 0";
+                break;
+            case '50':
+                $sql .= " AND (a.percent > 0 AND a.percent < 100)";
+                break;
+            case '100':
+            case 'done':
+                $sql .= " AND a.percent = 100";
+                break;
+            case 'todo':
+                $sql .= " AND (a.percent >= 0 AND a.percent < 100)";
+                break;
+            case 'na':
+            case '-1':
+                $sql .= " AND a.percent = -1";
+                break;
+            default:
+                break;
+        }
+
+        // Assigned to any user of a given group.
+        if ($usergroup > 0) {
+            $sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."actioncomm_resources arg";
+            $sql .= " INNER JOIN ".MAIN_DB_PREFIX."usergroup_user ugu ON ugu.fk_user = arg.fk_element";
+            $sql .= " WHERE arg.fk_actioncomm = a.id AND arg.element_type = 'user'";
+            $sql .= " AND ugu.fk_usergroup = ".((int) $usergroup).")";
+        }
+
+        // Linked project.
+        if ($projectid > 0) {
+            $sql .= " AND a.fk_project = ".((int) $projectid);
+        }
+
+        // Linked resource (room, equipment...).
+        if ($resourceid > 0) {
+            $sql .= " AND EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."element_resources er";
+            $sql .= " WHERE er.element_type = 'action' AND er.element_id = a.id";
+            $sql .= " AND er.resource_id = ".((int) $resourceid).")";
         }
 
         if ($start !== null) {
-            $sql .= " AND (t.datep2 IS NULL OR t.datep2 >= '".$db->idate($start)."')";
+            $sql .= " AND (a.datep2 IS NULL OR a.datep2 >= '".$db->idate($start)."')";
         }
         if ($end !== null) {
-            $sql .= " AND t.datep <= '".$db->idate($end)."'";
+            $sql .= " AND a.datep <= '".$db->idate($end)."'";
+        }
+        if ($since !== null) {
+            $sql .= " AND a.tms > '".$db->idate($since)."'";
         }
 
         if ($q !== '') {
             $escaped = $db->escape($q);
-            $sql .= " AND (t.label LIKE '%".$escaped."%' OR t.location LIKE '%".$escaped."%')";
+            $sql .= " AND (a.label LIKE '%".$escaped."%' OR a.location LIKE '%".$escaped."%')";
         }
 
-        $sql .= " ORDER BY t.datep ASC, t.id DESC";
-        $sql .= $db->plimit($limit, $offset);
+        $sql .= " ORDER BY a.datep ASC, a.id DESC";
+        // Fetch one extra row to detect (and loudly log) a cap hit.
+        $sql .= $db->plimit($limit + 1, 0);
 
-        $events = [];
         $resql = $db->query($sql);
         if (!$resql) {
             dol_syslog('DPK AgendaController::index SQL failed: '.$db->lasterror(), LOG_ERR);
             return [['error' => 'Failed to list events'], 500];
         }
 
-        $mapper = $this->getMapper();
+        $events = [];
         while ($obj = $db->fetch_object($resql)) {
-            $event = new ActionComm($db);
-            if ($event->fetch((int) $obj->id) > 0) {
-                $event->fetch_optionals();
-                $events[] = $this->formatEvent($event, $mapper);
-            }
+            $events[] = $this->formatRow($obj);
         }
         $db->free($resql);
 
+        if (count($events) > $limit) {
+            array_pop($events);
+            dol_syslog('DPK AgendaController::index hit safety cap '.$limit.' (window pathologically dense); some events omitted', LOG_WARNING);
+        }
+
+        // Birthday virtual events (cf comm/action/index.php showbirthday). Only
+        // on full loads (not delta `since` -- they have no tms) and when a window
+        // is set. Occurrences are computed in PHP (portable: no MONTH()/DAY()).
+        // Marked by a NEGATIVE id (= -contactId) so the frontend treats them as
+        // read-only, non-navigable markers.
+        if ($showBirthday && $since === null && $start !== null && $end !== null) {
+            $sqlB = "SELECT rowid, firstname, lastname, birthday";
+            $sqlB .= " FROM ".MAIN_DB_PREFIX."socpeople";
+            $sqlB .= " WHERE (priv = 0 OR (priv = 1 AND fk_user_creat = ".((int) $user->id)."))";
+            $sqlB .= " AND entity IN (".getEntity('contact').")";
+            $sqlB .= " AND birthday IS NOT NULL";
+            $resB = $db->query($sqlB);
+            if ($resB) {
+                $startYear = (int) date('Y', $start);
+                $endYear = (int) date('Y', $end);
+                while ($ob = $db->fetch_object($resB)) {
+                    $parts = explode('-', substr((string) $ob->birthday, 0, 10));
+                    if (count($parts) !== 3) {
+                        continue;
+                    }
+                    $bMonth = (int) $parts[1];
+                    $bDay = (int) $parts[2];
+                    if ($bMonth < 1 || $bDay < 1) {
+                        continue;
+                    }
+                    for ($y = $startYear; $y <= $endYear; $y++) {
+                        $ts = (int) dol_mktime(0, 0, 0, $bMonth, $bDay, $y, 'gmt');
+                        if ($ts < $start || $ts > $end) {
+                            continue;
+                        }
+                        $name = trim(((string) $ob->firstname).' '.((string) $ob->lastname));
+                        $events[] = [
+                            'id'               => -((int) $ob->rowid),
+                            'ref'              => '',
+                            'label'            => 'Anniversaire '.$name,
+                            'type_code'        => 'BIRTHDAY',
+                            'datep'            => $ts,
+                            'datef'            => $ts,
+                            'percentage'       => 100,
+                            'location'         => '',
+                            'fulldayevent'     => 1,
+                            'note'             => '',
+                            'fk_user_action'   => 0,
+                            'fk_user_assigned' => 0,
+                            'socid'            => null,
+                            'fk_soc'           => null,
+                            'fk_contact'       => (int) $ob->rowid,
+                            'fk_element'       => null,
+                            'elementtype'      => '',
+                            'status'           => 0,
+                            'tms'              => null,
+                        ];
+                    }
+                }
+                $db->free($resB);
+            } else {
+                dol_syslog('DPK AgendaController::index birthday SQL failed: '.$db->lasterror(), LOG_ERR);
+            }
+        }
+
         return [$events, 200];
+    }
+
+    /**
+     * Shape a raw SQL row (from index()'s single query) into the JSON output.
+     *
+     * Mirrors the non-detailed output of formatEvent() but consumes a plain
+     * stdClass row instead of a fully fetched ActionComm object, so the list
+     * endpoint stays at ONE query. Datetimes are converted to unix timestamps
+     * via jdate() to match the appside mapper (which expects int seconds).
+     *
+     * @param  object $obj Row from the actioncomm SELECT.
+     * @return array
+     */
+    private function formatRow($obj)
+    {
+        global $db;
+
+        $socid = !empty($obj->fk_soc) ? (int) $obj->fk_soc : null;
+
+        return [
+            'id'               => (int) $obj->id,
+            'ref'              => (string) $obj->ref,
+            'label'            => (string) $obj->label,
+            'type_code'        => (string) ($obj->type_code ?? ''),
+            'datep'            => !empty($obj->datep) ? (int) $db->jdate($obj->datep) : null,
+            'datef'            => !empty($obj->datep2) ? (int) $db->jdate($obj->datep2) : null,
+            'percentage'       => (int) ($obj->percent ?? 0),
+            'location'         => (string) ($obj->location ?? ''),
+            'fulldayevent'     => !empty($obj->fulldayevent) ? 1 : 0,
+            'note'             => (string) ($obj->note_private ?? ''),
+            'fk_user_action'   => (int) ($obj->fk_user_action ?? 0),
+            'fk_user_assigned' => (int) ($obj->fk_user_action ?? 0),
+            'socid'            => $socid,
+            'fk_soc'           => $socid,
+            'fk_contact'       => !empty($obj->fk_contact) ? (int) $obj->fk_contact : null,
+            'fk_element'       => !empty($obj->fk_element) ? (int) $obj->fk_element : null,
+            'elementtype'      => (string) ($obj->elementtype ?? ''),
+            'status'           => (int) ($obj->status ?? 0),
+            'tms'              => !empty($obj->tms) ? (int) $db->jdate($obj->tms) : null,
+        ];
+    }
+
+    /**
+     * GET event/counts
+     *
+     * Aggregate counts over the given window (start/end), for the filter-bar
+     * preset badges (cf docs/AGENDA_FILTERS_SPEC.md, B-front-3). Deliberately
+     * IGNORES the UI facet filters: the badges must always reflect the whole
+     * window ("12 to do") regardless of what is currently filtered, otherwise
+     * "Terminees" would read 0 as soon as "A faire" is active. Only the entity
+     * scope + the owned/assigned visibility restriction apply (like index()).
+     *
+     * One query, conditional SUMs (portable MySQL + SQLite).
+     *
+     * @param  array|null $arr Query params (start, end).
+     * @return array            [data, httpCode]
+     */
+    public function counts($arr = null)
+    {
+        global $db, $user;
+
+        if (!$user->hasRight('agenda', 'myactions', 'read')) {
+            dol_syslog('DPK AgendaController::counts denied: missing agenda.myactions.read for user '.((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        $start = isset($arr['start']) ? $this->parseDate($arr['start']) : null;
+        $end = isset($arr['end']) ? $this->parseDate($arr['end']) : null;
+        $canSeeAll = $user->hasRight('agenda', 'allactions', 'read');
+        $uid = (int) $user->id;
+        $nowSql = $db->idate(dol_now());
+
+        // Owned-or-assigned predicate (reused for the "mine" bucket AND the
+        // visibility restriction).
+        $ownerPredicate = "(a.fk_user_action = ".$uid;
+        $ownerPredicate .= " OR EXISTS (SELECT 1 FROM ".MAIN_DB_PREFIX."actioncomm_resources arc";
+        $ownerPredicate .= " WHERE arc.fk_actioncomm = a.id AND arc.element_type = 'user'";
+        $ownerPredicate .= " AND arc.fk_element = ".$uid."))";
+
+        $sql = "SELECT COUNT(*) as total";
+        $sql .= ", SUM(CASE WHEN a.percent >= 0 AND a.percent < 100 THEN 1 ELSE 0 END) as todo";
+        $sql .= ", SUM(CASE WHEN a.percent = 100 THEN 1 ELSE 0 END) as done";
+        $sql .= ", SUM(CASE WHEN a.percent >= 0 AND a.percent < 100 AND a.datep < '".$nowSql."' THEN 1 ELSE 0 END) as overdue";
+        $sql .= ", SUM(CASE WHEN ".$ownerPredicate." THEN 1 ELSE 0 END) as mine";
+        $sql .= " FROM ".MAIN_DB_PREFIX."actioncomm AS a";
+        $sql .= " WHERE a.entity IN (".getEntity('agenda').")";
+        if (!$canSeeAll) {
+            $sql .= " AND ".$ownerPredicate;
+        }
+        if ($start !== null) {
+            $sql .= " AND (a.datep2 IS NULL OR a.datep2 >= '".$db->idate($start)."')";
+        }
+        if ($end !== null) {
+            $sql .= " AND a.datep <= '".$db->idate($end)."'";
+        }
+
+        $resql = $db->query($sql);
+        if (!$resql) {
+            dol_syslog('DPK AgendaController::counts SQL failed: '.$db->lasterror(), LOG_ERR);
+            return [['error' => 'Failed to count events'], 500];
+        }
+        $obj = $db->fetch_object($resql);
+        $db->free($resql);
+
+        return [[
+            'total'   => (int) ($obj->total ?? 0),
+            'todo'    => (int) ($obj->todo ?? 0),
+            'done'    => (int) ($obj->done ?? 0),
+            'overdue' => (int) ($obj->overdue ?? 0),
+            'mine'    => (int) ($obj->mine ?? 0),
+        ], 200];
+    }
+
+    /**
+     * GET event/filter-options
+     *
+     * Populates the calendar filter bar without hardcoding anything client-side
+     * (cf docs/AGENDA_FILTERS_SPEC.md section 2.2). Returns the active event
+     * types (with their colour + systemauto flag), the assignable user groups
+     * (only when the caller may enumerate them), and the fixed advancement
+     * buckets.
+     *
+     * @param  array|null $arr Unused (no params).
+     * @return array            [data, httpCode]
+     */
+    public function filterOptions($arr = null)
+    {
+        global $db, $user, $conf;
+
+        if (!$user->hasRight('agenda', 'myactions', 'read')) {
+            dol_syslog('DPK AgendaController::filterOptions denied: missing agenda.myactions.read for user '.((int) $user->id), LOG_WARNING);
+            return [['error' => 'Access denied'], 403];
+        }
+
+        // Event types. c_actioncomm is a GLOBAL dictionary (no entity column),
+        // so it is never entity-filtered.
+        $types = [];
+        $sql = "SELECT id, code, libelle as label, color, type, picto";
+        $sql .= " FROM ".MAIN_DB_PREFIX."c_actioncomm";
+        $sql .= " WHERE active = 1";
+        $sql .= " ORDER BY position ASC, id ASC";
+        $resql = $db->query($sql);
+        if ($resql) {
+            while ($obj = $db->fetch_object($resql)) {
+                $types[] = [
+                    'id'         => (int) $obj->id,
+                    'code'       => (string) $obj->code,
+                    'label'      => (string) $obj->label,
+                    'color'      => !empty($obj->color) ? (string) $obj->color : null,
+                    'picto'      => !empty($obj->picto) ? (string) $obj->picto : null,
+                    'systemauto' => ($obj->type === 'systemauto'),
+                ];
+            }
+            $db->free($resql);
+        } else {
+            dol_syslog('DPK AgendaController::filterOptions types SQL failed: '.$db->lasterror(), LOG_ERR);
+        }
+
+        // User groups (assignment-by-group filter). Only exposed to callers
+        // allowed to enumerate groups; otherwise an empty list so the filter
+        // degrades to hidden client-side.
+        $groups = [];
+        if (!empty($user->admin) || $user->hasRight('user', 'user', 'lire')) {
+            $sql = "SELECT rowid as id, nom as label";
+            $sql .= " FROM ".MAIN_DB_PREFIX."usergroup";
+            $sql .= " WHERE entity IN (".getEntity('usergroup').")";
+            $sql .= " ORDER BY nom ASC";
+            $resql = $db->query($sql);
+            if ($resql) {
+                while ($obj = $db->fetch_object($resql)) {
+                    $groups[] = ['id' => (int) $obj->id, 'label' => (string) $obj->label];
+                }
+                $db->free($resql);
+            } else {
+                dol_syslog('DPK AgendaController::filterOptions groups SQL failed: '.$db->lasterror(), LOG_ERR);
+            }
+        }
+
+        // Advancement buckets are fixed semantics (percent). Exposed here so the
+        // UI does not hardcode them; labels are translated client-side by value.
+        $statuses = [
+            ['value' => 'todo', 'percentRule' => '0<=p<100'],
+            ['value' => '0',    'percentRule' => 'p=0'],
+            ['value' => '50',   'percentRule' => '0<p<100'],
+            ['value' => 'done', 'percentRule' => 'p=100'],
+            ['value' => 'na',   'percentRule' => 'p=-1'],
+        ];
+
+        return [[
+            'types'    => $types,
+            'groups'   => $groups,
+            'statuses' => $statuses,
+        ], 200];
     }
 
     /**
@@ -254,7 +611,12 @@ class AgendaController
         $event->note_private = isset($arr['note']) ? (string) $arr['note'] : '';
         $event->percentage = isset($arr['percentage']) ? (int) $arr['percentage'] : 0;
 
-        $assignedUserId = !empty($arr['fk_user_assigned']) ? (int) $arr['fk_user_assigned'] : (int) $user->id;
+        // Assigned user: accept the legacy write key fk_user_assigned first, then
+        // the appside key fk_user_action produced by the desktop AutoForm mapper
+        // (mapToBackend maps the FkPicker onto fk_user_action). Default to self.
+        $assignedUserId = !empty($arr['fk_user_assigned'])
+            ? (int) $arr['fk_user_assigned']
+            : (!empty($arr['fk_user_action']) ? (int) $arr['fk_user_action'] : (int) $user->id);
         $event->userownerid = $assignedUserId;
         $event->userassigned = [
             $assignedUserId => ['id' => $assignedUserId, 'transparency' => 0],
@@ -265,6 +627,9 @@ class AgendaController
         }
         if (!empty($arr['fk_contact'])) {
             $event->contact_id = (int) $arr['fk_contact'];
+        }
+        if (!empty($arr['fk_project'])) {
+            $event->fk_project = (int) $arr['fk_project'];
         }
         if (!empty($arr['fk_element']) && !empty($arr['elementtype'])) {
             $event->fk_element = (int) $arr['fk_element'];
@@ -318,9 +683,17 @@ class AgendaController
         // Legacy API write key fk_user_assigned has no entry in
         // listOfPublishedFields (the symmetric read key is fk_user_action).
         // Translate the legacy write key into the appside key the mapper
-        // recognises BEFORE importMappedData() sees the payload.
-        if (isset($payload['fk_user_assigned'])) {
-            $payload['fk_user_action'] = $payload['fk_user_assigned'];
+        // recognises BEFORE importMappedData() sees the payload, then drop it
+        // (importMappedData would reject the unknown key otherwise).
+        //
+        // Guard on !empty, not isset: the desktop AutoForm mapper (mapToBackend)
+        // always backfills fk_user_assigned=0 as a completeness default. A blind
+        // rename would then clobber the real fk_user_action (assigned user) with
+        // 0 on every save/move. Only override when a genuine assignee is sent.
+        if (array_key_exists('fk_user_assigned', $payload)) {
+            if (!empty($payload['fk_user_assigned'])) {
+                $payload['fk_user_action'] = (int) $payload['fk_user_assigned'];
+            }
             unset($payload['fk_user_assigned']);
         }
 
@@ -555,6 +928,10 @@ class AgendaController
         $data['fk_element'] = !empty($event->fk_element) ? (int) $event->fk_element : null;
         $data['elementtype'] = (string) ($event->elementtype ?? '');
         $data['status'] = (int) ($event->status ?? 0);
+        // Delta-sync watermark. ActionComm::fetch() exposes the tms column as
+        // $datem (already a unix timestamp). Emitting it lets the client patch
+        // its cache and advance its `since` cursor after a mutation.
+        $data['tms'] = !empty($event->datem) ? (int) $event->datem : null;
 
         if ($detailed && is_array($event->userassigned ?? null)) {
             $assigned = [];

@@ -197,8 +197,55 @@ class AuthController extends BaseController
 			dol_syslog('DPK tenant activation update failed: ' . $db->lasterror(), LOG_ERR);
 		}
 
+		// Optionally seed a demo dataset for the fresh tenant. Operator opt-in
+		// via the DOLIPOCKET_DEMO_ON_SIGNUP constant (off by default). Non-fatal:
+		// signup must succeed even if seeding fails.
+		if (getDolGlobalInt('DOLIPOCKET_DEMO_ON_SIGNUP')) {
+			$this->seedDemoData($db, (int) $result['entity'], (int) $result['userid']);
+		}
+
 		unset($_SESSION['dpk_signup_email']);
 		$this->redirect('/signup/done');
+	}
+
+	/**
+	 * Seed the demo dataset into a freshly provisioned tenant entity.
+	 *
+	 * Switches $conf->entity to the new tenant, loads its admin user (already
+	 * granted the module rights by EntityProvisioner) and runs the demo
+	 * generator. Fully non-fatal and logged: any failure leaves signup
+	 * unaffected. Restores the previous entity on the way out.
+	 *
+	 * @param   \DoliDB  $db      Database handler
+	 * @param   int      $entity  Freshly provisioned entity
+	 * @param   int      $userId  Tenant admin user id
+	 * @return  void
+	 */
+	private function seedDemoData($db, int $entity, int $userId): void
+	{
+		global $conf;
+
+		$prevEntity = isset($conf->entity) ? $conf->entity : null;
+		try {
+			dol_include_once('/dolipocket/class/demodata.class.php');
+			require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
+
+			$conf->entity = $entity;
+			$admin = new \User($db);
+			if ($admin->fetch($userId) <= 0) {
+				dol_syslog('DPK demo-on-signup: admin user not found (id ' . $userId . ')', LOG_ERR);
+			} else {
+				$admin->getrights();
+				$demo = new \DolipocketDemoData($db);
+				$out = $demo->generate($admin, true);
+				dol_syslog('DPK demo-on-signup: entity=' . $entity . ' summary=' . $out['summary'] . ' warnings=' . $out['warnings'], LOG_INFO);
+			}
+		} catch (\Throwable $e) {
+			dol_syslog('DPK demo-on-signup failed for entity ' . $entity . ': ' . $e->getMessage(), LOG_ERR);
+		}
+		if ($prevEntity !== null) {
+			$conf->entity = $prevEntity;
+		}
 	}
 
 	/**

@@ -130,7 +130,7 @@ const indexByDay = (days, events) => {
     return set;
 };
 
-const EventBlock = ({ block, onSelect }) => {
+const EventBlock = ({ block, onSelect, onMouseDown, dimmed }) => {
     const { ev, top, height, lane, clusterLanes } = block;
     const meta = getTypeMeta(ev.typeCode);
     const isDone = (ev.percentage ?? 0) >= 100;
@@ -142,15 +142,16 @@ const EventBlock = ({ block, onSelect }) => {
         <button
             type="button"
             data-event-block
+            onMouseDown={(e) => onMouseDown?.(e, ev)}
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect(ev.id);
             }}
             title={ev.label}
             style={{ top, height, left: `${leftPct}%`, width: `calc(${100 / cols}% - 3px)` }}
-            className={`absolute rounded-lg px-2 py-1 text-[12px] leading-snug overflow-hidden text-left border border-current cursor-pointer hover:shadow-md transition-shadow ${
+            className={`absolute rounded-lg px-2 py-1 text-[12px] leading-snug overflow-hidden text-left border border-current cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
                 meta.block
-            } ${isDone ? "opacity-50 line-through" : ""}`}
+            } ${isDone ? "opacity-50 line-through" : ""} ${dimmed ? "opacity-30" : ""}`}
         >
             {!veryTight && <div className="font-bold truncate">{ev.label || "-"}</div>}
             {veryTight && <div className="text-[11px] truncate">{ev.label || "-"}</div>}
@@ -172,8 +173,10 @@ export const TimeGridView = ({
     onSelectSlot,
     onUpdateEvent,
     onCreateEvent,
+    onMoveEvent,
 }) => {
     const scrollRef = useRef(null);
+    const columnsRef = useRef(null);
     const [quickViewOpen, setQuickViewOpen] = useState(false);
     const [selectedEventForQuickView, setSelectedEventForQuickView] = useState(null);
     const [quickCreateOpen, setQuickCreateOpen] = useState(false);
@@ -182,6 +185,74 @@ export const TimeGridView = ({
     // Live drag-to-create selection: { dayKey, startMin, endMin } or null.
     const [drag, setDrag] = useState(null);
     const dragRef = useRef(null);
+    // Live drag-to-move (reschedule) ghost: { colIndex, startMin, durationMin, ev }.
+    const [moveGhost, setMoveGhost] = useState(null);
+    const moveRef = useRef(null);
+    // Set on a real drag so the trailing native click does not reopen the quick view.
+    const suppressClickRef = useRef(false);
+
+    // Mouse-down on an existing event starts a reschedule drag. The block follows
+    // the cursor (keeping the grab offset) across days/hours; on drop we compute a
+    // new datep/datef (SECONDS) preserving the original duration. A pure click
+    // (no movement) falls through to the native onClick -> quick view.
+    const handleEventMouseDown = (e, ev) => {
+        if (e.button !== 0) return; // left button only
+        if (!onMoveEvent) return; // no reschedule capability wired
+        if (isAllDayLike(ev)) return; // all-day events are not in the hourly grid
+        const cols = columnsRef.current;
+        if (!cols) return;
+        e.stopPropagation(); // never start a column create-drag underneath
+
+        const rect = cols.getBoundingClientRect();
+        const colWidth = rect.width / days.length;
+        const grabOffset = e.clientY - e.currentTarget.getBoundingClientRect().top;
+        const startSec = Number(ev.datep) || 0;
+        const endSec = Number(ev.datef) || startSec + 3600;
+        const durationSec = Math.max(endSec - startSec, DRAG_SNAP * 60);
+        const durationMin = durationSec / 60;
+        const startX = e.clientX;
+        const startY = e.clientY;
+        moveRef.current = { ev, rect, colWidth, grabOffset, durationSec, durationMin, moved: false, colIndex: 0, startMin: 0 };
+
+        const onMove = (mv) => {
+            const cur = moveRef.current;
+            if (!cur) return;
+            if (!cur.moved) {
+                if (Math.abs(mv.clientX - startX) < 4 && Math.abs(mv.clientY - startY) < 4) return;
+                cur.moved = true;
+                document.body.style.cursor = "grabbing";
+            }
+            const colIndex = Math.max(0, Math.min(days.length - 1, Math.floor((mv.clientX - cur.rect.left) / cur.colWidth)));
+            let startMin = yToMinutes(mv.clientY - cur.grabOffset, cur.rect.top);
+            startMin = Math.max(0, Math.min(startMin, DAY_MINUTES - cur.durationMin));
+            cur.colIndex = colIndex;
+            cur.startMin = startMin;
+            setMoveGhost({ colIndex, startMin, durationMin: cur.durationMin, ev: cur.ev });
+        };
+        const onUp = () => {
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", onUp);
+            document.body.style.cursor = "";
+            const cur = moveRef.current;
+            moveRef.current = null;
+            setMoveGhost(null);
+            if (!cur || !cur.moved) return;
+            // Swallow the trailing native click, but only the immediate one: if
+            // the drop lands off the event (no click fires) the flag would stay
+            // set and eat the user's NEXT event click. Clear it after this tick.
+            suppressClickRef.current = true;
+            setTimeout(() => {
+                suppressClickRef.current = false;
+            }, 0);
+            const newDay = days[cur.colIndex];
+            const base = startOfDay(newDay);
+            base.setMinutes(cur.startMin);
+            const newDatep = Math.floor(base.getTime() / 1000);
+            onMoveEvent(cur.ev.id, { datep: newDatep, datef: newDatep + cur.durationSec });
+        };
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", onUp);
+    };
 
     // Open the quick-create modal for a [startMin, endMin] range on a given day.
     const openQuickCreate = (day, startMin, endMin) => {
@@ -203,6 +274,8 @@ export const TimeGridView = ({
         const startMin = yToMinutes(e.clientY, rectTop);
         dragRef.current = { day, rectTop, startMin, endMin: startMin, moved: false };
         setDrag({ dayKey: dayKey(day), startMin, endMin: startMin });
+        // Vertical-resize cursor for the whole drag (like Google Calendar).
+        document.body.style.cursor = "ns-resize";
 
         const onMove = (ev) => {
             const cur = dragRef.current;
@@ -215,6 +288,7 @@ export const TimeGridView = ({
         const onUp = () => {
             window.removeEventListener("mousemove", onMove);
             window.removeEventListener("mouseup", onUp);
+            document.body.style.cursor = "";
             const cur = dragRef.current;
             dragRef.current = null;
             setDrag(null);
@@ -243,6 +317,11 @@ export const TimeGridView = ({
     const hasAllDay = Object.values(allDayByDay).some((arr) => arr.length > 0);
 
     const handleEventClick = (eventId) => {
+        // A reschedule drag just ended -> swallow the trailing native click.
+        if (suppressClickRef.current) {
+            suppressClickRef.current = false;
+            return;
+        }
         const event = (events || []).find((e) => e.id === eventId);
         if (event) {
             setSelectedEventForQuickView(event);
@@ -345,19 +424,20 @@ export const TimeGridView = ({
                     </div>
 
                     {/* Day columns */}
-                    <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0,1fr))` }}>
-                        {days.map((d) => {
+                    <div ref={columnsRef} className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0,1fr))` }}>
+                        {days.map((d, colIndex) => {
                             const blocks = layoutDay(d, byDay[dayKey(d)] || []);
                             const visible = blocks.filter((b) => b.lane < MAX_TIMED_COLS);
                             const hiddenCount = blocks.length - visible.length;
                             const today = isToday(d);
                             const dragSel = drag && drag.dayKey === dayKey(d) ? drag : null;
+                            const moveSel = moveGhost && moveGhost.colIndex === colIndex ? moveGhost : null;
                             return (
                                 <div
                                     key={dayKey(d)}
                                     data-testid="day-column"
                                     onMouseDown={(e) => handleColumnMouseDown(e, d)}
-                                    className={`relative border-r border-soft-border/70 last:border-r-0 select-none cursor-crosshair ${
+                                    className={`relative border-r border-soft-border/70 last:border-r-0 select-none ${
                                         isWeekend(d) ? "bg-medium-bg/15" : "bg-white"
                                     }`}
                                 >
@@ -396,8 +476,33 @@ export const TimeGridView = ({
                                         </div>
                                     )}
 
+                                    {moveSel &&
+                                        (() => {
+                                            const top = (moveSel.startMin / DAY_MINUTES) * GRID_H;
+                                            const height = Math.max((moveSel.durationMin / DAY_MINUTES) * GRID_H, 22);
+                                            const endMin = moveSel.startMin + moveSel.durationMin;
+                                            const meta = getTypeMeta(moveSel.ev.typeCode);
+                                            return (
+                                                <div
+                                                    className={`absolute left-0.5 right-0.5 z-40 rounded-lg border-2 border-primary shadow-lg overflow-hidden pointer-events-none ${meta.block}`}
+                                                    style={{ top, height }}
+                                                >
+                                                    <div className="px-2 py-1 text-[12px] font-bold truncate">{moveSel.ev.label || "-"}</div>
+                                                    <div className="px-2 text-[11px] font-semibold tabular-nums opacity-80">
+                                                        {fmtMinutes(moveSel.startMin)} - {fmtMinutes(endMin)}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+
                                     {visible.map((b, i) => (
-                                        <EventBlock key={b.ev.id + "-" + i} block={b} onSelect={handleEventClick} />
+                                        <EventBlock
+                                            key={b.ev.id + "-" + i}
+                                            block={b}
+                                            onSelect={handleEventClick}
+                                            onMouseDown={handleEventMouseDown}
+                                            dimmed={moveGhost?.ev?.id === b.ev.id}
+                                        />
                                     ))}
 
                                     {hiddenCount > 0 && (
