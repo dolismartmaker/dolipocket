@@ -40,12 +40,7 @@ export const appConfig = {
             }
         },
         pages: {
-            "/welcome": {
-                "/login": "slideLeft",
-                "*": "fade"
-            },
             "/login": {
-                "/welcome": "slideRight",
                 "*": "fade"
             },
             // "/": "fade",

@@ -5,6 +5,23 @@
     },
     "login-page": {
         "title": "Connexion",
+        "hero": {
+            "badge": "100% React",
+            "title": "Dolibarr, enfin dans votre poche.",
+            "subtitle": "Le premier front 100% React pour Dolibarr. Rapide, fluide, pensé mobile - toute votre gestion, où que vous soyez.",
+            "server-label": "Serveur",
+            "secure": "Connexion chiffrée",
+            "modules": {
+                "invoices": "Factures",
+                "proposals": "Devis",
+                "stock": "Stock",
+                "thirdparties": "Tiers",
+                "projects": "Projets",
+                "agenda": "Agenda"
+            }
+        },
+        "form-subtitle": "Accédez à votre espace de gestion.",
+        "powered-by": "Propulsé par Dolipocket",
         "email-input": {
             "label": "Identifiant",
             "placeholder": "Rentrez votre identifiant ..."

@@ -99,6 +99,15 @@ export const FilterRow = ({
                     </td>
                 );
             })}
+            {/* Filler cell: absorbs horizontal slack (see Row.jsx). */}
+            <td
+                aria-hidden="true"
+                style={{
+                    height: 28,
+                    background: "#fff",
+                    borderBottom: "1px solid #e5e7eb",
+                }}
+            />
             {hasActions && (
                 <td
                     style={{

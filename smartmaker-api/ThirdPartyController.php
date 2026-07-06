@@ -1152,7 +1152,11 @@ class ThirdPartyController
             $sql .= " WHERE fk_soc = " . ((int) $id);
             $sql .= " AND entity IN (" . getEntity('facture') . ")";
             $sql .= " ORDER BY datef DESC, rowid DESC";
-            $sql .= $db->plimit(6, 0);
+            // Cap at 25: the desktop cockpit lets each user pick a per-box list
+            // length up to 20 (+"Tout"), sliced client-side, so 25 gives the
+            // frontend enough rows to honour any choice without a per-request
+            // param.
+            $sql .= $db->plimit(25, 0);
             $resql = $db->query($sql);
             if ($resql) {
                 while ($obj = $db->fetch_object($resql)) {
@@ -1172,7 +1176,8 @@ class ThirdPartyController
             }
 
             // Unpaid invoices: validated (1) and not paid (paye=0). Total is
-            // summed over ALL unpaid; the returned list is capped to 10.
+            // summed over ALL unpaid; the returned list is capped to 25 (see
+            // recent-invoices note -- lets the user pick up to 20 client-side).
             $sql = "SELECT rowid, ref, total_ttc, date_lim_reglement";
             $sql .= " FROM " . MAIN_DB_PREFIX . "facture";
             $sql .= " WHERE fk_soc = " . ((int) $id);
@@ -1184,7 +1189,7 @@ class ThirdPartyController
                 $unpaidTotal = 0.0;
                 while ($obj = $db->fetch_object($resql)) {
                     $unpaidTotal += (float) $obj->total_ttc;
-                    if (count($data['invoicesUnpaid']) < 10) {
+                    if (count($data['invoicesUnpaid']) < 25) {
                         $data['invoicesUnpaid'][] = [
                             'id'       => (int) $obj->rowid,
                             'ref'      => (string) $obj->ref,
@@ -1207,7 +1212,7 @@ class ThirdPartyController
             $sql .= " WHERE fk_soc = " . ((int) $id);
             $sql .= " AND entity IN (" . getEntity('contact') . ")";
             $sql .= " ORDER BY lastname ASC, firstname ASC";
-            $sql .= $db->plimit(6, 0);
+            $sql .= $db->plimit(25, 0);
             $resql = $db->query($sql);
             if ($resql) {
                 while ($obj = $db->fetch_object($resql)) {
@@ -1234,7 +1239,7 @@ class ThirdPartyController
             $sql .= " WHERE fk_soc = " . ((int) $id);
             $sql .= " AND entity IN (" . getEntity('agenda') . ")";
             $sql .= " ORDER BY datep DESC, id DESC";
-            $sql .= $db->plimit(6, 0);
+            $sql .= $db->plimit(25, 0);
             $resql = $db->query($sql);
             if ($resql) {
                 while ($obj = $db->fetch_object($resql)) {

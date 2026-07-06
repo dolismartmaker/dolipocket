@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Multi-row selection on the current page only. Cleared on filter / sort /
 // page change (cf DATATABLE_SPEC.md §7.4).
@@ -9,10 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 export const useRowSelection = ({ rows, rowKeyFn, purgeKey }) => {
     const [selectedKeys, setSelectedKeys] = useState(() => new Set());
+    // Index of the last row toggled without Shift; anchor for range selection.
+    const anchorIndexRef = useRef(null);
 
     // Purge on filter / sort / page change.
     useEffect(() => {
         setSelectedKeys(new Set());
+        anchorIndexRef.current = null;
     }, [purgeKey]);
 
     const isSelected = useCallback((row) => {
@@ -20,7 +23,24 @@ export const useRowSelection = ({ rows, rowKeyFn, purgeKey }) => {
         return selectedKeys.has(k);
     }, [selectedKeys, rowKeyFn]);
 
-    const toggle = useCallback((row) => {
+    // toggle(row) -> flip a single row.
+    // toggle(row, index, shiftKey) -> Shift+click selects the contiguous range
+    // between the anchor row and the clicked row (standard list ergonomics).
+    const toggle = useCallback((row, index, shiftKey) => {
+        if (shiftKey && anchorIndexRef.current != null
+            && Array.isArray(rows) && typeof index === "number") {
+            const start = Math.min(anchorIndexRef.current, index);
+            const end = Math.max(anchorIndexRef.current, index);
+            setSelectedKeys((prev) => {
+                const next = new Set(prev);
+                for (let i = start; i <= end; i++) {
+                    const r = rows[i];
+                    if (r) next.add(rowKeyFn(r));
+                }
+                return next;
+            });
+            return;
+        }
         const k = rowKeyFn(row);
         setSelectedKeys((prev) => {
             const next = new Set(prev);
@@ -28,7 +48,8 @@ export const useRowSelection = ({ rows, rowKeyFn, purgeKey }) => {
             else next.add(k);
             return next;
         });
-    }, [rowKeyFn]);
+        if (typeof index === "number") anchorIndexRef.current = index;
+    }, [rowKeyFn, rows]);
 
     const selectAllVisible = useCallback(() => {
         const allKeys = (rows ?? []).map(rowKeyFn);

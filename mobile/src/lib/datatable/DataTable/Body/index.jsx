@@ -17,7 +17,8 @@ export const Body = ({
     error,
     onRetry,
 }) => {
-    const visibleColCount = 1
+    // checkbox + visible columns + filler + optional actions column.
+    const visibleColCount = 2
         + columns.filter((c) => c.visible !== false).length
         + ((rowActions?.length || rowKebabActions?.length) ? 1 : 0);
 
@@ -80,6 +81,7 @@ export const Body = ({
                         columns={columns}
                         rowKey={rowKey}
                         selected={selection.isSelected(row)}
+                        selectionActive={selection.count > 0}
                         onToggleSelect={selection.toggle}
                         rowActions={rowActions}
                         rowKebabActions={rowKebabActions}

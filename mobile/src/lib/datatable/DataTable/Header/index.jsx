@@ -75,6 +75,15 @@ export const Header = ({
                         />
                     );
                 })}
+                {/* Filler cell: absorbs horizontal slack (see Row.jsx). */}
+                <th
+                    aria-hidden="true"
+                    style={{
+                        height: 32,
+                        background: "#f8fafc",
+                        borderBottom: "1px solid #e5e7eb",
+                    }}
+                />
                 {hasActions && (
                     <th
                         scope="col"

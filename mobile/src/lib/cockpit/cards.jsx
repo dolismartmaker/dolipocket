@@ -115,11 +115,12 @@ export const CaChartCard = ({ data, loading, currency, onRefresh }) => {
 
 // ---- Recent invoices ----
 
-export const RecentInvoicesCard = ({ data, loading, onRowClick, onRefresh }) => {
+export const RecentInvoicesCard = ({ data, loading, onRowClick, onRefresh, limit = Infinity }) => {
     const state = blockState(data, "invoice");
     if (state === "forbidden") return null;
 
-    const rows = state === "ready" ? (data.invoicesRecent || []) : [];
+    const all = state === "ready" ? (data.invoicesRecent || []) : [];
+    const rows = Number.isFinite(limit) ? all.slice(0, limit) : all;
 
     return (
         <CockpitCard
@@ -164,11 +165,13 @@ export const RecentInvoicesCard = ({ data, loading, onRowClick, onRefresh }) => 
 
 // ---- Unpaid invoices ----
 
-export const UnpaidInvoicesCard = ({ data, loading, onRowClick, onRefresh }) => {
+export const UnpaidInvoicesCard = ({ data, loading, onRowClick, onRefresh, limit = Infinity }) => {
     const state = blockState(data, "invoice");
     if (state === "forbidden") return null;
 
-    const rows = state === "ready" ? (data.invoicesUnpaid || []) : [];
+    const all = state === "ready" ? (data.invoicesUnpaid || []) : [];
+    const rows = Number.isFinite(limit) ? all.slice(0, limit) : all;
+    // Total due always reflects the full returned set, not the displayed slice.
     const total = state === "ready" ? data.unpaidTotal : 0;
 
     return (
@@ -218,11 +221,12 @@ export const UnpaidInvoicesCard = ({ data, loading, onRowClick, onRefresh }) => 
 
 // ---- Contacts ----
 
-export const ContactsCard = ({ data, loading, onRowClick, onRefresh }) => {
+export const ContactsCard = ({ data, loading, onRowClick, onRefresh, limit = Infinity }) => {
     const state = blockState(data, "contact");
     if (state === "forbidden") return null;
 
-    const rows = state === "ready" ? (data.contactsRecent || []) : [];
+    const all = state === "ready" ? (data.contactsRecent || []) : [];
+    const rows = Number.isFinite(limit) ? all.slice(0, limit) : all;
     const count = state === "ready" ? (data.counts?.contacts ?? rows.length) : null;
 
     return (
@@ -267,11 +271,12 @@ export const ContactsCard = ({ data, loading, onRowClick, onRefresh }) => {
 
 // ---- Recent agenda events ----
 
-export const EventsCard = ({ data, loading, onRowClick, onRefresh }) => {
+export const EventsCard = ({ data, loading, onRowClick, onRefresh, limit = Infinity }) => {
     const state = blockState(data, "agenda");
     if (state === "forbidden") return null;
 
-    const rows = state === "ready" ? (data.events || []) : [];
+    const all = state === "ready" ? (data.events || []) : [];
+    const rows = Number.isFinite(limit) ? all.slice(0, limit) : all;
 
     return (
         <CockpitCard

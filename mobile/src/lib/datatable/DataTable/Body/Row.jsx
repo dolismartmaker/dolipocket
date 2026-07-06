@@ -48,6 +48,7 @@ export const Row = ({
     columns,
     rowKey,
     selected,
+    selectionActive,
     onToggleSelect,
     rowActions,
     rowKebabActions,
@@ -59,18 +60,23 @@ export const Row = ({
     const [kebabOpen, setKebabOpen] = useState(false);
 
     const handleRowMouseDown = (e) => {
-        // Only navigate if the click target was the row itself (not buttons).
         if (e.button !== 0) return;
         // Bubbling from interactive children is filtered via `data-row-action`.
         const target = e.target;
         if (target?.closest?.("[data-row-action='1']")) return;
         if (target?.closest?.("input")) return;
+        // Selection mode: once a row is checked, clicking anywhere on a row
+        // toggles its checkbox instead of navigating to the detail page.
+        if (selectionActive) {
+            onToggleSelect(row, rowIndexInPage, e.shiftKey);
+            return;
+        }
         onRowClick?.(row);
     };
 
     return (
         <tr
-            className={`group ${selected ? "bg-primary/5" : "hover:bg-gray-50"}`}
+            className={`group ${selected ? "bg-[#eef2ff]" : "hover:bg-gray-50"}`}
             style={{ height: 28 }}
         >
             <td
@@ -91,7 +97,7 @@ export const Row = ({
                 <input
                     type="checkbox"
                     checked={selected}
-                    onChange={() => onToggleSelect(row)}
+                    onChange={(e) => onToggleSelect(row, rowIndexInPage, e.nativeEvent?.shiftKey)}
                     aria-label="Sélectionner la ligne"
                     className="cursor-pointer"
                     data-row-action="1"
@@ -136,6 +142,17 @@ export const Row = ({
                     </td>
                 );
             })}
+            {/* Filler cell: absorbs the horizontal slack so fixed-width
+                columns (checkbox, #, ...) keep their exact width instead of
+                being stretched by table-layout:fixed. */}
+            <td
+                aria-hidden="true"
+                onMouseDown={handleRowMouseDown}
+                style={{
+                    borderBottom: "1px solid #f3f4f6",
+                    cursor: (selectionActive || onRowClick) ? "pointer" : "default",
+                }}
+            />
             {(rowActions?.length || rowKebabActions?.length) && (
                 <td
                     style={{

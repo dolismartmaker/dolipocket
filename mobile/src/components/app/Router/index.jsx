@@ -4,7 +4,7 @@ import {
     // App layouts + bootstrapped pages
     LoginPage, HomePage, Error404Page,
     PrivatePagesLayout, PagesLayout, PreDeviceLayout, PostDeviceIdentificationLayout, PublicPagesLayout,
-    WelcomePage, HandoffPage, DeviceIdentificationPage, AnimationLayout,
+    HandoffPage, DeviceIdentificationPage, AnimationLayout,
     AppShell,
     // Lot 1 - Tiers + Contacts
     ThirdPartiesPage, ThirdPartyPage, ThirdPartyEditPage,
@@ -53,7 +53,6 @@ export const Router = () => {
             <Routes>
                 <Route element={<PagesLayout />}>
                     <Route element={<PublicPagesLayout />}>
-                        <Route path="/welcome" element={<WelcomePage />} />
                         <Route path="/login" element={<LoginPage />} />
                         <Route path="/handoff" element={<HandoffPage />} />
                     </Route>
